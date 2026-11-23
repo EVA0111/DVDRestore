@@ -97,6 +97,38 @@ def _borders(y, maxw=24):
     return width(cm), width(cm.flip(0)), width(rm), width(rm.flip(0))
 
 
+# Line / highlight guard (2026-11-23). On The Simpsons S1 (JPN NTSC DVD) the model took out the bright rims beside the
+# outlines (6.5 -> 0.5 levels) but also lifted the ink lines themselves (line depth 122 -> 106: "washed out") and dimmed
+# small whites (teeth 219 -> 213): it read part of every line as dark overshoot. A halo rim is LOW: a few to ~20 levels
+# off the fill next to it. An ink line or a highlight is DEEP / HIGH. So:
+#   depth  = closing(x) - x   (closing fills thin dark features: how far a pixel sits below the fill around it)
+#   height = x - opening(x)   (opening removes thin bright features: how far it sticks out above it)
+# brightening is kept where depth < LIFT[0] and fades to none at LIFT[1] (line cores stay as dark as on the disc);
+# darkening is kept where height < DIM[0] and fades to none at DIM[1] (teeth, eye whites, sparkles stay).
+GUARD = os.environ.get("DVDRESTORE_HALO_GUARD", "1") != "0"      # 0 = the model's raw output (benchmarks)
+LIFT = (12 / 255, 35 / 255)
+DIM = (20 / 255, 50 / 255)
+GUARD_R = 2               # closing 5x5: ink lines on SD are 1-4 px wide
+GUARD_RH = 4              # opening 9x9: a rim (1-3 px) lies against a wide fill and is removed by it; teeth, pupils'
+                          # glints and small whites up to ~8 px stand out against dark on all sides and are kept
+
+
+def _guard(x, out):
+    """x, out: [1, 1, H, W] float luma 0..1 (model input / output). Returns out with line cores and highlights kept."""
+    import torch
+    import torch.nn.functional as F
+    dil = lambda a, r: F.max_pool2d(F.pad(a, (r,) * 4, mode="replicate"), 2 * r + 1, 1)
+    ero = lambda a, r: -F.max_pool2d(F.pad(-a, (r,) * 4, mode="replicate"), 2 * r + 1, 1)
+    closing = ero(dil(x, GUARD_R), GUARD_R)
+    opening = dil(ero(x, GUARD_RH), GUARD_RH)
+    depth = (closing - x).clamp(min=0)
+    height = (x - opening).clamp(min=0)
+    wl = ((LIFT[1] - depth) / (LIFT[1] - LIFT[0])).clamp(0, 1)
+    wd = ((DIM[1] - height) / (DIM[1] - DIM[0])).clamp(0, 1)
+    d = out - x
+    return (x + torch.where(d > 0, d * wl, d * wd)).clamp(0, 1)
+
+
 def available():
     if not os.path.isfile(MODEL):
         return False
@@ -139,6 +171,8 @@ def halonet(clip, strength=1.0):
             o = net(t).float()[..., PAD:-PAD, PAD:-PAD]
             t = t[..., PAD:-PAD, PAD:-PAD]
             out = (t.float() + strength * (o - t.float())).clamp(0, 1)
+            if GUARD:
+                out = _guard(t.float(), out)
             keep = torch.ones_like(out, dtype=torch.bool)
             keep[..., tp:H - bt, l:W - r] = False
             out = torch.where(keep, t0, out)[0, 0].cpu().numpy()
