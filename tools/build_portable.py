@@ -126,8 +126,8 @@ Restores NTSC and PAL DVD video, other video files and still images - anime, car
 
 * **Inverse telecine** (VFR / CFR) and PAL field matching or deinterlacing. Progressive sources (23.976p, 24p, 25p,
   50p, 60p, HD files) are recognised and left at their own frame rate.
-* **Dot crawl and rainbows** (composite artifacts): neural clean-up (Precise, Precise temporal, StableNet, all-in-one,
-  FieldNet) or classic filters, optional composite re-decode.
+* **Dot crawl and rainbows** (composite artifacts): neural clean-up (Precise or Precise temporal)
+  or classic filters, optional composite re-decode.
 * **MPEG blocking**, **halos / ringing** (HaloNet), **colour bleed and colour shift** (ChromaNet), clean white / black.
 * **Temporal stabilizer "Universal"**: steadies flicker, boil and line wobble in every kind of shot - fades, cuts,
   flashes and zooms are never dragged into the next frame.

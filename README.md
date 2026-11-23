@@ -27,12 +27,14 @@ footage it makes itself.
   the CPU and are very slow.
 * About 10 GB of free disk space, more for the work folders of long episodes.
 
+Full documentation: **[the wiki](../../wiki)** (installation, every step of the window, troubleshooting).
+
 ## What it does
 
 * **Inverse telecine** (VFR / CFR) and PAL field matching or deinterlacing. Progressive sources (23.976p, 24p, 25p,
   50p, 60p, HD files) are recognised and keep their own frame rate.
-* **Dot crawl and rainbows** (composite artifacts): neural clean-up (Precise, Precise temporal, StableNet, all-in-one,
-  FieldNet) or classic filters, optional composite re-decode.
+* **Dot crawl and rainbows** (composite artifacts): neural clean-up (Precise or Precise temporal)
+  or classic filters, optional composite re-decode.
 * **MPEG blocking**, **halos / ringing** (HaloNet), **colour bleed and colour shift** (ChromaNet), clean white / black.
 * **Temporal stabilizer "Universal"**: steadies flicker, boil and line wobble in every kind of shot. Fades, cuts,
   flashes and zooms are never dragged into the next frame.
