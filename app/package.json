@@ -1,0 +1,14 @@
+{
+  "name": "dvd-restore",
+  "productName": "DVD Restore",
+  "version": "0.1.0-alpha",
+  "description": "DVD restoration: IVTC (VFR/CFR), PAL, dot crawl / rainbow / halo clean-up, chroma fixes, encode + mux",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "37.10.3"
+  }
+}

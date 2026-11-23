@@ -1,0 +1,60 @@
+{
+  "_about": "EVA toolbox curation. Keys are calls as listed in the toolbox (plugin: namespace.Function, vs-jetpack: module.function). hide = left out of the toolbox, with the reason. defaults = values used when the field is left empty (vs-jetpack values are Python, plugin values as typed in the form). needs = settings without a default that must be filled in, with a hint. adapt = input format the function needs (the block converts to it and back); the compatibility scan also finds these by itself. notes = shown in the block. Edit freely; the toolbox reads it every time it opens. prep = a step run before the function: scene_detect marks scene changes (vs-jetpack sc_detect) for filters that need them.",
+  "hide": {
+    "vstools.split": "returns several clips (one per plane) - use Custom code",
+    "vstools.flatten_vnodes": "returns a list of clips - use Custom code",
+    "vstools.shift_clip_multi": "returns a list of clips - use Custom code",
+    "vstools.expect_bits": "returns a clip and a bit depth, not a filter",
+    "vstools.finalize_output": "a decorator for scripts, not a filter",
+    "vstools.initialize_input": "a decorator for scripts, not a filter",
+    "vstools.join": "joins several clips - use Custom code",
+    "vstools.stack_clips": "stacks several clips - use Custom code",
+    "vsmasktools.get_all_edge_detects": "returns a list of masks - use Custom code",
+    "vsmasktools.get_all_ridge_detect": "returns a list of masks - use Custom code",
+    "vsdenoise.frequency_merge": "merges several clips - use Custom code",
+    "std.SetVideoCache": "changes the cache, returns nothing",
+    "std.SplitPlanes": "returns several clips - use Custom code",
+    "std.PropToClip": "needs a frame stored in a frame property (from another filter) - use Custom code",
+    "mv.Analyse": "needs a super clip from mv.Super - use vsdenoise.mc_degrain or Custom code",
+    "mv.Finest": "needs a super clip from mv.Super - use Custom code",
+    "mvu.Analyse": "needs a super clip from mvu.Super - use Custom code",
+    "mvu.AnalyseMany": "needs a super clip from mvu.Super - use Custom code",
+    "mvu.OcclusionMask": "needs motion vectors from mvu.Analyse - use Custom code",
+    "mvu.SADMask": "needs motion vectors from mvu.Analyse - use Custom code",
+    "mvu.VectorLengthMask": "needs motion vectors from mvu.Analyse - use Custom code",
+    "bm3d.OPP2RGB": "only after bm3d.RGB2OPP + bm3d.Basic/Final (opponent colour) - use vsdenoise or Custom code",
+    "composite.Decode": "needs a composite (GRAY16) signal from composite.Encode - use Custom code",
+    "akarin.DLISR": "needs NVIDIA's DLISR runtime, which this PC's driver does not provide to VapourSynth",
+    "std.DoubleWeave": "needs fields from std.SeparateFields (field properties) - use Custom code",
+    "vsdeinterlace.weave": "needs fields from std.SeparateFields / vsdeinterlace.reweave input - use Custom code",
+    "vszip.PackRGB": "packs RGB into one 32-bit plane for other software - not a picture"
+  },
+  "defaults": {
+    "zsmooth.TTempSmooth": {
+      "scthresh": "0"
+    }
+  },
+  "needs": {
+    "fmtc.matrix": "mat: a matrix preset, e.g. 601 or 709",
+    "fmtc.primaries": "an RGB (linear) input and prims_in / prims_out",
+    "fmtc.transfer": "an RGB input and transs / transd",
+    "placebo.Shader": "shader: path of a .glsl shader file",
+    "std.AssumeFPS": "fpsnum and fpsden",
+    "std.Lut": "lut (a list) - or use std.Expr",
+    "composite.Encode": "standard: ntsc (720x480 DVDs) or pal (720x576)",
+    "composite.Restore": "standard: ntsc (720x480 DVDs) or pal (720x576)",
+    "vsscale.pre_ss": "function: the filter to run supersampled, e.g. vsrgtools.box_blur",
+    "placebo.Tonemap": "HDR -> SDR tonemapping: src_csp / dst_csp of an HDR source (not used for DVDs)"
+  },
+  "adapt": {},
+  "notes": {
+    "zsmooth.TTempSmooth": "scthresh 0 = no scene-change detection (that needs the miscfilters plugin); the app's Steady chain uses it the same way.",
+    "vsdeinterlace.vinverse": "Before IVTC (on the telecined / interlaced frames) or on frames with leftover combing.",
+    "zsmooth.Cnr4": "Scene changes are marked first (vs-jetpack sc_detect), so nothing is blended across a cut.",
+    "vsmasktools.stabilize_mask": "Scene changes are marked first (vs-jetpack sc_detect)."
+  },
+  "prep": {
+    "vsmasktools.stabilize_mask": "scene_detect",
+    "zsmooth.Cnr4": "scene_detect"
+  }
+}

@@ -1,0 +1,21 @@
+# Optional: vsview, the frame-accurate preview window (Script step -> "Open in vsview"). About 700 MB (Qt).
+vsview==0.13.0
+vsjetengine==1.8.1
+vspackrgb==2.0.0
+PySide6==6.12.0
+PySide6_Addons==6.12.0
+PySide6_Essentials==6.12.0
+PySide6_Pdf==6.12.0.140
+PySide6_WebEngine==6.12.0.140
+shiboken6==6.12.0
+annotated-types==0.7.0
+attrs==25.4.0
+cyclopts==5.2.0
+docstring_parser==0.18.0
+pathvalidate==3.3.1
+platformdirs==4.13.5
+pluggy==1.6.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+rich-rst==2.2.0
+typing-inspection==0.4.2

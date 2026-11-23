@@ -1,0 +1,17 @@
+# made on first start / by the app (caches and personal settings)
+runtime/
+engines/
+temp/
+settings.json
+portable.json
+
+# Electron is installed with "npm install" in app/
+app/node_modules/
+
+# build output
+dist/
+*.exe
+*.zip
+
+__pycache__/
+*.pyc

@@ -1,0 +1,1348 @@
+{
+ "_about": "EVA toolbox groups and plain names. names: call -> [group, name]; rules: families by regex; fallback: namespace -> group. Edit freely - the toolbox window re-reads this file.",
+ "groups": [
+  [
+   "den",
+   "Denoise & grain",
+   "Remove noise and grain - spatial, temporal and motion-compensated"
+  ],
+  [
+   "deb",
+   "Deband",
+   "Smooth colour banding in gradients"
+  ],
+  [
+   "dbk",
+   "Deblock & compression",
+   "MPEG blocks, mosquito noise and other compression damage"
+  ],
+  [
+   "ana",
+   "Analog & composite",
+   "Dot crawl, rainbows and other composite-video artefacts"
+  ],
+  [
+   "dhl",
+   "Dehalo & dering",
+   "Halos and ringing around edges"
+  ],
+  [
+   "shp",
+   "Sharpen & lines",
+   "Sharpening, line darkening and detail restore"
+  ],
+  [
+   "aa",
+   "Anti-aliasing & edge interpolation",
+   "Jagged edges, NNEDI3 / EEDI3 / SangNom"
+  ],
+  [
+   "ivtc",
+   "Deinterlace & IVTC",
+   "Field matching, decimation, deblending, deinterlacing"
+  ],
+  [
+   "mo",
+   "Motion & frame rate",
+   "Motion vectors, compensation, interpolation, stabilisation"
+  ],
+  [
+   "blur",
+   "Blur & smooth",
+   "Blurs, medians and spatial smoothing"
+  ],
+  [
+   "rs",
+   "Resize & scale",
+   "Resizers, descale, GPU scalers and shaders"
+  ],
+  [
+   "col",
+   "Colour, levels & format",
+   "Levels, range, matrices, bit depth, contrast, planes"
+  ],
+  [
+   "geo",
+   "Crop, borders & rotate",
+   "Crop, add borders, flip and rotate"
+  ],
+  [
+   "frm",
+   "Frames & timing",
+   "Trim, select, freeze, replace and shift frames, frame rate"
+  ],
+  [
+   "mask",
+   "Masks",
+   "Edge, detail, line, grain and other masks"
+  ],
+  [
+   "meas",
+   "Measure & view",
+   "Scene changes, statistics, quality scores and diagnostic views"
+  ],
+  [
+   "txt",
+   "Text & subtitles",
+   "Burn in subtitles, show frame numbers and properties"
+  ],
+  [
+   "adv",
+   "Advanced & helpers",
+   "Expressions, merging, frame properties and building blocks for scripts"
+  ]
+ ],
+ "names": {
+  "akarin.Cambi": [
+   "meas",
+   "Banding detector (CAMBI score)"
+  ],
+  "akarin.DLVFX": [
+   "rs",
+   "NVIDIA AI upscale / artefact removal (DLVFX)"
+  ],
+  "awarp.AWarp": [
+   "shp",
+   "Warp sharpen with your own edge map (AWarp)"
+  ],
+  "bm3d.Basic": [
+   "den",
+   "BM3D denoise - basic step"
+  ],
+  "bm3d.Final": [
+   "den",
+   "BM3D denoise - final step"
+  ],
+  "bm3d.RGB2OPP": [
+   "col",
+   "RGB to OPP colour space (for BM3D)"
+  ],
+  "bm3d.VAggregate": [
+   "den",
+   "BM3D temporal - aggregate step"
+  ],
+  "bm3d.VBasic": [
+   "den",
+   "BM3D temporal denoise - basic step"
+  ],
+  "bm3d.VFinal": [
+   "den",
+   "BM3D temporal denoise - final step"
+  ],
+  "bwdif.Bwdif": [
+   "ivtc",
+   "Deinterlace - Bwdif"
+  ],
+  "composite.Encode": [
+   "ana",
+   "Simulate composite video (encode)"
+  ],
+  "composite.Restore": [
+   "ana",
+   "Composite artefact repair (dot crawl, rainbows)"
+  ],
+  "deblock.Deblock": [
+   "dbk",
+   "Deblock (H.264 deblocking filter)"
+  ],
+  "descale.Decustom": [
+   "rs",
+   "Undo upscale - custom kernel (descale)"
+  ],
+  "descale.ScaleCustom": [
+   "rs",
+   "Resize - custom kernel (descale)"
+  ],
+  "dfttest2_cpu.DFTTest": [
+   "den",
+   "DFTTest frequency denoise (CPU)"
+  ],
+  "dmetrics.DMetrics": [
+   "ivtc",
+   "Field-match metrics (DMetrics)"
+  ],
+  "edgemasks.FDoG": [
+   "mask",
+   "Edge mask - FDoG"
+  ],
+  "edgemasks.RScharr": [
+   "mask",
+   "Edge mask - Scharr (refined)"
+  ],
+  "fmtc.bitdepth": [
+   "col",
+   "Bit depth with dither (fmtconv)"
+  ],
+  "fmtc.histluma": [
+   "meas",
+   "Luma histogram view (fmtconv)"
+  ],
+  "fmtc.matrix": [
+   "col",
+   "Colour matrix conversion (fmtconv)"
+  ],
+  "fmtc.matrix2020cl": [
+   "col",
+   "BT.2020 constant-luminance matrix (fmtconv)"
+  ],
+  "fmtc.nativetostack16": [
+   "adv",
+   "Native to stacked 16-bit (legacy)"
+  ],
+  "fmtc.primaries": [
+   "col",
+   "Colour primaries conversion (fmtconv)"
+  ],
+  "fmtc.resample": [
+   "rs",
+   "Resize / resample (fmtconv)"
+  ],
+  "fmtc.stack16tonative": [
+   "adv",
+   "Stacked 16-bit to native (legacy)"
+  ],
+  "fmtc.transfer": [
+   "col",
+   "Gamma / transfer curve conversion (fmtconv)"
+  ],
+  "hysteresis.Hysteresis": [
+   "mask",
+   "Hysteresis (grow a mask into another)"
+  ],
+  "nlm_ispc.NLMeans": [
+   "den",
+   "Non-local means denoise (NLMeans)"
+  ],
+  "placebo.Deband": [
+   "deb",
+   "Deband - libplacebo (GPU)"
+  ],
+  "placebo.Resample": [
+   "rs",
+   "Resize - libplacebo (GPU)"
+  ],
+  "placebo.Shader": [
+   "rs",
+   "Run a GLSL shader (libplacebo)"
+  ],
+  "placebo.Tonemap": [
+   "col",
+   "Tone-map / colour space (libplacebo)"
+  ],
+  "resize.Bob": [
+   "ivtc",
+   "Bob deinterlace - simple resize"
+  ],
+  "resize2.Bob": [
+   "ivtc",
+   "Bob deinterlace - simple resize (resize2)"
+  ],
+  "resize2.Custom": [
+   "rs",
+   "Resize - custom kernel (resize2)"
+  ],
+  "sangnom.SangNom": [
+   "aa",
+   "Anti-alias / field interpolation - SangNom"
+  ],
+  "sub.ImageFile": [
+   "txt",
+   "Image subtitles (VobSub / PGS)"
+  ],
+  "sub.Subtitle": [
+   "txt",
+   "Styled text subtitle"
+  ],
+  "sub.TextFile": [
+   "txt",
+   "Subtitle file (ASS / SRT)"
+  ],
+  "text.ClipInfo": [
+   "txt",
+   "Show clip info"
+  ],
+  "text.CoreInfo": [
+   "txt",
+   "Show VapourSynth info"
+  ],
+  "text.FrameNum": [
+   "txt",
+   "Show frame number"
+  ],
+  "text.FrameProps": [
+   "txt",
+   "Show frame properties"
+  ],
+  "text.Text": [
+   "txt",
+   "Show text"
+  ],
+  "tivtc.TDecimate": [
+   "ivtc",
+   "Decimate - TDecimate"
+  ],
+  "tivtc.TFM": [
+   "ivtc",
+   "Field match - TFM"
+  ],
+  "vivtc.VDecimate": [
+   "ivtc",
+   "Decimate - VDecimate"
+  ],
+  "vivtc.VFM": [
+   "ivtc",
+   "Field match - VFM"
+  ],
+  "znedi3.nnedi3": [
+   "aa",
+   "Edge interpolation - NNEDI3"
+  ],
+  "std.AddBorders": [
+   "geo",
+   "Add borders"
+  ],
+  "std.AssumeFPS": [
+   "frm",
+   "Set frame rate (frames unchanged)"
+  ],
+  "std.Binarize": [
+   "mask",
+   "Threshold to black / white"
+  ],
+  "std.BinarizeMask": [
+   "mask",
+   "Threshold a mask"
+  ],
+  "std.BlankClip": [
+   "adv",
+   "Blank clip in the same format"
+  ],
+  "std.BoxBlur": [
+   "blur",
+   "Box blur"
+  ],
+  "std.ClipToProp": [
+   "adv",
+   "Attach a clip as a frame property"
+  ],
+  "std.Convolution": [
+   "blur",
+   "Custom convolution (kernel matrix)"
+  ],
+  "std.CopyFrameProps": [
+   "adv",
+   "Copy frame properties"
+  ],
+  "std.Crop": [
+   "geo",
+   "Crop"
+  ],
+  "std.CropAbs": [
+   "geo",
+   "Crop to a size at a position"
+  ],
+  "std.CropRel": [
+   "geo",
+   "Crop (from each edge)"
+  ],
+  "std.Deflate": [
+   "mask",
+   "Soft shrink (deflate)"
+  ],
+  "std.DeleteFrames": [
+   "frm",
+   "Delete frames"
+  ],
+  "std.DuplicateFrames": [
+   "frm",
+   "Duplicate frames"
+  ],
+  "std.FlipHorizontal": [
+   "geo",
+   "Flip horizontally"
+  ],
+  "std.FlipVertical": [
+   "geo",
+   "Flip vertically"
+  ],
+  "std.FrameEval": [
+   "adv",
+   "Per-frame script (FrameEval)"
+  ],
+  "std.FreezeFrames": [
+   "frm",
+   "Freeze frames"
+  ],
+  "std.GPUDownload": [
+   "adv",
+   "GPU to CPU"
+  ],
+  "std.GPUUpload": [
+   "adv",
+   "CPU to GPU"
+  ],
+  "std.Inflate": [
+   "mask",
+   "Soft grow (inflate)"
+  ],
+  "std.Invert": [
+   "col",
+   "Invert (negative)"
+  ],
+  "std.InvertMask": [
+   "mask",
+   "Invert a mask"
+  ],
+  "std.Levels": [
+   "col",
+   "Levels (black, white, gamma)"
+  ],
+  "std.Limiter": [
+   "col",
+   "Clamp to legal range"
+  ],
+  "std.Loop": [
+   "frm",
+   "Loop"
+  ],
+  "std.Lut": [
+   "col",
+   "Lookup table (LUT)"
+  ],
+  "std.Lut2": [
+   "adv",
+   "Two-clip lookup table"
+  ],
+  "std.MakeDiff": [
+   "adv",
+   "Difference clip"
+  ],
+  "std.MakeFullDiff": [
+   "adv",
+   "Difference clip (full range)"
+  ],
+  "std.MaskedMerge": [
+   "adv",
+   "Merge through a mask"
+  ],
+  "std.Maximum": [
+   "mask",
+   "Expand (maximum)"
+  ],
+  "std.Median": [
+   "blur",
+   "Median 3x3"
+  ],
+  "std.Merge": [
+   "adv",
+   "Blend two clips"
+  ],
+  "std.MergeDiff": [
+   "adv",
+   "Add a difference clip"
+  ],
+  "std.MergeFullDiff": [
+   "adv",
+   "Add a difference clip (full range)"
+  ],
+  "std.Minimum": [
+   "mask",
+   "Shrink (minimum)"
+  ],
+  "std.ModifyFrame": [
+   "adv",
+   "Modify frames with Python"
+  ],
+  "std.PEMVerifier": [
+   "adv",
+   "Verify pixel range (debug)"
+  ],
+  "std.PlaneStats": [
+   "meas",
+   "Plane statistics (average, min, max)"
+  ],
+  "std.PreMultiply": [
+   "adv",
+   "Pre-multiply alpha"
+  ],
+  "std.Prewitt": [
+   "mask",
+   "Edge mask - Prewitt (core)"
+  ],
+  "std.RemoveFrameProps": [
+   "adv",
+   "Remove frame properties"
+  ],
+  "std.Reverse": [
+   "frm",
+   "Reverse"
+  ],
+  "std.SelectEvery": [
+   "frm",
+   "Select every Nth frame"
+  ],
+  "std.SeparateFields": [
+   "ivtc",
+   "Separate fields"
+  ],
+  "std.SetFieldBased": [
+   "ivtc",
+   "Mark as progressive / interlaced"
+  ],
+  "std.SetFrameProp": [
+   "adv",
+   "Set a frame property"
+  ],
+  "std.SetFrameProps": [
+   "adv",
+   "Set frame properties"
+  ],
+  "std.Sobel": [
+   "mask",
+   "Edge mask - Sobel (core)"
+  ],
+  "std.Transpose": [
+   "geo",
+   "Transpose"
+  ],
+  "std.Trim": [
+   "frm",
+   "Trim"
+  ],
+  "std.Turn180": [
+   "geo",
+   "Rotate 180°"
+  ],
+  "std.Turn270": [
+   "geo",
+   "Rotate 90° left"
+  ],
+  "std.Turn90": [
+   "geo",
+   "Rotate 90° right"
+  ],
+  "vszip.AdaptiveBinarize": [
+   "mask",
+   "Adaptive threshold"
+  ],
+  "vszip.AdaptiveGrainMask": [
+   "mask",
+   "Grain mask by brightness (vszip)"
+  ],
+  "vszip.Bilateral": [
+   "den",
+   "Bilateral denoise (edge-preserving)"
+  ],
+  "vszip.BilateralDither": [
+   "deb",
+   "Deband - bilateral dither"
+  ],
+  "vszip.BoxBlur": [
+   "blur",
+   "Box blur (vszip)"
+  ],
+  "vszip.Checkmate": [
+   "ana",
+   "Dot crawl removal (Checkmate)"
+  ],
+  "vszip.CLAHE": [
+   "col",
+   "Local contrast (CLAHE)"
+  ],
+  "vszip.ColorMap": [
+   "meas",
+   "False-colour view (heat map)"
+  ],
+  "vszip.CombMask": [
+   "mask",
+   "Combing mask"
+  ],
+  "vszip.CombMaskMT": [
+   "mask",
+   "Combing mask (multithreaded)"
+  ],
+  "vszip.Compress": [
+   "adv",
+   "Compress (vszip)"
+  ],
+  "vszip.Deband": [
+   "deb",
+   "Deband - f3kdb style (vszip)"
+  ],
+  "vszip.Dither": [
+   "col",
+   "Dither to a lower bit depth"
+  ],
+  "vszip.EEDI3": [
+   "aa",
+   "Edge interpolation - EEDI3 (vszip)"
+  ],
+  "vszip.EEDI3H": [
+   "aa",
+   "Edge interpolation - EEDI3, H variant (vszip)"
+  ],
+  "vszip.Limiter": [
+   "col",
+   "Clamp to legal range (vszip)"
+  ],
+  "vszip.LimitFilter": [
+   "adv",
+   "Limit how much a filter changes"
+  ],
+  "vszip.MosquitoNR": [
+   "dbk",
+   "Mosquito noise removal"
+  ],
+  "vszip.PlaneAverage": [
+   "meas",
+   "Plane average"
+  ],
+  "vszip.PlaneMinMax": [
+   "meas",
+   "Plane min / max"
+  ],
+  "vszip.RFS": [
+   "frm",
+   "Replace frame ranges (RFS)"
+  ],
+  "vszip.SSIMULACRA2": [
+   "meas",
+   "Quality score - SSIMULACRA2"
+  ],
+  "vszip.WNNM": [
+   "den",
+   "WNNM denoise (strong, slow)"
+  ],
+  "vszip.XPSNR": [
+   "meas",
+   "Quality score - XPSNR"
+  ],
+  "zsmooth.BackwardClense": [
+   "den",
+   "Temporal clense - backward"
+  ],
+  "zsmooth.CCD": [
+   "den",
+   "Chroma noise removal (CCD)"
+  ],
+  "zsmooth.Clense": [
+   "den",
+   "Temporal clense (median of neighbours)"
+  ],
+  "zsmooth.Cnr4": [
+   "den",
+   "Chroma noise reduction (Cnr)"
+  ],
+  "zsmooth.DCTFilter": [
+   "den",
+   "DCT frequency filter"
+  ],
+  "zsmooth.DegrainMedian": [
+   "den",
+   "Median degrain (temporal)"
+  ],
+  "zsmooth.FluxSmoothST": [
+   "den",
+   "FluxSmooth - spatial + temporal"
+  ],
+  "zsmooth.FluxSmoothT": [
+   "den",
+   "FluxSmooth - temporal"
+  ],
+  "zsmooth.ForwardClense": [
+   "den",
+   "Temporal clense - forward"
+  ],
+  "zsmooth.InterQuartileMean": [
+   "blur",
+   "Inter-quartile mean smooth"
+  ],
+  "zsmooth.Median": [
+   "blur",
+   "Median (any radius)"
+  ],
+  "zsmooth.RemoveGrain": [
+   "blur",
+   "RemoveGrain (spatial modes)"
+  ],
+  "zsmooth.Repair": [
+   "adv",
+   "Repair (limit to a reference)"
+  ],
+  "zsmooth.SmartMedian": [
+   "blur",
+   "Smart median (edge-aware)"
+  ],
+  "zsmooth.TemporalMedian": [
+   "den",
+   "Temporal median"
+  ],
+  "zsmooth.TemporalRepair": [
+   "adv",
+   "Temporal repair"
+  ],
+  "zsmooth.TemporalSoften": [
+   "den",
+   "Temporal soften"
+  ],
+  "zsmooth.TTempSmooth": [
+   "den",
+   "TTempSmooth temporal denoise"
+  ],
+  "zsmooth.VerticalCleaner": [
+   "blur",
+   "Vertical median cleaner"
+  ],
+  "mv.BlockFPS": [
+   "mo",
+   "Frame-rate change - block based (MVTools)"
+  ],
+  "mv.Compensate": [
+   "mo",
+   "Motion compensate (MVTools)"
+  ],
+  "mv.DepanAnalyse": [
+   "mo",
+   "Global motion - analyse (MVTools)"
+  ],
+  "mv.DepanCompensate": [
+   "mo",
+   "Global motion - compensate (MVTools)"
+  ],
+  "mv.DepanEstimate": [
+   "mo",
+   "Global motion - estimate (MVTools)"
+  ],
+  "mv.DepanStabilise": [
+   "mo",
+   "Stabilise camera shake (MVTools)"
+  ],
+  "mv.Flow": [
+   "mo",
+   "Motion flow warp (MVTools)"
+  ],
+  "mv.FlowBlur": [
+   "mo",
+   "Motion blur (MVTools)"
+  ],
+  "mv.FlowFPS": [
+   "mo",
+   "Frame-rate change - motion flow (MVTools)"
+  ],
+  "mv.FlowInter": [
+   "mo",
+   "Frame interpolation (MVTools)"
+  ],
+  "mv.Mask": [
+   "mask",
+   "Motion mask (MVTools)"
+  ],
+  "mv.Recalculate": [
+   "mo",
+   "Refine motion vectors (MVTools)"
+  ],
+  "mv.SCDetection": [
+   "meas",
+   "Scene-change marks from motion (MVTools)"
+  ],
+  "mv.Super": [
+   "mo",
+   "Motion search pyramid (Super) (MVTools)"
+  ],
+  "mv.Degrain": [
+   "den",
+   "Motion-compensated denoise, any radius (MVTools)"
+  ],
+  "mvu.BlockFPS": [
+   "mo",
+   "Frame-rate change - block based (MVUtensils)"
+  ],
+  "mvu.Compensate": [
+   "mo",
+   "Motion compensate (MVUtensils)"
+  ],
+  "mvu.DepanAnalyse": [
+   "mo",
+   "Global motion - analyse (MVUtensils)"
+  ],
+  "mvu.DepanCompensate": [
+   "mo",
+   "Global motion - compensate (MVUtensils)"
+  ],
+  "mvu.DepanEstimate": [
+   "mo",
+   "Global motion - estimate (MVUtensils)"
+  ],
+  "mvu.DepanStabilise": [
+   "mo",
+   "Stabilise camera shake (MVUtensils)"
+  ],
+  "mvu.Flow": [
+   "mo",
+   "Motion flow warp (MVUtensils)"
+  ],
+  "mvu.FlowBlur": [
+   "mo",
+   "Motion blur (MVUtensils)"
+  ],
+  "mvu.FlowFPS": [
+   "mo",
+   "Frame-rate change - motion flow (MVUtensils)"
+  ],
+  "mvu.FlowInter": [
+   "mo",
+   "Frame interpolation (MVUtensils)"
+  ],
+  "mvu.Mask": [
+   "mask",
+   "Motion mask (MVUtensils)"
+  ],
+  "mvu.Recalculate": [
+   "mo",
+   "Refine motion vectors (MVUtensils)"
+  ],
+  "mvu.SCDetection": [
+   "meas",
+   "Scene-change marks from motion (MVUtensils)"
+  ],
+  "mvu.Super": [
+   "mo",
+   "Motion search pyramid (Super) (MVUtensils)"
+  ],
+  "mvu.Degrain": [
+   "den",
+   "Motion-compensated denoise, any radius (MVUtensils)"
+  ],
+  "vstools.change_fps": [
+   "frm",
+   "Change frame rate (drop / duplicate)"
+  ],
+  "vstools.check_ref_clip": [
+   "adv",
+   "Check a reference clip's format"
+  ],
+  "vstools.depth": [
+   "col",
+   "Bit depth"
+  ],
+  "vstools.finalize_clip": [
+   "col",
+   "Finalize for the encoder (bit depth, range)"
+  ],
+  "vstools.find_prop_rfs": [
+   "frm",
+   "Replace frames by a property"
+  ],
+  "vstools.get_b": [
+   "col",
+   "Blue plane only"
+  ],
+  "vstools.get_g": [
+   "col",
+   "Green plane only"
+  ],
+  "vstools.get_r": [
+   "col",
+   "Red plane only"
+  ],
+  "vstools.get_u": [
+   "col",
+   "Chroma U plane only"
+  ],
+  "vstools.get_v": [
+   "col",
+   "Chroma V plane only"
+  ],
+  "vstools.get_y": [
+   "col",
+   "Luma (Y) plane only"
+  ],
+  "vstools.initialize_clip": [
+   "col",
+   "Initialize (tags, bit depth)"
+  ],
+  "vstools.insert_clip": [
+   "frm",
+   "Insert a clip over frames"
+  ],
+  "vstools.limiter": [
+   "col",
+   "Clamp to legal range (vs-tools)"
+  ],
+  "vstools.match_clip": [
+   "adv",
+   "Match format to a reference"
+  ],
+  "vstools.merge_clip_props": [
+   "adv",
+   "Merge frame properties"
+  ],
+  "vstools.plane": [
+   "col",
+   "One plane only"
+  ],
+  "vstools.prop_compare_cb": [
+   "adv",
+   "Compare a property (callback)"
+  ],
+  "vstools.remap_frames": [
+   "frm",
+   "Remap frames"
+  ],
+  "vstools.replace_every": [
+   "frm",
+   "Replace every Nth frame"
+  ],
+  "vstools.sc_detect": [
+   "meas",
+   "Scene-change detect"
+  ],
+  "vstools.shift_clip": [
+   "frm",
+   "Shift frames"
+  ],
+  "vstools.stack_planes": [
+   "meas",
+   "Show planes side by side"
+  ],
+  "vsdenoise.ccd": [
+   "den",
+   "Chroma noise removal (CCD, vs-jetpack)"
+  ],
+  "vsdenoise.deblock_qed": [
+   "dbk",
+   "Deblock - QED"
+  ],
+  "vsdenoise.decrease_size": [
+   "den",
+   "Blur away noise to save bitrate"
+  ],
+  "vsdenoise.mc_clamp": [
+   "adv",
+   "Motion-compensated clamp"
+  ],
+  "vsdenoise.mc_degrain": [
+   "den",
+   "Motion-compensated denoise (MCDegrain)"
+  ],
+  "vsdenoise.mpeg2stinx": [
+   "dbk",
+   "MPEG-2 combing artefact fix (mpeg2stinx)"
+  ],
+  "vsdenoise.prefilter_to_full_range": [
+   "adv",
+   "Prefilter: full range + dark boost"
+  ],
+  "vsdenoise.wnnm": [
+   "den",
+   "WNNM denoise (vs-jetpack)"
+  ],
+  "vsaa.pre_aa": [
+   "aa",
+   "Pre-AA (directional)"
+  ],
+  "vsdehalo.YAHR": [
+   "dhl",
+   "Dehalo - YAHR"
+  ],
+  "vsdehalo.dehalo_alpha": [
+   "dhl",
+   "Dehalo - DeHalo_alpha"
+  ],
+  "vsdehalo.edge_cleaner": [
+   "dhl",
+   "Edge cleaner"
+  ],
+  "vsdehalo.fine_dehalo2": [
+   "dhl",
+   "Dehalo - FineDehalo2 (2nd-order halos)"
+  ],
+  "vsdehalo.hq_dering": [
+   "dhl",
+   "Dering - HQDering"
+  ],
+  "vsdehalo.smooth_dering": [
+   "dhl",
+   "Dering - smooth"
+  ],
+  "vsdehalo.vine_dehalo": [
+   "dhl",
+   "Dehalo - Vine (non-local)"
+  ],
+  "vsdeinterlace.deblend": [
+   "ivtc",
+   "Deblend after field matching"
+  ],
+  "vsdeinterlace.deblend_bob": [
+   "ivtc",
+   "Deblend - stronger (bob based)"
+  ],
+  "vsdeinterlace.deblend_fix_kf": [
+   "ivtc",
+   "Deblend - fix keyframes"
+  ],
+  "vsdeinterlace.deblending_helper": [
+   "ivtc",
+   "Deblend helper"
+  ],
+  "vsdeinterlace.dmetrics": [
+   "ivtc",
+   "Field-match metrics (vs-jetpack)"
+  ],
+  "vsdeinterlace.get_field_difference": [
+   "meas",
+   "Field difference"
+  ],
+  "vsdeinterlace.jivtc": [
+   "ivtc",
+   "IVTC - JIVTC (hard cases)"
+  ],
+  "vsdeinterlace.reinterlace": [
+   "ivtc",
+   "Reinterlace"
+  ],
+  "vsdeinterlace.reweave": [
+   "ivtc",
+   "Reweave fields"
+  ],
+  "vsdeinterlace.sivtc": [
+   "ivtc",
+   "IVTC - simple pattern"
+  ],
+  "vsdeinterlace.telecine_patterns": [
+   "ivtc",
+   "Show every telecine pattern"
+  ],
+  "vsdeinterlace.vdecimate": [
+   "ivtc",
+   "Decimate - VDecimate (vs-jetpack)"
+  ],
+  "vsdeinterlace.vfm": [
+   "ivtc",
+   "Field match - VFM (vs-jetpack)"
+  ],
+  "vsdeinterlace.vinverse": [
+   "ivtc",
+   "Remove leftover combing (Vinverse)"
+  ],
+  "vsscale.descale_detail_mask": [
+   "mask",
+   "Descale detail mask"
+  ],
+  "vsscale.descale_error_mask": [
+   "mask",
+   "Descale error mask"
+  ],
+  "vsscale.pre_ss": [
+   "aa",
+   "Supersample, filter, scale back"
+  ],
+  "vsscale.pscale_blend": [
+   "rs",
+   "pscale blend"
+  ],
+  "vsscale.scale_var_clip": [
+   "rs",
+   "Scale a variable-size clip"
+  ],
+  "vsmasktools.adg_mask": [
+   "mask",
+   "Grain mask by brightness (vs-jetpack)"
+  ],
+  "vsmasktools.based_diff_mask": [
+   "mask",
+   "Difference mask"
+  ],
+  "vsmasktools.bounded_dehardsub": [
+   "adv",
+   "Remove hardsubs (bounded)"
+  ],
+  "vsmasktools.detail_mask": [
+   "mask",
+   "Detail mask"
+  ],
+  "vsmasktools.detail_mask_neo": [
+   "mask",
+   "Detail mask (neo)"
+  ],
+  "vsmasktools.diff_creditless": [
+   "mask",
+   "Credits difference mask"
+  ],
+  "vsmasktools.diff_creditless_oped": [
+   "mask",
+   "Credits mask (OP / ED)"
+  ],
+  "vsmasktools.diff_hardsub_mask": [
+   "mask",
+   "Hardsub mask"
+  ],
+  "vsmasktools.diff_rescale": [
+   "mask",
+   "Rescale difference mask"
+  ],
+  "vsmasktools.flat_mask": [
+   "mask",
+   "Flat-area mask"
+  ],
+  "vsmasktools.freeze_replace_squaremask": [
+   "frm",
+   "Freeze and replace inside a box"
+  ],
+  "vsmasktools.get_all_sign_masks": [
+   "mask",
+   "Sign masks"
+  ],
+  "vsmasktools.grow_mask": [
+   "mask",
+   "Grow a mask"
+  ],
+  "vsmasktools.limited_linemask": [
+   "mask",
+   "Line mask (limited)"
+  ],
+  "vsmasktools.luma_credit_mask": [
+   "mask",
+   "Credits mask (luma)"
+  ],
+  "vsmasktools.luma_mask": [
+   "mask",
+   "Brightness mask"
+  ],
+  "vsmasktools.max_planes": [
+   "mask",
+   "Maximum of the planes"
+  ],
+  "vsmasktools.multi_detail_mask": [
+   "mask",
+   "Detail mask (multi)"
+  ],
+  "vsmasktools.range_mask": [
+   "mask",
+   "Range mask"
+  ],
+  "vsmasktools.replace_squaremask": [
+   "adv",
+   "Replace a box with another clip"
+  ],
+  "vsmasktools.retinex": [
+   "col",
+   "Retinex local contrast"
+  ],
+  "vsmasktools.ringing_mask": [
+   "mask",
+   "Ringing mask"
+  ],
+  "vsmasktools.simple_detail_mask": [
+   "mask",
+   "Detail mask (simple)"
+  ],
+  "vsmasktools.squaremask": [
+   "mask",
+   "Box mask"
+  ],
+  "vsmasktools.stabilize_mask": [
+   "mask",
+   "Unstable-area mask"
+  ],
+  "vsmasktools.strength_zones_mask": [
+   "mask",
+   "Strength zones mask"
+  ],
+  "vsmasktools.tcanny_retinex": [
+   "mask",
+   "Line mask - TCanny + Retinex"
+  ],
+  "vsmasktools.texture_mask": [
+   "mask",
+   "Texture mask"
+  ],
+  "vsrgtools.awarpsharp": [
+   "shp",
+   "Warp sharpen (AWarpSharp)"
+  ],
+  "vsrgtools.box_blur": [
+   "blur",
+   "Box blur (vs-jetpack)"
+  ],
+  "vsrgtools.contrasharpening": [
+   "shp",
+   "Contra-sharpen (restore detail after denoise)"
+  ],
+  "vsrgtools.contrasharpening_dehalo": [
+   "shp",
+   "Contra-sharpen after dehalo"
+  ],
+  "vsrgtools.contrasharpening_median": [
+   "shp",
+   "Contra-sharpen (median)"
+  ],
+  "vsrgtools.fast_line_darken": [
+   "shp",
+   "Darken lines (FastLineDarken)"
+  ],
+  "vsrgtools.fine_sharp": [
+   "shp",
+   "FineSharp"
+  ],
+  "vsrgtools.flux_smooth": [
+   "den",
+   "FluxSmooth (vs-jetpack)"
+  ],
+  "vsrgtools.median_blur": [
+   "blur",
+   "Median blur"
+  ],
+  "vsrgtools.min_blur": [
+   "blur",
+   "MinBlur (blur + median)"
+  ],
+  "vsrgtools.reconstruct": [
+   "adv",
+   "Reconstruct from regression"
+  ],
+  "vsrgtools.sbr": [
+   "blur",
+   "SBR soft blur"
+  ],
+  "vsrgtools.side_box_blur": [
+   "blur",
+   "Side-window box blur"
+  ],
+  "vsrgtools.soothe": [
+   "shp",
+   "Soothe sharpening flicker"
+  ],
+  "vsrgtools.unsharpen": [
+   "shp",
+   "Unsharp mask"
+  ],
+  "vsdeband.deband_detail_mask": [
+   "mask",
+   "Deband detail mask"
+  ],
+  "vsdeband.mdb_bilateral": [
+   "deb",
+   "Deband - multi-stage bilateral"
+  ],
+  "vsdeband.pfdeband": [
+   "deb",
+   "Deband - prefiltered"
+  ],
+  "vsdeband.placebo_deband": [
+   "deb",
+   "Deband - libplacebo (vs-jetpack)"
+  ],
+  "vskernels.resample_to": [
+   "rs",
+   "Resample to a format"
+  ],
+  "vsexprtools.combine": [
+   "adv",
+   "Combine clips with an operator"
+  ],
+  "vsexprtools.expr_func": [
+   "adv",
+   "Pixel expression (akarin.Expr)"
+  ],
+  "vsexprtools.norm_expr": [
+   "adv",
+   "Pixel expression (normalized)"
+  ]
+ },
+ "rules": [
+  [
+   "^mvu?\\.Degrain(\\d+)$",
+   "den",
+   "Motion-compensated denoise, radius {1} ({ns})"
+  ],
+  [
+   "^descale\\.De(\\w+)$",
+   "rs",
+   "Undo upscale - {1} (descale)"
+  ],
+  [
+   "^descale\\.(\\w+)$",
+   "rs",
+   "Resize - {1} (descale)"
+  ],
+  [
+   "^resize2\\.(\\w+)$",
+   "rs",
+   "Resize - {1} (resize2)"
+  ],
+  [
+   "^resize\\.(\\w+)$",
+   "rs",
+   "Resize - {1}"
+  ],
+  [
+   "^edgemasks\\.Ex(\\w+)$",
+   "mask",
+   "Edge mask - {1} (extended)"
+  ],
+  [
+   "^edgemasks\\.(\\w+)$",
+   "mask",
+   "Edge mask - {1}"
+  ]
+ ],
+ "fallback": {
+  "bm3d": "den",
+  "bm3dcpu": "den",
+  "bm3dcuda": "den",
+  "dfttest": "den",
+  "dfttest2_cpu": "den",
+  "dfttest2_cuda": "den",
+  "dfttest2_nvrtc": "den",
+  "knlm": "den",
+  "nlm_cuda": "den",
+  "nlm_ispc": "den",
+  "zsmooth": "den",
+  "vsdenoise": "den",
+  "neo_fft3d": "den",
+  "fft3dfilter": "den",
+  "neo_f3kdb": "deb",
+  "f3kdb": "deb",
+  "vsdeband": "deb",
+  "placebo": "rs",
+  "deblock": "dbk",
+  "composite": "ana",
+  "vsdehalo": "dhl",
+  "vsrgtools": "blur",
+  "awarp": "shp",
+  "cas": "shp",
+  "vsaa": "aa",
+  "znedi3": "aa",
+  "nnedi3": "aa",
+  "nnedi3cl": "aa",
+  "eedi3m": "aa",
+  "sangnom": "aa",
+  "tivtc": "ivtc",
+  "vivtc": "ivtc",
+  "bwdif": "ivtc",
+  "dmetrics": "ivtc",
+  "vsdeinterlace": "ivtc",
+  "tdm": "ivtc",
+  "mv": "mo",
+  "mvu": "mo",
+  "mvsf": "mo",
+  "resize": "rs",
+  "resize2": "rs",
+  "descale": "rs",
+  "fmtc": "col",
+  "vsscale": "rs",
+  "vskernels": "rs",
+  "edgemasks": "mask",
+  "tcanny": "mask",
+  "vsmasktools": "mask",
+  "hysteresis": "mask",
+  "text": "txt",
+  "sub": "txt",
+  "std": "adv",
+  "vstools": "adv",
+  "vsexprtools": "adv",
+  "akarin": "adv",
+  "vszip": "adv"
+ }
+}

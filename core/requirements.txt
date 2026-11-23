@@ -1,0 +1,63 @@
+# DVD Restore v0.1 alpha - the Python packages the engine needs (exact versions, the ones it was tested with).
+# The dependency window installs these into runtime\python with:
+#   python -m pip install -r core\requirements.txt
+# PyTorch with CUDA 13 comes from the PyTorch index, TensorRT from NVIDIA's index, everything else from PyPI.
+# Only ready-built wheels: on PyPI tensorrt_cu13_libs is a "stub" that, when pip builds it, silently downloads the
+# 2.4 GB wheel from NVIDIA with no progress - NVIDIA's index has the real wheel. tensorrt_cu13 itself is a small
+# source-only package (the "import tensorrt" shim, no download), so it alone may be built.
+--extra-index-url https://download.pytorch.org/whl/cu130
+--extra-index-url https://pypi.nvidia.com
+--only-binary :all:
+--no-binary tensorrt_cu13
+
+# neural networks
+torch==2.13.0+cu130
+torchvision==0.28.0+cu130
+triton-windows==3.7.1.post27
+tensorrt_cu13==11.4.0.106
+tensorrt_cu13_bindings==11.4.0.106
+tensorrt_cu13_libs==11.4.0.106
+onnx==1.21.0
+numpy==2.5.4
+scipy==1.18.1
+pillow==11.3.0
+
+# VapourSynth R81 + the plugins the engine uses
+VapourSynth==81
+vapoursynth-akarin==1.5.0
+vapoursynth-awarp==3.1
+vapoursynth-bestsource==22
+vapoursynth-bwdif==5.1
+vapoursynth-composite==2
+vapoursynth-edgemasks==4.1
+vapoursynth-mlrt-ort==16.2
+vapoursynth-mvtools==29
+vapoursynth-mvutensils==9
+vapoursynth-resize2==0.5.1
+vapoursynth-tivtc==4
+vapoursynth-vivtc==2.0
+vapoursynth-vszip==22.1.0
+vapoursynth-znedi3==3.3
+vapoursynth-zsmooth==0.20.0
+vs_temporalfix==2.4.0
+vsjetpack==2.2.6
+jetpytools==3.2.0
+
+# their helpers
+filelock==3.32.3
+fsspec==2025.12.0
+Jinja2==3.1.6
+markdown-it-py==4.0.0
+MarkupSafe==3.0.3
+mdurl==0.1.2
+ml_dtypes==0.5.4
+mpmath==1.3.0
+networkx==3.6.1
+packaging==26.3
+protobuf==7.36.2
+psutil==7.2.1
+Pygments==2.21.0
+rich==15.0.0
+setuptools==84.0.0
+sympy==1.14.0
+typing_extensions==4.16.0

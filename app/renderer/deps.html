@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>DVD Restore v0.1 alpha - Dependencies</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { overflow: auto; user-select: text; }
+  .deps { max-width: 760px; margin: 0 auto; padding: 22px 24px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+  .head { display: flex; gap: 14px; align-items: center; }
+  .head .logo { width: 40px; height: 40px; }
+  .head h1 { margin: 0; font-size: 19px; font-weight: 600; }
+  .head h1 i { font-style: normal; font-size: 12px; color: var(--accent); margin-left: 6px; font-weight: 500; }
+  .head p { margin: 2px 0 0; color: var(--muted); }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .comp { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+  .comp .row { display: flex; align-items: center; gap: 10px; }
+  .comp .name { font-weight: 600; flex: 1; min-width: 0; }
+  .comp .size { color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .comp .el { color: var(--accent); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .comp .what { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line2); color: var(--muted); white-space: nowrap; }
+  .badge.ok { color: var(--go); border-color: var(--go); }
+  .badge.missing, .badge.update { color: var(--warn); border-color: var(--warn); }
+  .badge.failed { color: var(--danger); border-color: var(--danger); }
+  .badge.busy { color: var(--accent); border-color: var(--accent); }
+  .bar { height: 6px; border-radius: 3px; background: var(--field); margin-top: 8px; overflow: hidden; display: none; }
+  .bar > div { height: 100%; width: 0; background: var(--accent2); transition: width .2s; }
+  .bar.indet > div { width: 30%; animation: slide 1.2s linear infinite; }
+  @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+  .detail { font-size: 11px; color: var(--faint); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 0; }
+  .opt { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .msg { border-radius: var(--r); padding: 10px 12px; font-size: 12px; white-space: pre-wrap; display: none; }
+  .msg.err { display: block; background: #2a1517; border: 1px solid var(--danger); color: #f3b2ac; }
+  .msg.ok { display: block; background: #13261c; border: 1px solid var(--go); color: #a8e6c4; }
+  .foot { margin-top: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .foot .spacer { flex: 1; }
+  .where { font-size: 11px; color: var(--faint); }
+  @media (max-width: 560px) { .deps { padding: 16px; } .comp .size { display: none; } }
+</style>
+</head>
+<body>
+<div class="deps">
+  <div class="head">
+    <span class="logo"></span>
+    <div>
+      <h1>DVD Restore<i>v0.1 alpha</i></h1>
+      <p id="lead">Checking what is installed…</p>
+    </div>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <label class="opt"><input type="checkbox" id="optView"> Also install vsview (optional preview window, about 700 MB)</label>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="where" id="where"></div>
+  <div class="foot">
+    <button class="ghost" id="btnFolder">Open runtime folder</button>
+    <span class="spacer"></span>
+    <button class="ghost" id="btnCancel" style="display:none">Cancel</button>
+    <button class="primary big" id="btnInstall" disabled>Download and install</button>
+    <button class="go big" id="btnStart" style="display:none">Start DVD Restore</button>
+  </div>
+</div>
+<script src="deps.js"></script>
+</body>
+</html>
