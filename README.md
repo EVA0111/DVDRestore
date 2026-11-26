@@ -89,7 +89,7 @@ python tools\build_portable.py dist\DVDRestore-v0.2-alpha --zip
 
 ## Licence
 
-DVD Restore is free software under the **GNU General Public License v3.0** (see `LICENSE`).
+DVD Restore is free software under the **MIT License** (see `LICENSE`).
 
 The tools it downloads keep their own licences: ffmpeg (GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its
 plugins, PyTorch (BSD-3), NVIDIA TensorRT (NVIDIA licence), Electron (MIT). The NeuFlow v2 optical-flow weights keep

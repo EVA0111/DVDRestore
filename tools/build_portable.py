@@ -176,7 +176,9 @@ sidebar opens it any time (repair, or add the optional vsview preview window).
 
 ## Licences
 
-ffmpeg (LGPL / GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its plugins, PyTorch (BSD-3), NVIDIA TensorRT
+DVD Restore itself: **MIT** (see `LICENSE`).
+
+The tools it uses: ffmpeg (LGPL / GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its plugins, PyTorch (BSD-3), NVIDIA TensorRT
 (NVIDIA licence), Electron (MIT), NeuFlow v2 weights (see `models\neuflow\LICENSE`). Each keeps its own licence. Apart
 from Electron they are not in the zip: the Dependencies window downloads them from their publishers.
 """)
@@ -241,6 +243,7 @@ def main():
     copytree(os.path.join(SRC, "app", "renderer"), os.path.join(DEST, "app", "renderer"))
     log("core/")
     copytree(os.path.join(SRC, "core"), os.path.join(DEST, "core"))
+    copy(os.path.join(SRC, "LICENSE"), os.path.join(DEST, "LICENSE"))       # DVD Restore: MIT
     log("my_filters/ (the example of your own filters; an empty plugins folder)")
     os.makedirs(os.path.join(DEST, "my_filters", "plugins"), exist_ok=True)
     copy(os.path.join(SRC, "my_filters", "example_filters.py"), os.path.join(DEST, "my_filters", "example_filters.py"))
