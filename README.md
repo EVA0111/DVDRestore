@@ -5,6 +5,7 @@ A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch 
 
 > **Alpha.** It works on the discs it was tuned on and passes its self-test, but expect rough edges.
 > Bug reports with a sample are very welcome (Issues).
+<img width="1711" height="985" alt="image" src="https://github.com/user-attachments/assets/1cf0e28a-0548-442b-a3ed-5d1411fdb0a8" />
 
 ## Download and run
 
