@@ -17,6 +17,7 @@
    "dmetrics:PluginVersion(major=1, minor=0)",
    "dvdsrc2:PluginVersion(major=1, minor=0)",
    "edgemasks:PluginVersion(major=4, minor=1)",
+   "fb:PluginVersion(major=4, minor=0)",
    "ffms2:PluginVersion(major=1281, minor=512)",
    "fmtc:PluginVersion(major=31, minor=0)",
    "hysteresis:PluginVersion(major=1, minor=3)",
@@ -39,11 +40,15 @@
    "zsmooth:PluginVersion(major=0, minor=20)"
   ]
  },
- "made": "2026-11-21 19:35",
+ "made": "2026-11-25 23:46",
  "results": {
   "vs:akarin.DLISR": {
    "status": "hidden",
    "why": "needs NVIDIA's DLISR runtime, which this PC's driver does not provide to VapourSynth"
+  },
+  "vs:akarin.DLVFX": {
+   "status": "hidden",
+   "why": "needs NVIDIA's Video Effects SDK (NvVFX), not installed"
   },
   "vs:bm3d.OPP2RGB": {
    "status": "hidden",
@@ -53,33 +58,41 @@
    "status": "hidden",
    "why": "needs a composite (GRAY16) signal from composite.Encode - use Custom code"
   },
-  "vs:composite.Encode": {
-   "status": "args",
-   "need": "standard: ntsc (720x480 DVDs) or pal (720x576)"
+  "vs:descale.Decustom": {
+   "status": "hidden",
+   "why": "needs a Python kernel function - use a Custom code block"
   },
-  "vs:composite.Restore": {
-   "status": "args",
-   "need": "standard: ntsc (720x480 DVDs) or pal (720x576)"
+  "vs:descale.ScaleCustom": {
+   "status": "hidden",
+   "why": "needs a Python kernel function - use a Custom code block"
   },
-  "vs:fmtc.matrix": {
-   "status": "args",
-   "need": "mat: a matrix preset, e.g. 601 or 709"
-  },
-  "vs:fmtc.primaries": {
-   "status": "args",
-   "need": "an RGB (linear) input and prims_in / prims_out"
-  },
-  "vs:fmtc.transfer": {
-   "status": "args",
-   "need": "an RGB input and transs / transd"
+  "vs:dfttest2_cpu.DFTTest": {
+   "status": "hidden",
+   "why": "the low-level part of DFTTest2 - use vsdenoise DFTTest instead"
   },
   "vs:mv.Analyse": {
    "status": "hidden",
    "why": "needs a super clip from mv.Super - use vsdenoise.mc_degrain or Custom code"
   },
+  "vs:mv.DepanAnalyse": {
+   "status": "hidden",
+   "why": "makes motion data, not a picture - DepanStabilise / DepanCompensate make it themselves"
+  },
+  "vs:mv.DepanEstimate": {
+   "status": "hidden",
+   "why": "makes motion data, not a picture - DepanStabilise / DepanCompensate make it themselves"
+  },
   "vs:mv.Finest": {
    "status": "hidden",
    "why": "needs a super clip from mv.Super - use Custom code"
+  },
+  "vs:mv.Recalculate": {
+   "status": "hidden",
+   "why": "refines motion vectors, not a picture - the MVTools filters build their vectors themselves"
+  },
+  "vs:mv.Super": {
+   "status": "hidden",
+   "why": "builds MVTools' search clip, not a picture - the MVTools filters build it themselves"
   },
   "vs:mvu.Analyse": {
    "status": "hidden",
@@ -89,13 +102,29 @@
    "status": "hidden",
    "why": "needs a super clip from mvu.Super - use Custom code"
   },
+  "vs:mvu.DepanAnalyse": {
+   "status": "hidden",
+   "why": "makes motion data, not a picture - DepanStabilise / DepanCompensate make it themselves"
+  },
+  "vs:mvu.DepanEstimate": {
+   "status": "hidden",
+   "why": "makes motion data, not a picture - DepanStabilise / DepanCompensate make it themselves"
+  },
   "vs:mvu.OcclusionMask": {
    "status": "hidden",
    "why": "needs motion vectors from mvu.Analyse - use Custom code"
   },
+  "vs:mvu.Recalculate": {
+   "status": "hidden",
+   "why": "refines motion vectors, not a picture - the MVTools filters build their vectors themselves"
+  },
   "vs:mvu.SADMask": {
    "status": "hidden",
    "why": "needs motion vectors from mvu.Analyse - use Custom code"
+  },
+  "vs:mvu.Super": {
+   "status": "hidden",
+   "why": "builds MVTools' search clip, not a picture - the MVTools filters build it themselves"
   },
   "vs:mvu.VectorLengthMask": {
    "status": "hidden",
@@ -103,27 +132,63 @@
   },
   "vs:placebo.Shader": {
    "status": "args",
-   "need": "shader: path of a .glsl shader file"
+   "need": "shader: the path of a .glsl shader file, e.g. D:\\shaders\\FSRCNNX_x2_8-0-4-1.glsl"
   },
   "vs:placebo.Tonemap": {
-   "status": "args",
-   "need": "HDR -> SDR tonemapping: src_csp / dst_csp of an HDR source (not used for DVDs)"
+   "status": "hidden",
+   "why": "HDR -> SDR only (no DVD is HDR)"
   },
-  "vs:std.AssumeFPS": {
+  "vs:resize2.Custom": {
+   "status": "hidden",
+   "why": "needs a Python kernel function - use a Custom code block"
+  },
+  "vs:std.ClipToProp": {
+   "status": "hidden",
+   "why": "stores a clip in a frame property (scripting helper)"
+  },
+  "vs:std.DeleteFrames": {
    "status": "args",
-   "need": "fpsnum and fpsden"
+   "need": "frames: the frame numbers to delete, e.g. 120,121"
   },
   "vs:std.DoubleWeave": {
    "status": "hidden",
    "why": "needs fields from std.SeparateFields (field properties) - use Custom code"
   },
-  "vs:std.Lut": {
+  "vs:std.DuplicateFrames": {
    "status": "args",
-   "need": "lut (a list) - or use std.Expr"
+   "need": "frames: the frame numbers to repeat, e.g. 120"
+  },
+  "vs:std.FrameEval": {
+   "status": "hidden",
+   "why": "needs a Python function - use a Custom code block"
+  },
+  "vs:std.FreezeFrames": {
+   "status": "args",
+   "need": "first, last, replacement: ranges to replace by one frame, e.g. 100 / 110 / 99"
+  },
+  "vs:std.Lut": {
+   "status": "hidden",
+   "why": "needs a whole lookup table - std.Expr / akarin.Expr do the same with a formula"
+  },
+  "vs:std.Lut2": {
+   "status": "hidden",
+   "why": "needs a whole lookup table - std.Expr / akarin.Expr do the same with a formula"
+  },
+  "vs:std.ModifyFrame": {
+   "status": "hidden",
+   "why": "needs a Python function - use a Custom code block"
+  },
+  "vs:std.PreMultiply": {
+   "status": "hidden",
+   "why": "needs an alpha clip (DVDs have none)"
   },
   "vs:std.PropToClip": {
    "status": "hidden",
    "why": "needs a frame stored in a frame property (from another filter) - use Custom code"
+  },
+  "vs:std.SetFrameProps": {
+   "status": "hidden",
+   "why": "takes any properties by name - std.SetFrameProp sets one"
   },
   "vs:std.SetVideoCache": {
    "status": "hidden",
@@ -133,9 +198,25 @@
    "status": "hidden",
    "why": "returns several clips - use Custom code"
   },
+  "vs:sub.ImageFile": {
+   "status": "args",
+   "need": "file: the path of a subtitle image file (.sup / .sub)"
+  },
+  "vs:sub.TextFile": {
+   "status": "args",
+   "need": "file: the path of a subtitle file (.ass / .srt)"
+  },
   "vs:vszip.PackRGB": {
    "status": "hidden",
    "why": "packs RGB into one 32-bit plane for other software - not a picture"
+  },
+  "vs:vszip.RFS": {
+   "status": "args",
+   "need": "frames: the frames to take from the other clip, e.g. 100,101 (clipb is the picture before the group)"
+  },
+  "jet:vstools.check_ref_clip": {
+   "status": "hidden",
+   "why": "a check for scripts (returns the clip unchanged)"
   },
   "jet:vstools.expect_bits": {
    "status": "hidden",
@@ -145,6 +226,10 @@
    "status": "hidden",
    "why": "a decorator for scripts, not a filter"
   },
+  "jet:vstools.find_prop_rfs": {
+   "status": "hidden",
+   "why": "needs a property comparison function - use a Custom code block"
+  },
   "jet:vstools.flatten_vnodes": {
    "status": "hidden",
    "why": "returns a list of clips - use Custom code"
@@ -153,9 +238,21 @@
    "status": "hidden",
    "why": "a decorator for scripts, not a filter"
   },
+  "jet:vstools.insert_clip": {
+   "status": "args",
+   "need": "insert: a second video and start_frame - use a Custom code block"
+  },
   "jet:vstools.join": {
    "status": "hidden",
    "why": "joins several clips - use Custom code"
+  },
+  "jet:vstools.prop_compare_cb": {
+   "status": "hidden",
+   "why": "returns a callback, not a clip"
+  },
+  "jet:vstools.remap_frames": {
+   "status": "args",
+   "need": "ranges: frames to remap, e.g. [(0, 100), 105]"
   },
   "jet:vstools.shift_clip_multi": {
    "status": "hidden",
@@ -173,13 +270,57 @@
    "status": "hidden",
    "why": "merges several clips - use Custom code"
   },
+  "jet:vsdenoise.mc_clamp": {
+   "status": "hidden",
+   "why": "needs an MVTools object - part of vs-jetpack's motion-compensated denoisers"
+  },
+  "jet:vsdeinterlace.deblend_fix_kf": {
+   "status": "hidden",
+   "why": "a helper inside vs-jetpack's deblending"
+  },
+  "jet:vsdeinterlace.deblending_helper": {
+   "status": "hidden",
+   "why": "a helper inside vs-jetpack's deblending"
+  },
+  "jet:vsdeinterlace.reweave": {
+   "status": "hidden",
+   "why": "weaves two separate field clips (scripting helper)"
+  },
+  "jet:vsdeinterlace.telecine_patterns": {
+   "status": "hidden",
+   "why": "shows the telecine patterns stacked (a scripting aid)"
+  },
   "jet:vsdeinterlace.weave": {
    "status": "hidden",
    "why": "needs fields from std.SeparateFields / vsdeinterlace.reweave input - use Custom code"
   },
-  "jet:vsscale.pre_ss": {
+  "jet:vsscale.pscale_blend": {
+   "status": "hidden",
+   "why": "needs a processing function - use a Custom code block"
+  },
+  "jet:vsscale.scale_var_clip": {
+   "status": "hidden",
+   "why": "needs a scaler function - use a Custom code block"
+  },
+  "jet:vsmasktools.bounded_dehardsub": {
+   "status": "hidden",
+   "why": "needs a list of hardsub sign masks - use a Custom code block"
+  },
+  "jet:vsmasktools.diff_creditless": {
    "status": "args",
-   "need": "function: the filter to run supersampled, e.g. vsrgtools.box_blur"
+   "need": "nc_clip: the creditless opening / ending as a second video - use a Custom code block"
+  },
+  "jet:vsmasktools.diff_creditless_oped": {
+   "status": "args",
+   "need": "ncop / nced: the creditless opening and ending videos - use a Custom code block"
+  },
+  "jet:vsmasktools.diff_rescale": {
+   "status": "hidden",
+   "why": "a native-resolution check for HD anime (needs float32 descaling) - not for DVDs"
+  },
+  "jet:vsmasktools.freeze_replace_squaremask": {
+   "status": "hidden",
+   "why": "needs a second video to insert - use a Custom code block"
   },
   "jet:vsmasktools.get_all_edge_detects": {
    "status": "hidden",
@@ -189,1119 +330,13 @@
    "status": "hidden",
    "why": "returns a list of masks - use Custom code"
   },
-  "vs:akarin.DLVFX": {
-   "status": "args",
-   "need": [
-    "op"
-   ]
-  },
-  "vs:awarp.AWarp": {
-   "status": "args",
-   "need": [
-    "mask"
-   ]
-  },
-  "vs:bm3d.Final": {
-   "status": "args",
-   "need": [
-    "ref"
-   ]
-  },
-  "vs:bm3d.VFinal": {
-   "status": "args",
-   "need": [
-    "ref"
-   ]
-  },
-  "vs:bwdif.Bwdif": {
-   "status": "args",
-   "need": [
-    "field"
-   ]
-  },
-  "vs:descale.Bicubic": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Bilinear": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Debicubic": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Debilinear": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Decustom": {
-   "status": "args",
-   "need": [
-    "width",
-    "height",
-    "custom_kernel",
-    "taps"
-   ]
-  },
-  "vs:descale.Delanczos": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Depoint": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Despline16": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Despline36": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Despline64": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Lanczos": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Point": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.ScaleCustom": {
-   "status": "args",
-   "need": [
-    "width",
-    "height",
-    "custom_kernel",
-    "taps"
-   ]
-  },
-  "vs:descale.Spline16": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Spline36": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:descale.Spline64": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:dfttest2_cpu.DFTTest": {
-   "status": "args",
-   "need": [
-    "window",
-    "sigma",
-    "sigma2",
-    "pmin",
-    "pmax",
-    "filter_type"
-   ]
-  },
-  "vs:hysteresis.Hysteresis": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:mv.BlockFPS": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw"
-   ]
-  },
-  "vs:mv.Compensate": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mv.Degrain1": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw"
-   ]
-  },
-  "vs:mv.Degrain2": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw",
-    "mvbw2",
-    "mvfw2"
-   ]
-  },
-  "vs:mv.Degrain3": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw",
-    "mvbw2",
-    "mvfw2",
-    "mvbw3",
-    "mvfw3"
-   ]
-  },
-  "vs:mv.Degrain4": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw",
-    "mvbw2",
-    "mvfw2",
-    "mvbw3",
-    "mvfw3",
-    "mvbw4",
-    "mvfw4"
-   ]
-  },
-  "vs:mv.Degrain5": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw",
-    "mvbw2",
-    "mvfw2",
-    "mvbw3",
-    "mvfw3",
-    "mvbw4",
-    "mvfw4",
-    "mvbw5",
-    "mvfw5"
-   ]
-  },
-  "vs:mv.Degrain6": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw",
-    "mvbw2",
-    "mvfw2",
-    "mvbw3",
-    "mvfw3",
-    "mvbw4",
-    "mvfw4",
-    "mvbw5",
-    "mvfw5",
-    "mvbw6",
-    "mvfw6"
-   ]
-  },
-  "vs:mv.DepanAnalyse": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mv.DepanCompensate": {
-   "status": "args",
-   "need": [
-    "data"
-   ]
-  },
-  "vs:mv.DepanStabilise": {
-   "status": "args",
-   "need": [
-    "data"
-   ]
-  },
-  "vs:mv.Flow": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mv.FlowBlur": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw"
-   ]
-  },
-  "vs:mv.FlowFPS": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw"
-   ]
-  },
-  "vs:mv.FlowInter": {
-   "status": "args",
-   "need": [
-    "super",
-    "mvbw",
-    "mvfw"
-   ]
-  },
-  "vs:mv.Mask": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mv.Recalculate": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mv.SCDetection": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mvu.Compensate": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain1": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain10": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain11": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain12": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain13": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain14": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain15": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain16": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain17": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain18": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain19": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain2": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain20": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain21": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain22": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain23": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain24": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain25": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain3": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain4": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain5": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain6": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain7": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain8": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Degrain9": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.DepanAnalyse": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mvu.DepanCompensate": {
-   "status": "args",
-   "need": [
-    "data"
-   ]
-  },
-  "vs:mvu.DepanStabilise": {
-   "status": "args",
-   "need": [
-    "data"
-   ]
-  },
-  "vs:mvu.Flow": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.FlowBlur": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.FlowFPS": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.FlowInter": {
-   "status": "args",
-   "need": [
-    "super",
-    "vectors"
-   ]
-  },
-  "vs:mvu.Recalculate": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mvu.SCDetection": {
-   "status": "args",
-   "need": [
-    "vectors"
-   ]
-  },
-  "vs:mvu.Super": {
-   "status": "args",
-   "need": [
-    "blksize",
-    "overlap"
-   ]
-  },
-  "vs:placebo.Resample": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:resize2.Custom": {
-   "status": "args",
-   "need": [
-    "custom_kernel",
-    "taps"
-   ]
-  },
-  "vs:std.ClipToProp": {
-   "status": "args",
-   "need": [
-    "mclip"
-   ]
-  },
-  "vs:std.Convolution": {
-   "status": "args",
-   "need": [
-    "matrix"
-   ]
-  },
-  "vs:std.CopyFrameProps": {
-   "status": "args",
-   "need": [
-    "prop_src"
-   ]
-  },
-  "vs:std.CropAbs": {
-   "status": "args",
-   "need": [
-    "width",
-    "height"
-   ]
-  },
-  "vs:std.DeleteFrames": {
-   "status": "args",
-   "need": [
-    "frames"
-   ]
-  },
-  "vs:std.DuplicateFrames": {
-   "status": "args",
-   "need": [
-    "frames"
-   ]
-  },
-  "vs:std.FrameEval": {
-   "status": "args",
-   "need": [
-    "eval"
-   ]
-  },
-  "vs:std.FreezeFrames": {
-   "status": "args",
-   "need": [
-    "first",
-    "last",
-    "replacement"
-   ]
-  },
-  "vs:std.Lut2": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.MakeDiff": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.MakeFullDiff": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.MaskedMerge": {
-   "status": "args",
-   "need": [
-    "clipb",
-    "mask"
-   ]
-  },
-  "vs:std.Merge": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.MergeDiff": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.MergeFullDiff": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "vs:std.ModifyFrame": {
-   "status": "args",
-   "need": [
-    "clips",
-    "selector"
-   ]
-  },
-  "vs:std.PreMultiply": {
-   "status": "args",
-   "need": [
-    "alpha"
-   ]
-  },
-  "vs:std.SelectEvery": {
-   "status": "args",
-   "need": [
-    "cycle",
-    "offsets"
-   ]
-  },
-  "vs:std.SetFieldBased": {
-   "status": "args",
-   "need": [
-    "value"
-   ]
-  },
-  "vs:std.SetFrameProp": {
-   "status": "args",
-   "need": [
-    "prop"
-   ]
-  },
-  "vs:std.SetFrameProps": {
-   "status": "args",
-   "need": [
-    "any"
-   ]
-  },
-  "vs:sub.ImageFile": {
-   "status": "args",
-   "need": [
-    "file"
-   ]
-  },
-  "vs:sub.Subtitle": {
-   "status": "args",
-   "need": [
-    "text"
-   ]
-  },
-  "vs:sub.TextFile": {
-   "status": "args",
-   "need": [
-    "file"
-   ]
-  },
-  "vs:text.Text": {
-   "status": "args",
-   "need": [
-    "text"
-   ]
-  },
-  "vs:vivtc.VFM": {
-   "status": "args",
-   "need": [
-    "order"
-   ]
-  },
-  "vs:vszip.AdaptiveBinarize": {
-   "status": "args",
-   "need": [
-    "clip2"
-   ]
-  },
-  "vs:vszip.Dither": {
-   "status": "args",
-   "need": [
-    "bitdepth"
-   ]
-  },
-  "vs:vszip.EEDI3": {
-   "status": "args",
-   "need": [
-    "field"
-   ]
-  },
-  "vs:vszip.EEDI3H": {
-   "status": "args",
-   "need": [
-    "field"
-   ]
-  },
-  "vs:vszip.LimitFilter": {
-   "status": "args",
-   "need": [
-    "src"
-   ]
-  },
-  "vs:vszip.PlaneAverage": {
-   "status": "args",
-   "need": [
-    "exclude"
-   ]
-  },
-  "vs:vszip.RFS": {
-   "status": "args",
-   "need": [
-    "clipb",
-    "frames"
-   ]
-  },
-  "vs:vszip.SSIMULACRA2": {
-   "status": "args",
-   "need": [
-    "distorted"
-   ]
-  },
-  "vs:vszip.XPSNR": {
-   "status": "args",
-   "need": [
-    "distorted"
-   ]
-  },
-  "vs:znedi3.nnedi3": {
-   "status": "args",
-   "need": [
-    "field"
-   ]
-  },
-  "vs:zsmooth.DCTFilter": {
-   "status": "args",
-   "need": [
-    "factors"
-   ]
-  },
-  "vs:zsmooth.RemoveGrain": {
-   "status": "args",
-   "need": [
-    "mode"
-   ]
-  },
-  "vs:zsmooth.Repair": {
-   "status": "args",
-   "need": [
-    "repairclip",
-    "mode"
-   ]
-  },
-  "vs:zsmooth.TemporalRepair": {
-   "status": "args",
-   "need": [
-    "repairclip"
-   ]
-  },
-  "vs:zsmooth.VerticalCleaner": {
-   "status": "args",
-   "need": [
-    "mode"
-   ]
-  },
-  "jet:vstools.change_fps": {
-   "status": "args",
-   "need": [
-    "fps"
-   ]
-  },
-  "jet:vstools.check_ref_clip": {
-   "status": "args",
-   "need": [
-    "ref"
-   ]
-  },
-  "jet:vstools.find_prop_rfs": {
-   "status": "args",
-   "need": [
-    "clip_b",
-    "prop",
-    "op",
-    "prop_ref"
-   ]
-  },
-  "jet:vstools.insert_clip": {
-   "status": "args",
-   "need": [
-    "insert",
-    "start_frame"
-   ]
-  },
-  "jet:vstools.match_clip": {
-   "status": "args",
-   "need": [
-    "ref"
-   ]
-  },
-  "jet:vstools.plane": {
-   "status": "args",
-   "need": [
-    "index"
-   ]
-  },
-  "jet:vstools.prop_compare_cb": {
-   "status": "args",
-   "need": [
-    "prop",
-    "op",
-    "ref"
-   ]
-  },
-  "jet:vstools.remap_frames": {
-   "status": "args",
-   "need": [
-    "ranges"
-   ]
-  },
-  "jet:vstools.replace_every": {
-   "status": "args",
-   "need": [
-    "clipb",
-    "cycle",
-    "offsets"
-   ]
-  },
-  "jet:vstools.shift_clip": {
-   "status": "args",
-   "need": [
-    "offset"
-   ]
-  },
-  "jet:vsdenoise.mc_clamp": {
-   "status": "args",
-   "need": [
-    "src",
-    "mv_obj"
-   ]
-  },
-  "jet:vsdeinterlace.deblend_fix_kf": {
-   "status": "args",
-   "need": [
-    "fieldmatched"
-   ]
-  },
-  "jet:vsdeinterlace.deblending_helper": {
-   "status": "args",
-   "need": [
-    "fieldmatched"
-   ]
-  },
-  "jet:vsdeinterlace.jivtc": {
-   "status": "args",
-   "need": [
-    "pattern"
-   ]
-  },
-  "jet:vsdeinterlace.reinterlace": {
-   "status": "args",
-   "need": [
-    "tff"
-   ]
-  },
-  "jet:vsdeinterlace.reweave": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "jet:vsdeinterlace.telecine_patterns": {
-   "status": "args",
-   "need": [
-    "clipb"
-   ]
-  },
-  "jet:vsscale.descale_detail_mask": {
-   "status": "args",
-   "need": [
-    "rescaled"
-   ]
-  },
-  "jet:vsscale.descale_error_mask": {
-   "status": "args",
-   "need": [
-    "rescaled"
-   ]
-  },
-  "jet:vsscale.pscale_blend": {
-   "status": "args",
-   "need": [
-    "processed",
-    "unprocessed"
-   ]
-  },
-  "jet:vsscale.scale_var_clip": {
-   "status": "args",
-   "need": [
-    "scaler",
-    "width",
-    "height"
-   ]
-  },
-  "jet:vsmasktools.based_diff_mask": {
-   "status": "args",
-   "need": [
-    "ref_or_height"
-   ]
-  },
-  "jet:vsmasktools.bounded_dehardsub": {
-   "status": "args",
-   "need": [
-    "ref",
-    "signs"
-   ]
-  },
-  "jet:vsmasktools.diff_creditless": {
-   "status": "args",
-   "need": [
-    "nc_clip"
-   ]
-  },
-  "jet:vsmasktools.diff_creditless_oped": {
-   "status": "args",
-   "need": [
-    "ncop",
-    "nced"
-   ]
-  },
-  "jet:vsmasktools.diff_hardsub_mask": {
-   "status": "args",
-   "need": [
-    "b"
-   ]
-  },
-  "jet:vsmasktools.diff_rescale": {
-   "status": "args",
-   "need": [
-    "height"
-   ]
-  },
-  "jet:vsmasktools.freeze_replace_squaremask": {
-   "status": "args",
-   "need": [
-    "insert",
-    "mask_params",
-    "frame",
-    "frame_range"
-   ]
-  },
   "jet:vsmasktools.get_all_sign_masks": {
-   "status": "args",
-   "need": [
-    "ref",
-    "signs"
-   ]
-  },
-  "jet:vsmasktools.luma_mask": {
-   "status": "args",
-   "need": [
-    "thr_lo",
-    "thr_hi"
-   ]
-  },
-  "jet:vsmasktools.replace_squaremask": {
-   "status": "args",
-   "need": [
-    "clipb",
-    "mask_params"
-   ]
-  },
-  "jet:vsmasktools.squaremask": {
-   "status": "args",
-   "need": [
-    "width",
-    "height",
-    "offset_x",
-    "offset_y"
-   ]
-  },
-  "jet:vsmasktools.tcanny_retinex": {
-   "status": "args",
-   "need": [
-    "thr"
-   ]
-  },
-  "jet:vsrgtools.contrasharpening": {
-   "status": "args",
-   "need": [
-    "src"
-   ]
-  },
-  "jet:vsrgtools.contrasharpening_dehalo": {
-   "status": "args",
-   "need": [
-    "src"
-   ]
-  },
-  "jet:vsrgtools.contrasharpening_median": {
-   "status": "args",
-   "need": [
-    "src"
-   ]
+   "status": "hidden",
+   "why": "needs a list of hardsub sign masks - use a Custom code block"
   },
   "jet:vsrgtools.reconstruct": {
-   "status": "args",
-   "need": [
-    "r"
-   ]
-  },
-  "jet:vsrgtools.soothe": {
-   "status": "args",
-   "need": [
-    "src"
-   ]
-  },
-  "jet:vskernels.resample_to": {
-   "status": "args",
-   "need": [
-    "out_fmt"
-   ]
-  },
-  "jet:vsexprtools.expr_func": {
-   "status": "args",
-   "need": [
-    "expr"
-   ]
-  },
-  "jet:vsexprtools.norm_expr": {
-   "status": "args",
-   "need": [
-    "expr"
-   ]
+   "status": "hidden",
+   "why": "needs regression clips from vsrgtools.regression - use a Custom code block"
   },
   "vs:akarin.Cambi": {
    "status": "ok",
@@ -1314,6 +349,21 @@
    "format": "YUV420P8"
   },
   "vs:bm3d.Basic": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444P8"
+  },
+  "vs:bm3d.Final": {
    "status": "ok",
    "formats": [
     "YUV444P8",
@@ -1359,6 +409,48 @@
     "RGBS"
    ],
    "format": "YUV444PS"
+  },
+  "vs:bwdif.Bwdif": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:composite.Encode": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS"
+   ],
+   "format": "Gray16"
+  },
+  "vs:composite.Restore": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS"
+   ],
+   "format": "YUV444P16"
   },
   "vs:deblock.Deblock": {
    "status": "ok",
@@ -1637,6 +729,21 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:fb.FillBorders": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:fmtc.bitdepth": {
    "status": "ok",
    "formats": [
@@ -1669,6 +776,18 @@
     "RGB48"
    ],
    "format": "YUV420P8"
+  },
+  "vs:fmtc.matrix": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB24"
   },
   "vs:fmtc.matrix2020cl": {
    "status": "ok",
@@ -1720,7 +839,241 @@
    ],
    "format": "YUV420P16"
   },
-  "vs:mv.DepanEstimate": {
+  "vs:fmtc.transfer": {
+   "status": "ok",
+   "formats": [
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray16"
+  },
+  "vs:hysteresis.Hysteresis": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.BlockFPS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Compensate": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain1": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain2": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain3": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain4": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain5": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Degrain6": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.DepanCompensate": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.DepanStabilise": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Flow": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.FlowBlur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.FlowFPS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.FlowInter": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.Mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mv.SCDetection": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Compensate": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -1735,7 +1088,397 @@
    ],
    "format": "YUV420P8"
   },
-  "vs:mv.Super": {
+  "vs:mvu.Degrain": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain1": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain10": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain11": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain12": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain13": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain14": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain15": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain16": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain17": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain18": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain19": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain2": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain20": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain21": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain22": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain23": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain24": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain25": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain3": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain4": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain5": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain6": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain7": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain8": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Degrain9": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.DepanCompensate": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -1748,7 +1491,80 @@
    ],
    "format": "YUV420P8"
   },
-  "vs:mvu.DepanEstimate": {
+  "vs:mvu.DepanStabilise": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.Flow": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.FlowBlur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.FlowFPS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.FlowInter": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mvu.SCDetection": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -1785,16 +1601,19 @@
    "status": "ok",
    "formats": [
     "YUV420P8",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
     "YUV444PS",
-    "GRAY8",
     "GRAY16",
     "GRAYS",
     "RGB24",
     "RGB48",
     "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:placebo.Resample": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8"
    ],
    "format": "YUV420P8"
   },
@@ -2102,6 +1921,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:std.AssumeFPS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:std.Binarize": {
    "status": "ok",
    "formats": [
@@ -2174,7 +2011,61 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:std.Convolution": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.CopyFrameProps": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:std.Crop": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.CropAbs": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -2408,6 +2299,56 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:std.MakeDiff": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.MakeFullDiff": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV444P8",
+    "YUV444PS",
+    "GRAY8",
+    "GRAYS",
+    "RGB24",
+    "RGBS"
+   ],
+   "format": "YUV420P9"
+  },
+  "vs:std.MaskedMerge": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:std.Maximum": {
    "status": "ok",
    "formats": [
@@ -2443,6 +2384,51 @@
     "RGBS"
    ],
    "format": "YUV420P8"
+  },
+  "vs:std.Merge": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.MergeDiff": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.MergeFullDiff": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
   },
   "vs:std.Minimum": {
    "status": "ok",
@@ -2551,12 +2537,66 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:std.SelectEvery": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:std.SeparateFields": {
    "status": "ok",
    "formats": [
     "YUV420P8"
    ],
    "interlaced": true,
+   "format": "YUV420P8"
+  },
+  "vs:std.SetFieldBased": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:std.SetFrameProp": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
    "format": "YUV420P8"
   },
   "vs:std.Sobel": {
@@ -2667,6 +2707,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:sub.Subtitle": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:text.ClipInfo": {
    "status": "ok",
    "formats": [
@@ -2739,6 +2797,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:text.Text": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:tivtc.TDecimate": {
    "status": "ok",
    "formats": [
@@ -2776,11 +2852,29 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:vivtc.VFM": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:vszip.AdaptiveBinarize": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8",
+    "RGB24"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:vszip.AdaptiveGrainMask": {
    "status": "ok",
    "formats": [
     "YUV420P8",
-    "YUV420P10",
     "YUV420P16",
     "YUV444P8",
     "YUV444P16",
@@ -2926,7 +3020,79 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:vszip.Dither": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:vszip.EEDI3": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:vszip.EEDI3H": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:vszip.Limiter": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:vszip.LimitFilter": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -2959,6 +3125,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:vszip.PlaneAverage": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:vszip.PlaneMinMax": {
    "status": "ok",
    "formats": [
@@ -2977,6 +3161,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:vszip.SSIMULACRA2": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGBS"
+  },
   "vs:vszip.WNNM": {
    "status": "ok",
    "formats": [
@@ -2985,6 +3187,33 @@
     "RGBS"
    ],
    "format": "YUV444PS"
+  },
+  "vs:vszip.XPSNR": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV444P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:znedi3.nnedi3": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "vs:zsmooth.BackwardClense": {
    "status": "ok",
@@ -3045,6 +3274,24 @@
     "YUV420P16",
     "YUV444P8",
     "YUV444P16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:zsmooth.DCTFilter": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "YUV420P8"
   },
@@ -3153,6 +3400,42 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:zsmooth.RemoveGrain": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:zsmooth.Repair": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:zsmooth.SmartMedian": {
    "status": "ok",
    "formats": [
@@ -3189,6 +3472,24 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:zsmooth.TemporalRepair": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:zsmooth.TemporalSoften": {
    "status": "ok",
    "formats": [
@@ -3208,6 +3509,42 @@
    "format": "YUV420P8"
   },
   "vs:zsmooth.TTempSmooth": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:zsmooth.VerticalCleaner": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vstools.change_fps": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -3363,6 +3700,24 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vstools.match_clip": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "jet:vstools.merge_clip_props": {
    "status": "ok",
    "formats": [
@@ -3381,7 +3736,43 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vstools.replace_every": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "jet:vstools.sc_detect": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vstools.shift_clip": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -3709,6 +4100,24 @@
    "interlaced": true,
    "format": "YUV420P8"
   },
+  "jet:vsdeinterlace.reinterlace": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "jet:vsdeinterlace.sivtc": {
    "status": "ok",
    "formats": [
@@ -3758,10 +4167,53 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vsscale.descale_detail_mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "Gray8"
+  },
+  "jet:vsscale.descale_error_mask": {
+   "status": "ok",
+   "formats": [
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "Gray8"
+  },
+  "jet:vsscale.pre_ss": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "jet:vsmasktools.adg_mask": {
    "status": "ok",
    "formats": [
     "YUV420P8",
+    "YUV420P10",
     "YUV420P16",
     "YUV444P8",
     "YUV444P16",
@@ -3804,6 +4256,21 @@
     "GRAYS"
    ],
    "format": "Gray8"
+  },
+  "jet:vsmasktools.diff_hardsub_mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsmasktools.flat_mask": {
    "status": "ok",
@@ -3874,6 +4341,21 @@
    ],
    "format": "Gray8"
   },
+  "jet:vsmasktools.luma_mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "Gray8"
+  },
   "jet:vsmasktools.max_planes": {
    "status": "ok",
    "formats": [
@@ -3919,6 +4401,24 @@
     "GRAY8",
     "GRAY16",
     "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vsmasktools.replace_squaremask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "YUV420P8"
   },
@@ -3970,6 +4470,24 @@
    ],
    "format": "Gray8"
   },
+  "jet:vsmasktools.squaremask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray8"
+  },
   "jet:vsmasktools.stabilize_mask": {
    "status": "ok",
    "formats": [
@@ -4005,6 +4523,21 @@
     "RGBS"
    ],
    "format": "YUV420PS"
+  },
+  "jet:vsmasktools.tcanny_retinex": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "Gray8"
   },
   "jet:vsmasktools.texture_mask": {
    "status": "ok",
@@ -4043,6 +4576,60 @@
    "format": "YUV420P8"
   },
   "jet:vsrgtools.box_blur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vsrgtools.contrasharpening": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vsrgtools.contrasharpening_dehalo": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vsrgtools.contrasharpening_median": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -4183,6 +4770,24 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vsrgtools.soothe": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "jet:vsrgtools.unsharpen": {
    "status": "ok",
    "formats": [
@@ -4269,6 +4874,21 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vskernels.resample_to": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P16"
+  },
   "jet:vsexprtools.combine": {
    "status": "ok",
    "formats": [
@@ -4286,6 +4906,250 @@
     "RGBS"
    ],
    "format": "YUV420P8"
+  },
+  "jet:vsexprtools.expr_func": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vsexprtools.norm_expr": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:awarp.AWarp": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444P8"
+  },
+  "vs:bm3d.VFinal": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Bicubic": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Bilinear": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Debicubic": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Debilinear": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Delanczos": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Depoint": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline16": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline36": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline64": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Lanczos": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Point": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline16": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline36": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline64": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:fmtc.primaries": {
+   "status": "ok",
+   "formats": [
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB48"
+  },
+  "jet:vstools.plane": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray8"
+  },
+  "jet:vsdeinterlace.jivtc": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8"
+   ],
+   "interlaced": true,
+   "format": "YUV420P8"
+  },
+  "jet:vsmasktools.based_diff_mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray8"
   }
  }
 }

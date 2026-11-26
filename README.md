@@ -1,4 +1,4 @@
-# DVD Restore v0.1 alpha
+# DVD Restore v0.2 alpha
 
 Restores NTSC and PAL DVD video, other video files and still images: anime, cartoons and live action.
 A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch / TensorRT networks).
@@ -8,7 +8,7 @@ A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch 
 
 ## Download and run
 
-1. Download **`DVDRestore-v0.1-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
+1. Download **`DVDRestore-v0.2-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
 2. Unpack it anywhere: another drive or a USB disk is fine.
 3. Start **`DVD Restore.exe`**.
 4. **First start:** the *Dependencies* window installs what the engine needs with one click, into `runtime\` next to
@@ -41,7 +41,23 @@ Full documentation: **[the wiki](../../wiki)** (installation, every step of the 
 * Colour correction with adjustment layers, crop, resize (incl. EWA on the GPU), sharpening, line darkening.
 * Encode (x264 / x265 / SVT-AV1 / NVENC / ProRes / FFV1 / UT Video) and mux with all audio and subtitle tracks and a
   sync check. Still images (PNG / JPEG / TIFF / BMP / WebP) are saved as 16-bit PNG.
-* Opens `.iso` images and `VIDEO_TS` folders directly.
+* Opens `.iso` images, `VIDEO_TS` folders and Blu-ray `BDMV` folders directly.
+
+## New in v0.2
+
+* **Colour page laid out like DaVinci Resolve**: the picture in the middle, Auto correction left, scopes right, and a
+  collapsible panel underneath with the wheels, light, colour, hue / shadow colour and curves on one page.
+* **RepairNet**: halos and colour bleed fixed in one neural pass.
+* **VapourSynth filter groups** in Repair: any installed plugin or vs-jetpack function, picked from a searchable,
+  categorised filter browser, in draggable / duplicable groups placed anywhere in the chain (even instead of the IVTC).
+  Plus **your own filters** (Python functions, `.dll` plugins, custom code) and **your AI upscale / restore models**
+  (`.onnx`, `.pth`, `.safetensors`) with a VapourKit-style TensorRT engine dialog.
+* **Leftover combing** after the IVTC is found and repaired much better: single frames field matching could not fix,
+  and credits / captions laid on at 60 fields per second over film.
+* **Damaged discs**: undecodable frames are found in seconds (a fast scan on open) and replaced; the VFR analysis no
+  longer takes an hour on such files.
+* **Undo / redo** (Ctrl+Z / Ctrl+Y), **workflows** you can save and share, crop & size moved into Repair, image
+  information for stills, render progress with ETA, Blu-ray import, a better IVTC and colour auto-correction.
 
 ## Source layout
 
@@ -68,7 +84,7 @@ Python 3.12 is needed; ffmpeg (a *full* build, with the DVD-Video reader) and `m
 ### Build the release
 
 ```powershell
-python tools\build_portable.py dist\DVDRestore-v0.1-alpha --zip
+python tools\build_portable.py dist\DVDRestore-v0.2-alpha --zip
 ```
 
 ## Licence

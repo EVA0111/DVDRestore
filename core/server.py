@@ -41,6 +41,16 @@ def emit(obj):
         sys.stdout.flush()
 
 
+def fail(rid, what, e):
+    """Report a failed request: the window gets the error TYPE, message and where it happened (a bare KeyError
+    used to read "Preview: 'info'"); the full traceback goes to stderr, which the app writes to temp/dvdrestore.log."""
+    tb = traceback.extract_tb(e.__traceback__)
+    where = next((f"{os.path.basename(fr.filename)}:{fr.lineno}" for fr in reversed(tb) if "site-packages" not in fr.filename), "")
+    msg = f"{what}{type(e).__name__}: {e}" + (f" ({where})" if where else "")
+    print(f"{what or 'Request '}failed: {msg}\n" + "".join(traceback.format_exception(e))[-4000:], file=sys.stderr, flush=True)
+    emit({"id": rid, "error": msg, "trace": "".join(traceback.format_exception(e))[-1500:]})
+
+
 def log(msg, cur=None, tot=None):
     if msg is None:
         emit({"event": "progress", "cur": cur, "tot": tot})
@@ -103,6 +113,9 @@ OPTIONS = {
     "stab": [["off", "Off"], ["ustab", "Universal - steadies every kind of shot (fades, cuts, flashes, zooms, credits) without dragging the picture"], ["plus", "Steady plus - Steady chain + motion-aware still lock (steadiest; best for cartoons)"], ["chain", "Steady chain - MC + fine detail + still smoothing + still lock (best for grainy film)"], ["ttemp", "TTempSmooth (best for crawl / flicker)"], ["gtfix", "Temporal fix (guided, line wobble / shimmer)"], ["tfix_ai", "TemporalFix AI (TensorRT, line wobble)"],
              ["tfix_classic", "TemporalFix classic (CPU)"], ["mc", "MC degrain (motion-compensated)"]],
     "stab_levels": [["light", "Light"], ["normal", "Normal"], ["strong", "Strong"]],
+    "vsf_pos": [["source", "On the source (before IVTC)"], ["ivtc", "Instead of the app's IVTC (your own field matching)"],
+                ["after_ivtc", "After IVTC (before the clean-up)"], ["repairs", "After the repairs (before crop / stabilizer)"],
+                ["end", "At the end (after crop, stabilizer, colour, size)"]],
     "advanced": [
         ["cthresh", "Comb threshold (cthresh)", "9", "Per-pixel difference that counts as combing. Lower finds fainter combing."],
         ["mi", "Combed pixels per block (MI)", "80", "Raise (100-160) if clean frames get softened; lower (40-60) if combing slips through."],
@@ -184,10 +197,11 @@ def make_job(st, k):
         # halo removal switched on by hand without a measurement: DeHalo_alpha's standard radius 2
         "ghost": "auto" if st.get("ghost") == "auto" else "off",
         "ghost_taps": st.get("ghost_taps") or [], "halo_rx": (st.get("halo_rx") or 2.0) if st.get("ghost") == "auto" else 0,
-        "ghost_strength": float(st.get("ghost_strength", 1.0)), "halo_method": st.get("halo_method", "ai"),
+        "ghost_strength": float(st.get("ghost_strength", 1.0)), "halo_method": st.get("halo_method", "ai"), "repairnet": st.get("repairnet", "on"), "vs_filters": [f for f in (st.get("vs_filters") or []) if isinstance(f, dict) and f.get("on", True)], "vs_filters_pos": st.get("vs_filters_pos") or "repairs", "vs_groups": [g for g in (st.get("vs_groups") or []) if isinstance(g, dict)],
         "deblock": st.get("deblock", "off"), "rainbow_fill": "on" if st.get("rainbow_fill") else "off",
         "ivtc_repair": st.get("ivtc_repair", "ai"), "chroma_unmix": st.get("chroma_unmix", "off"), "deblend": st.get("deblend", "off"), "aa": st.get("aa", "off"),
         "grade": dict(st.get("grade") or {}),
+        "colour_ref": [str(x) for x in st.get("colour_ref") or []],      # Colour step: reference of the same show
         # adjustment layers that touch this episode (source frames of the whole title), bottom first
         "grade_layers": [{"start": int(l["start"]), "end": int(l["end"]), "opacity": float(l.get("opacity", 1)), "grade": l.get("grade") or {}}
                          for l in st.get("layers") or [] if l.get("on", True) and int(l["end"]) > a and int(l["start"]) < b],
@@ -263,7 +277,7 @@ class Tasks:
                 emit({"id": rid, "error": "Stopped"})
             except Exception as e:                     # noqa: BLE001
                 log(f"ERROR: {e}")
-                emit({"id": rid, "error": str(e), "trace": traceback.format_exc()[-1500:]})
+                fail(rid, "", e)
             finally:
                 emit({"event": "busy", "busy": False})
         self.thread = threading.Thread(target=wrap, daemon=True)
@@ -374,7 +388,7 @@ class Player:
                 emit(msg)
             emit({"id": rid, "result": {"stopped": ev.is_set()}})
         except Exception as e:                              # noqa: BLE001
-            emit({"id": rid, "error": f"Play: {e}"})
+            fail(rid, "Play: ", e)
 
 
 PLAYER = Player()
@@ -423,7 +437,7 @@ class Preview:
                 out["vfr"] = runner.JobRunner.has_pass1(make_job(st, k)) if st.get("mode") == "vfr" else False
                 emit({"id": rid, "result": out})
             except Exception as e:                     # noqa: BLE001
-                emit({"id": rid, "error": f"Preview: {e}"})
+                fail(rid, "Preview: ", e)
 
 
 PREVIEW = None
@@ -531,11 +545,30 @@ def m_save_settings(p):
 
 def m_probe(p):
     info = runner.probe(p["path"])
+    _scan_in_background(p["path"], info)
     return {"info": info, "episodes": [list(e) for e in runner.detect_episodes(info)]}
 
 
+def _scan_in_background(path, info):
+    """the damaged-frame scan (vsgraph.scan_source, once per file, ~10 s per SD episode) starts as soon as a video is
+    opened: preview, Analyze and the VFR analysis then skip damaged frames instead of stopping at them"""
+    if info.get("image") or not os.path.isfile(path):
+        return
+    import threading
+
+    def run():
+        try:
+            import vsgraph
+            bad = vsgraph.scan_source(path, progress=False)
+            if bad:
+                log(f"{len(bad)} damaged frame(s) in the source (cannot be decoded): each is replaced by its neighbour")
+        except Exception as e:                           # noqa: BLE001
+            print(f"Damaged-frame scan skipped: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    threading.Thread(target=run, daemon=True).start()
+
+
 def m_dvd_titles(p):
-    return runner.dvd_titles(p["path"])
+    return runner.disc_titles(p["path"])
 
 
 def m_import(p, rid):
@@ -654,6 +687,53 @@ def _scan_toolbox():
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     last = [l for l in (p.stdout or "").splitlines() if l.startswith("done")]
     return last[-1] if last else (p.stderr or "").strip()[-300:]
+
+
+def m_my_filter_add(p):
+    """copy your .py filter files / .dll plugins into my_filters (plugins load at once; the library is read again)"""
+    import shutil
+    import blocks
+    d = blocks.my_dir()
+    done = []
+    for src in p.get("paths") or []:
+        ext = os.path.splitext(src)[1].lower()
+        dst = os.path.join(d, "plugins" if ext == ".dll" else "", os.path.basename(src))
+        if ext not in (".py", ".dll") or not os.path.isfile(src):
+            continue
+        if os.path.abspath(src) != os.path.abspath(dst):
+            shutil.copy2(src, dst)
+        done.append(os.path.basename(src))
+    loaded = blocks.load_my_plugins()
+    global _LIBRARY
+    _LIBRARY = None                                      # read again (the compatibility scan tries a new plugin's functions)
+    return {"added": done, "loaded": loaded, "dir": d}
+
+
+def m_ai_models(p):
+    """the AI model files in your model folders (Repair -> VapourSynth filters -> AI upscale & restore models)"""
+    import blocks
+    return {"models": blocks.ai_models(p.get("dirs") or [], p.get("files") or [])}
+
+
+def m_model_info(p):
+    """what an AI model is: ONNX / PyTorch, scale, fixed input size, precision, video model"""
+    import aiupscale
+    try:
+        return aiupscale.info(p["path"])
+    except Exception as e:                                # noqa: BLE001
+        return {"error": f"Cannot read this model: {type(e).__name__}: {e}"}
+
+
+def m_build_ai_engine(p, rid):
+    """the engine dialog's "Save & build now": the model's TensorRT engine for this video's picture size, now"""
+    import blocks
+
+    def fn(r):
+        log(f"Building the TensorRT engine for {os.path.basename(p['model'])} ({p.get('w')}x{p.get('h')}) - once, up to a few minutes...")
+        out = blocks.build_ai_engine(p["model"], p.get("engine"), p.get("w") or 720, p.get("h") or 480, p.get("backend"))
+        log(f"Engine ready: {os.path.basename(p['model'])} ({out['w']}x{out['h']} out)")
+        return out
+    TASKS.start(rid, fn)
 
 
 def m_block_library(p):
@@ -801,7 +881,7 @@ def m_scopes(p, rid):
             rgb = np.dstack([np.asarray(f[q]) for q in range(3)])
             emit({"id": rid, "result": {"kind": p.get("kind", "waveform"), "png": base64.b64encode(scopes.draw(p.get("kind", "waveform"), rgb)).decode("ascii"), "frame": n}})
         except Exception as e:                            # noqa: BLE001
-            emit({"id": rid, "error": f"Scopes: {e}"})
+            fail(rid, "Scopes: ", e)
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -830,7 +910,7 @@ def m_locate(p, rid):
                 job["preview_vfr"] = True
             emit({"id": rid, "result": {"frame": vsgraph.locate_source_frame(job, int(p["src"]))}})
         except Exception as e:                            # noqa: BLE001
-            emit({"id": rid, "error": f"Locate: {e}"})
+            fail(rid, "Locate: ", e)
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -911,8 +991,8 @@ def m_stop_play(p):
 
 SYNC = {"hello": m_hello, "save_settings": m_save_settings, "probe": m_probe, "dvd_titles": m_dvd_titles,
         "cancel": m_cancel, "stop_play": m_stop_play, "lut_info": m_lut_info, "vfr_auto": m_vfr_auto,
-        "temp_info": m_temp_info, "temp_clear": m_temp_clear, "script": m_script, "block_library": m_block_library, "vsview_update": m_vsview_update, "chain_default": m_chain_default, "toolbox_info": m_toolbox_info, "save_recipe": m_save_recipe, "check_script": m_check_script, "env": lambda p: env_info()}
-ASYNC = {"import": m_import, "analyze": m_analyze, "autodetect": m_autodetect, "detect": m_detect, "report": m_report, "process": m_process,
+        "temp_info": m_temp_info, "temp_clear": m_temp_clear, "script": m_script, "block_library": m_block_library, "ai_models": m_ai_models, "my_filter_add": m_my_filter_add, "model_info": m_model_info, "vsview_update": m_vsview_update, "chain_default": m_chain_default, "toolbox_info": m_toolbox_info, "save_recipe": m_save_recipe, "check_script": m_check_script, "env": lambda p: env_info()}
+ASYNC = {"build_ai_engine": m_build_ai_engine, "import": m_import, "analyze": m_analyze, "autodetect": m_autodetect, "detect": m_detect, "report": m_report, "process": m_process,
          "vsview": m_vsview, "preview": m_preview, "play": m_play, "vfr_pass": m_vfr_pass, "scopes": m_scopes,
          "scenes": m_scenes, "locate": m_locate, "toolbox_update": m_toolbox_update, "toolbox_install": m_toolbox_install,
          "toolbox_rescan": m_toolbox_rescan}
@@ -949,7 +1029,7 @@ def main():
             else:
                 emit({"id": rid, "error": f"unknown method {method}"})
         except Exception as e:                         # noqa: BLE001
-            emit({"id": rid, "error": str(e), "trace": traceback.format_exc()[-1500:]})
+            fail(rid, "", e)
     # stdin closed = the app quit or crashed: end playback and any running job (vspipe / ffmpeg), then exit hard -
     # worker threads must not keep this process (and its RAM / GPU memory) alive in the background
     for stop in (lambda: PLAYER.stop(), lambda: TASKS.cancel()):

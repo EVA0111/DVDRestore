@@ -18,6 +18,8 @@ tensorrt_cu13==11.4.0.106
 tensorrt_cu13_bindings==11.4.0.106
 tensorrt_cu13_libs==11.4.0.106
 onnx==1.21.0
+onnxconverter-common==1.16.0        # your AI models (Repair -> VapourSynth filters): fp16 conversion for TensorRT
+spandrel==0.4.2                     # your AI models: .pth / .safetensors
 numpy==2.5.4
 scipy==1.18.1
 pillow==11.3.0
@@ -44,6 +46,8 @@ vsjetpack==2.2.6
 jetpytools==3.2.0
 
 # their helpers
+einops==0.8.1
+safetensors==0.7.0
 filelock==3.32.3
 fsspec==2025.12.0
 Jinja2==3.1.6

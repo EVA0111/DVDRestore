@@ -15,6 +15,9 @@ returns a clip, and a custom-code block."""
 import importlib
 import inspect
 import json
+import sys
+import os
+import re
 from fractions import Fraction
 
 import vapoursynth as vs
@@ -310,8 +313,12 @@ def _with_adapt(clip, p, fn):
 def run_vs(clip, job, p, ctx):
     ns, fn = p["call"].split(".", 1)
     f = getattr(getattr(core, ns), fn)
-    args = _vs_args(p["call"], p.get("args") or {})
-    return _with_adapt(clip, p, lambda c: f(c, **args))
+    raw = p.get("args") or {}
+    _vs_args(p["call"], raw)                             # a wrong setting fails here already, with its name
+
+    def call(c):
+        return f(c, **_vs_args(p["call"], raw, c), **_vs_clip_args(p["call"], raw, c, ctx))
+    return _with_adapt(clip, p, call)
 
 
 def run_jet(clip, job, p, ctx):
@@ -319,10 +326,28 @@ def run_jet(clip, job, p, ctx):
     mod, fn = p["call"].rsplit(".", 1)
     M = importlib.import_module(mod)
     f = getattr(M, fn)
-    args = {k: _eval_expr(e, mod) for k, e in (p.get("args") or {}).items() if str(e).strip() != ""}
+    raw = {k: e for k, e in (p.get("args") or {}).items() if str(e).strip() != ""}
 
     def call(c):
-        out = f(c, **args)
+        extra = {"w": c.width, "h": c.height, "current": c}
+        for n in ("group", "prev"):
+            if any(n in str(e) for e in raw.values()):
+                extra[n] = _ref_clip(n, c, ctx)
+        args = {k: _eval_expr(CLIP_REFS.get(str(e).strip(), e), mod, extra) for k, e in raw.items()}
+        pos = []
+        try:
+            for q in list(inspect.signature(f).parameters.values())[1:]:
+                if q.kind != q.POSITIONAL_ONLY:
+                    break
+                if q.name not in args:
+                    if q.default is q.empty:
+                        raise TypeError(f"{p['call']}: {q.name} is needed")
+                    break
+                pos.append(args.pop(q.name))
+        except (TypeError, ValueError) as e:
+            if "is needed" in str(e):
+                raise
+        out = f(c, *pos, **args)
         if not isinstance(out, vs.VideoNode):
             raise TypeError(f"{p['call']} returned {type(out).__name__}, not a clip")
         return out
@@ -330,7 +355,9 @@ def run_jet(clip, job, p, ctx):
 
 
 def run_code(clip, job, p, ctx):
-    ns = {"clip": clip, "core": core, "vs": vs, "job": job, "dr": _v()}
+    if not p.get("code") and (p.get("args") or {}).get("code"):
+        p = dict(p, code=p["args"]["code"])          # a Custom code filter of a filter group
+    ns = {"clip": clip, "core": core, "vs": vs, "job": job, "dr": _v(), "group": (ctx or {}).get("group_in") or clip}
     for m in ("vstools", "vsdenoise", "vsaa", "vsdehalo", "vsdeinterlace", "vsscale", "vsmasktools", "vsrgtools", "vsdeband",
               "vskernels", "vsexprtools"):
         try:
@@ -513,6 +540,187 @@ _def("jet_aa", "Anti-aliasing (NNEDI3 / EEDI3 / SangNom)", "JET tools", run_jet_
 _def("output", "Output", "Output", run_output, [],
      desc="Encoder format and colour tags (always last).", before=True, pinned="last")
 _def("vs", "VapourSynth filter", "VapourSynth", run_vs, [], desc="A plugin function.")
+
+
+AI_EXT = (".onnx", ".pth", ".safetensors")
+
+
+def _ai_preset(path, preset):
+    """engine settings from a preset name (filters made before the engine dialog)"""
+    import aiupscale
+    eng = dict(aiupscale.ENGINE)
+    eng.update(aiupscale.PRESETS.get(preset, {}))
+    if preset == "auto":                                 # the model's own precision (fp32 models: fp16, as VapourKit)
+        try:
+            pr = aiupscale.info(path).get("precision")
+        except Exception:                                # noqa: BLE001
+            pr = None
+        eng["precision"] = "bf16" if pr == "bf16" else "fp16"
+    return aiupscale.engine_settings({"engine": eng})
+
+
+def build_ai_engine(path, engine, w, h, backend="tensorrt"):
+    """build (and check) the TensorRT engine of a model now, for a w x h picture - as the first frame would"""
+    import aiupscale
+    import nnbackend
+    nnbackend.set_backend(backend or "tensorrt")
+    eng = aiupscale.engine_settings({"engine": engine or {}})
+    rgb = core.std.BlankClip(format=vs.RGBS, width=int(w), height=int(h), length=8, color=[0.5, 0.5, 0.5])
+    out = aiupscale.run_model(rgb, path, 1.0, eng)
+    out.get_frame(3)
+    return {"w": out.width, "h": out.height}
+
+
+def run_ai(clip, job, p, ctx):
+    """Your own AI model (aiupscale.py): ONNX from VapourKit / chaiNNer (TensorRT), .pth / .safetensors (spandrel,
+    PyTorch). Upscalers make the picture bigger (the chain continues at that size; Crop follows), 1x models restore.
+    Settings: model (path), strength 0..1 (blend with a plain resize), preset (auto = the model's own precision, or
+    an aiupscale.PRESETS name: balanced, max_speed, quick_build, safe_speed, exact), colour_fix (wavelet:
+    the model's detail with the colour / brightness of its input)."""
+    import os
+    import aiupscale
+    import nnbackend
+    a = dict(p.get("args") or {})
+    path = str(a.get("model") or "").strip().strip('"')
+    if not path or not os.path.isfile(path):
+        raise FileNotFoundError(f"AI model not found: {path or '(no model chosen)'}")
+    if os.path.splitext(path)[1].lower() not in AI_EXT:
+        raise ValueError("AI model: .onnx, .pth or .safetensors")
+    nnbackend.set_backend(_v().opt(job, "backend"))
+    if isinstance(p.get("engine"), dict):              # the engine dialog (VapourKit-style): switches + trtexec command
+        eng = aiupscale.engine_settings({"engine": p["engine"]})
+    else:
+        eng = _ai_preset(path, str(a.get("preset") or "auto"))
+    fmt = clip.format
+    matrix = "709" if clip.height > 576 else "170m"
+    yuv = fmt.color_family == vs.YUV
+    rgb = core.resize.Bicubic(clip, format=vs.RGBS, matrix_in_s=matrix) if yuv else core.resize.Bicubic(clip, format=vs.RGBS)
+    out = aiupscale.run_model(rgb, path, max(0.0, min(1.0, float(a.get("strength") or 1.0))), eng)
+    if str(a.get("colour_fix") or "off").lower() in ("on", "1", "true", "yes"):
+        out = core.std.Expr(aiupscale.wavelet_colour_fix(out, rgb, 5, 1.0), "x 0 max 1 min")   # (the model's own result is clamped on the GPU)
+    res = core.resize.Bicubic(out, format=vs.YUV444P16, matrix_s=matrix, dither_type="error_diffusion") if yuv else out
+    return core.std.CopyFrameProps(res, clip)
+
+
+def ai_models(dirs=(), files=()):
+    """the model files in the given folders (not their subfolders) and the single files, for the filter window"""
+    import os
+    seen, out = set(), []
+    def add(path, src):
+        k = os.path.normcase(os.path.abspath(path))
+        if k in seen or not os.path.isfile(path):
+            return
+        seen.add(k)
+        name = os.path.basename(path)
+        m = re.match(r"(\d+)x", name.lower())
+        out.append({"path": path, "file": name, "folder": src, "mb": round(os.path.getsize(path) / 2 ** 20, 1),
+                    "scale": int(m.group(1)) if m else None})
+    for d in dirs or ():
+        try:
+            for n in sorted(os.listdir(d), key=str.lower):
+                if n.lower().endswith(AI_EXT):
+                    add(os.path.join(d, n), d)
+        except OSError:
+            pass
+    for f in files or ():
+        add(f, os.path.dirname(f))
+    return out
+
+
+_def("ai", "AI model", "AI", run_ai, [], desc="Your own AI upscale / restore model (ONNX, .pth, .safetensors).")
+
+# ---------------------------------------------------------------- your own filters (my_filters\)
+# Every function in my_filters\*.py whose first argument is the clip is a filter of the window's "Your own filters"
+# category (settings = its other arguments, help = its docstring); plugins in my_filters\plugins\*.dll are loaded here,
+# so they work in the preview AND in an export (the export script imports the engine too) and appear with the others.
+_MY_MODS = {}
+
+
+def my_dir():
+    import paths
+    for d in (paths.MY_FILTERS, os.path.join(paths.MY_FILTERS, "plugins")):
+        os.makedirs(d, exist_ok=True)
+    return paths.MY_FILTERS
+
+
+def load_my_plugins():
+    d = os.path.join(my_dir(), "plugins")
+    have = {os.path.normcase(getattr(p, "plugin_path", None) or "") for p in core.plugins()}
+    out = []
+    for n in sorted(os.listdir(d)):
+        if n.lower().endswith(".dll") and os.path.normcase(os.path.join(d, n)) not in have:
+            try:
+                core.std.LoadPlugin(os.path.join(d, n))
+                out.append(n)
+            except vs.Error as e:
+                if "already loaded" not in str(e):
+                    print(f"Your plugin {n} was not loaded: {e}", file=sys.stderr, flush=True)
+    return out
+
+
+def _my_module(stem):
+    p = os.path.join(my_dir(), stem + ".py")
+    m = os.path.getmtime(p)
+    if stem not in _MY_MODS or _MY_MODS[stem][0] != m:   # edited: read again
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(f"my_filters_{stem}", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _MY_MODS[stem] = (m, mod)
+    return _MY_MODS[stem][1]
+
+
+def my_catalogue():
+    """[{call "my.<file>.<function>", doc, args, error}] of your Python filters"""
+    res = []
+    d = my_dir()
+    for n in sorted(os.listdir(d)):
+        if not n.lower().endswith(".py") or n.startswith("_"):
+            continue
+        stem = n[:-3]
+        try:
+            mod = _my_module(stem)
+        except Exception as e:                           # noqa: BLE001
+            res.append({"call": f"my.{stem}", "name": f"{stem}.py (cannot be read)", "doc": f"{type(e).__name__}: {e}", "args": [],
+                        "error": True})
+            continue
+        for name, f in vars(mod).items():
+            if name.startswith("_") or not inspect.isfunction(f) or f.__module__ != mod.__name__:
+                continue
+            ps = list(inspect.signature(f).parameters.values())
+            if not ps:
+                continue
+            args = [{"name": q.name, "type": str(q.annotation) if q.annotation is not q.empty else "",
+                     "default": "" if q.default is q.empty else repr(q.default), "required": q.default is q.empty}
+                    for q in ps[1:] if q.kind not in (q.VAR_POSITIONAL, q.VAR_KEYWORD)]
+            res.append({"call": f"my.{stem}.{name}", "doc": (inspect.getdoc(f) or "").strip()[:600], "args": args, "file": os.path.join(d, n)})
+    return res
+
+
+def run_my(clip, job, p, ctx):
+    _, stem, fn = p["call"].split(".", 2)
+    mod = _my_module(stem)
+    f = getattr(mod, fn)
+    raw = {k: e for k, e in (p.get("args") or {}).items() if str(e).strip() != ""}
+
+    def call(c):
+        extra = {"w": c.width, "h": c.height, "current": c, **{k: v for k, v in vars(mod).items() if not k.startswith("__")}}
+        for n in ("group", "prev"):
+            if any(n in str(e) for e in raw.values()):
+                extra[n] = _ref_clip(n, c, ctx)
+        out = f(c, **{k: _eval_expr(CLIP_REFS.get(str(e).strip(), e), "vstools", extra) for k, e in raw.items()})
+        if not isinstance(out, vs.VideoNode):
+            raise TypeError(f"{p['call']} returned {type(out).__name__}, not a clip")
+        return out
+    return _with_adapt(clip, p, call)
+
+
+_def("my", "Your filter", "Yours", run_my, [], desc="A function from my_filters\\*.py.")
+try:
+    load_my_plugins()
+except Exception as _e:                                  # noqa: BLE001
+    print(f"my_filters plugins: {_e}", file=sys.stderr)
+
 _def("jet", "vs-jetpack function", "vs-jetpack", run_jet, [], desc="A vs-jetpack function.")
 
 
@@ -573,8 +781,122 @@ def vs_catalogue():
     return res
 
 
-def _vs_args(call, args):
-    """settings (strings / numbers from the form) -> typed arguments for the plugin function"""
+CLIP_REFS = {"@group": "group", "@prev": "prev", "@self": "current"}
+
+
+def _tokens(x, c):
+    """@w / @h (the picture's size, also in sums such as @w*2) and @std (ntsc / pal) in a setting"""
+    import re
+    x = str(x).strip()
+    if c is None or "@" not in x:
+        return x
+    if x == "@std":
+        return "pal" if c.height in (576, 288) else "ntsc"
+    y = x.replace("@w", str(c.width)).replace("@h", str(c.height))
+    if re.fullmatch(r"[0-9\s+\-*/().]+", y):
+        return str(eval(y))                              # noqa: S307  (digits and + - * / only)
+    raise ValueError(f"'{x}': @w, @h and @std are the only names a setting can use")
+
+
+def _match(ref, c):
+    """a clip setting in the format and size of the picture the filter gets"""
+    if ref.format.id == c.format.id and (ref.width, ref.height) == (c.width, c.height):
+        return ref
+    kw = {}
+    if ref.format.color_family == vs.YUV and c.format.color_family == vs.RGB:
+        kw["matrix_in_s"] = "170m"
+    elif ref.format.color_family == vs.RGB and c.format.color_family == vs.YUV:
+        kw["matrix_s"] = "170m"
+    return core.resize.Bicubic(ref, c.width, c.height, format=c.format.id, **kw)
+
+
+def _ref_clip(name, c, ctx):
+    """group = the picture as it entered the filter group, prev = before the previous filter, current = this filter's input"""
+    ctx = ctx or {}
+    r = {"group": ctx.get("group_in"), "prev": ctx.get("prev_in"), "current": c}[name] or c
+    return _match(r, c)
+
+
+def _mv_arg(call, name, typ, c, cache):
+    """MVTools' search clip, motion vectors and Depan data, made the usual way (backward/forward, delta 1..n)"""
+    import re
+    ns, fn = call.split(".", 1)
+    if ns == "mv":
+        if "super" not in cache:
+            cache["super"] = core.mv.Super(c)
+        sup = cache["super"]
+        m = re.fullmatch(r"mv(bw|fw)(\d*)", name)
+        if name == "super":
+            return sup
+        if name == "vectors":
+            return core.mv.Analyse(sup, isb=True, delta=1, overlap=4)
+        if m:
+            return core.mv.Analyse(sup, isb=m.group(1) == "bw", delta=int(m.group(2) or 1), overlap=4)
+        if name == "data":
+            return core.mv.DepanAnalyse(c, core.mv.Analyse(sup, isb=False, delta=1, overlap=4))
+    if ns == "mvu":
+        if "super" not in cache:
+            cache["super"] = core.mvu.Super(c, blksize=[16], overlap=[8])
+        sup = cache["super"]
+        if name == "super":
+            return sup
+        if name == "vectors" and typ == "vnode":
+            return core.mvu.Analyse(sup, blksize=[16], overlap=[8], delta=1)
+        if name == "vectors":                            # vnode[]: all the deltas the filter uses (Degrain3 = 3)
+            n = re.search(r"(\d+)$", fn)
+            return core.mvu.AnalyseMany(sup, blksize=[16], overlap=[8], radius=int(n.group(1)) if n else (2 if fn == "Degrain" else 1))
+        if name == "data":
+            return core.mvu.DepanEstimate(c)
+    return None
+
+
+def _awarp_mask(c):
+    """AWarp's edge mask: Sobel of the luma, blurred, in every plane (as the app's colour-bleed warp makes it)"""
+    y = core.std.ShufflePlanes(c, 0, vs.GRAY) if c.format.num_planes > 1 else c
+    m = core.std.BoxBlur(core.std.Sobel(y, scale=2), hradius=2, vradius=2, hpasses=2, vpasses=2)
+    return core.std.ShufflePlanes([m] * c.format.num_planes, [0] * c.format.num_planes, c.format.color_family) if c.format.num_planes > 1 else m
+
+
+AUTO_CLIPS = {                                           # helper clips a filter needs, made from its own input
+    ("awarp.AWarp", "mask"): lambda c: _awarp_mask(c),
+    ("bm3d.Final", "ref"): lambda c: core.bm3d.Basic(c),
+    ("bm3d.VFinal", "ref"): lambda c: _match(core.bm3d.VAggregate(core.bm3d.VBasic(c, radius=1), radius=1), c),
+    ("std.MaskedMerge", "mask"): lambda c: core.std.Sobel(c),
+    ("vszip.AdaptiveBinarize", "clip2"): lambda c: core.std.BoxBlur(c, hradius=8, vradius=8),
+}
+
+
+def auto_fills(call, name):
+    """True when a required clip setting is made automatically (the scan can then try the filter)"""
+    return (call, name) in AUTO_CLIPS or (call.split(".")[0] in ("mv", "mvu") and (name in ("super", "vectors", "data")
+                                                                                   or name.startswith(("mvbw", "mvfw"))))
+
+
+def _vs_clip_args(call, raw, c, ctx):
+    """the plugin function's clip settings: @group / @prev / @self, or made automatically"""
+    out, cache = {}, {}
+    for a in _VS_SIGS.get(call, [])[1:]:
+        if not a["type"].startswith("vnode"):
+            continue
+        k, v = a["name"], str(raw.get(a["name"]) or "").strip()
+        if v in CLIP_REFS:
+            node = _ref_clip(CLIP_REFS[v], c, ctx)
+        elif v in ("", "auto"):
+            node = _mv_arg(call, k, a["type"], c, cache) if call.split(".")[0] in ("mv", "mvu") else None
+            if node is None and (call, k) in AUTO_CLIPS:
+                node = AUTO_CLIPS[(call, k)](c)
+            if node is None:
+                if a["opt"]:
+                    continue
+                raise ValueError(f"{call}: {k} needs a clip - type @group (the picture before the group), @prev or @self")
+        else:
+            raise ValueError(f"{call}: {k} is a clip - type @group, @prev or @self (not '{v}')")
+        out[k] = [node] if a["type"].endswith("[]") and isinstance(node, vs.VideoNode) else node
+    return out
+
+
+def _vs_args(call, args, c=None):
+    """settings (strings / numbers from the form) -> typed arguments for the plugin function (clip settings: _vs_clip_args)"""
     if call not in _VS_SIGS:
         vs_catalogue()
     sig = {a["name"]: a for a in _VS_SIGS.get(call, [])}
@@ -585,15 +907,18 @@ def _vs_args(call, args):
         t = sig.get(k, {}).get("type", "data")
         arr = t.endswith("[]")
         base = t[:-2] if arr else t
+        if base == "vnode":
+            continue                                     # _vs_clip_args
         vals = [x.strip() for x in str(v).split(",")] if arr and isinstance(v, str) else (v if isinstance(v, list) else [v])
+        if c is None and any("@" in str(x) for x in vals):
+            continue                                     # @w / @h: known once the picture is
         conv = []
         for x in vals:
+            x = _tokens(x, c) if isinstance(x, str) else x
             if base == "int":
                 conv.append(int(float(x)))
             elif base == "float":
                 conv.append(float(x))
-            elif base == "vnode":
-                raise ValueError(f"{call}: argument {k} needs a second clip - use a Custom code block")
             else:
                 conv.append(str(x))
         out[k] = conv if arr else conv[0]
@@ -639,10 +964,10 @@ def jet_catalogue():
     return res
 
 
-def _eval_expr(expr, mod):
+def _eval_expr(expr, mod, extra=None):
     """a jet argument as typed in the form: a Python expression (numbers, strings in quotes, enums such as
     vsdenoise.Prefilter.DFTTEST), evaluated with vs, core and the vs-jetpack modules available"""
-    ns = {"vs": vs, "core": core}
+    ns = {"vs": vs, "core": core, "Fraction": Fraction, **(extra or {})}
     for m in JET_MODULES:
         try:
             ns[m] = importlib.import_module(m)
@@ -650,7 +975,7 @@ def _eval_expr(expr, mod):
             pass
     try:
         M = importlib.import_module(mod)
-        ns.update({k: getattr(M, k) for k in getattr(M, "__all__", []) if hasattr(M, k)})
+        ns.update({k: getattr(M, k) for k in getattr(M, "__all__", []) if hasattr(M, k) and k not in (extra or {})})
     except Exception:                                    # noqa: BLE001
         pass
     return eval(str(expr), ns)                           # noqa: S307  (the user's own settings, like the Script step)
@@ -921,6 +1246,10 @@ def library(options):
             r = comp.get(f"{kind}:{c}")
             f["group"], f["name"] = eva_toolbox.label(c)  # what it is for + a plain name (names.json)
             f["kind"] = kind
+            if kind == "vs":                             # clip settings the toolbox makes itself (MVTools vectors, masks)
+                for a in f.get("args", []):
+                    if a["type"].startswith("vnode") and auto_fills(c, a["name"]):
+                        a["auto"] = True
             f["status"] = r["status"] if r else "untested"
             if r and r.get("error"):
                 f["error"] = r["error"]
@@ -942,7 +1271,12 @@ def library(options):
                 f["prep"] = cat["prep"][c]
             keep.append(f)
         res[kind] = keep
-    return {"blocks": out, "vs": res["vs"], "jet": res["jet"], "groups": eva_toolbox.names()["groups"], "scanned": made, "hidden": hidden,
+    try:
+        res["my"] = [dict(f, kind="my", group="my", name=f.get("name") or f["call"].split(".", 2)[-1].replace("_", " "),
+                          status="error" if f.get("error") else "ok") for f in my_catalogue()]
+    except Exception as e:                               # noqa: BLE001
+        res["my"] = [{"call": "my", "kind": "my", "group": "my", "name": "my_filters", "doc": str(e), "args": [], "status": "error"}]
+    return {"blocks": out, "vs": res["vs"], "jet": res["jet"], "my": res["my"], "my_dir": my_dir(), "groups": eva_toolbox.names()["groups"], "scanned": made, "hidden": hidden,
             "recipe_errors": dict(RECIPE_ERRORS), "catalog_error": cat.get("_error", "")}
 
 

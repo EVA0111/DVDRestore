@@ -1,6 +1,6 @@
 r"""Builds the shareable, portable DVD Restore: one folder that runs from anywhere, nothing personal in it.
 
-    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\DVDRestore-v0.1-alpha)
+    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\DVDRestore-v0.2-alpha)
 
 Result (about 0.7 GB):
     DVD Restore.exe        starts the app (tools\launcher.cs)     Self-test.bat    checks this PC can run everything
@@ -24,15 +24,15 @@ SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 FULL = "--full" in sys.argv
 ZIP = "--zip" in sys.argv
-DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "DVDRestore-v0.1-alpha")
-VERSION = "0.1.0-alpha"
+DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "DVDRestore-v0.2-alpha")
+VERSION = "0.2.0-alpha"
 PY = os.path.dirname(sys.executable)                      # the Python this runs with (3.12 with everything installed)
 GITHUB = "https://github.com/EVA0111"
 
 RUNTIME_MODELS = ["aanet.pt", "blocknet.pt", "chromanet.pt", "clipnet.pt", "combnet.pt", "dotnet.pt", "dvdnet_precise.pt",
                   "dvdnet_precise2.pt", "dvdnet_restore.pt", "dvdnet_temporal.pt", "fieldnet.pt", "halonet.pt", "stablenet.pt",
-                  "uninet.pt", "deblendnet.pt", "xnet.pt", "tstab.pt", "fieldnet5.pt"]          # missing ones are skipped
-MODEL_CODE = ["fieldnet_core.py", "fieldnet5.py", "tstab_core.py", "neuflow_v2.py"]
+                  "uninet.pt", "deblendnet.pt", "xnet.pt", "tstab.pt", "fieldnet5.pt", "repairnet.pt", "colourprior.pt"]          # missing ones are skipped
+MODEL_CODE = ["fieldnet_core.py", "fieldnet5.py", "tstab_core.py", "neuflow_v2.py", "repairnet_core.py"]
 PACKAGES = ["torch", "torchvision", "numpy", "pillow", "scipy", "onnx", "tensorrt-cu13", "triton-windows", "vapoursynth",
             "vs_temporalfix", "vsjetpack", "vsview", "typing_extensions", "packaging"]
 SKIP = ["__pycache__", "*.pyc"]
@@ -120,7 +120,7 @@ def python_runtime(dst):
 
 
 def readme(dst):
-    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# DVD Restore v0.1 alpha (portable)
+    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# DVD Restore v0.2 alpha (portable)
 
 Restores NTSC and PAL DVD video, other video files and still images - anime, cartoons and live action:
 
@@ -241,6 +241,9 @@ def main():
     copytree(os.path.join(SRC, "app", "renderer"), os.path.join(DEST, "app", "renderer"))
     log("core/")
     copytree(os.path.join(SRC, "core"), os.path.join(DEST, "core"))
+    log("my_filters/ (the example of your own filters; an empty plugins folder)")
+    os.makedirs(os.path.join(DEST, "my_filters", "plugins"), exist_ok=True)
+    copy(os.path.join(SRC, "my_filters", "example_filters.py"), os.path.join(DEST, "my_filters", "example_filters.py"))
     log("models/")
     for m in RUNTIME_MODELS + MODEL_CODE:
         s = os.path.join(SRC, "models", m)

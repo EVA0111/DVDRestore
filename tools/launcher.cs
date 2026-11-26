@@ -11,9 +11,9 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("DVD Restore")]
 [assembly: System.Reflection.AssemblyProduct("DVD Restore")]
-[assembly: System.Reflection.AssemblyDescription("DVD Restore v0.1 alpha")]
-[assembly: System.Reflection.AssemblyVersion("0.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.0.0")]
+[assembly: System.Reflection.AssemblyDescription("DVD Restore v0.2 alpha")]
+[assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
 
 static class Launcher
 {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
-<title>DVD Restore v0.1 alpha</title>
+<title>DVD Restore v0.2 alpha</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,17 +13,17 @@
 
 <!-- ============ step rail ============ -->
 <nav class="rail">
-  <div class="brand"><span class="logo"></span><div><b>DVD Restore</b><i class="ver">v0.1 alpha</i><small id="srcShort">no source</small></div></div>
+  <div class="brand"><span class="logo"></span><div><b>DVD Restore</b><i class="ver">v0.2 alpha</i><small id="srcShort">no source</small></div></div>
   <div class="steps" id="stepNav">
     <button data-step="source"><span class="dot">1</span><span class="lbl">Source<small>disc, file, episodes</small></span></button>
-    <button data-step="adjust"><span class="dot">2</span><span class="lbl">Repair<small>fix the source, in order</small></span></button>
-    <button data-step="colour" class="movable" draggable="true" title="Drag to change the processing order of Colour and Crop & size"><span class="dot">3</span><span class="lbl">Colour<small>levels, white balance</small></span></button>
-    <button data-step="frame" class="movable" draggable="true" title="Drag to change the processing order of Colour and Crop & size"><span class="dot">4</span><span class="lbl">Crop &amp; size<small>borders, shape, size</small></span></button>
+    <button data-step="adjust"><span class="dot">2</span><span class="lbl">Repair<small>fix the source, crop &amp; size</small></span></button>
+    <button data-step="colour"><span class="dot">3</span><span class="lbl">Colour<small>levels, white balance</small></span></button>
     <button data-step="script"><span class="dot">6</span><span class="lbl">Script<small>VapourSynth, edit &amp; save</small></span></button>
     <button data-step="export"><span class="dot">7</span><span class="lbl">Export<small>encode the episodes</small></span></button>
   </div>
   <div class="rail-foot">
     <div id="backendBadge" class="backend-badge" title="Where the neural models run - change in Settings">PyTorch</div>
+    <div class="wf-row"><button id="btnWfSave" class="ghost" title="Save the settings of the episode shown (Repair, Crop &amp; size, Colour, your filter groups) as a file to keep or share (Ctrl+S)">Save workflow</button><button id="btnWfLoad" class="ghost" title="Apply a saved or shared workflow file to this episode or all episodes">Load workflow</button></div>
     <button id="btnReport" class="ghost wide" title="Measure this source and save a zip (measurements, sample frames, short clips, settings, log) to send for tuning">Collect report</button>
     <button id="btnSettings" class="ghost wide">⚙ Settings</button>
     <button id="btnDeps" class="ghost wide" title="Python, PyTorch, TensorRT, VapourSynth, ffmpeg, MKVToolNix: check, repair or add vsview">Dependencies</button>
@@ -36,14 +36,14 @@
 
     <!-- ============ 1 SOURCE ============ -->
     <section class="panel" data-panel="source">
-      <header class="panel-head"><h2>Source</h2><p>Open a DVD (ISO or VIDEO_TS) or a video file. Each episode is cut from it.</p></header>
+      <header class="panel-head"><h2>Source</h2><p>Open a DVD (ISO or VIDEO_TS), a Blu-ray (BDMV folder), a video file or an image. Each episode is cut from it.</p></header>
       <div id="dropZone" class="drop">
         <div class="drop-icon">⤓</div>
         <div class="drop-title">Drop a DVD or video here</div>
         <div class="muted">ISO image, VIDEO_TS folder, or MKV / VOB / MPG / TS / AVI</div>
         <div class="actions center">
           <button id="btnOpenFile" class="primary">Open file…</button>
-          <button id="btnOpenFolder">Open DVD folder…</button>
+          <button id="btnOpenFolder" title="A DVD (VIDEO_TS folder) or Blu-ray (BDMV folder): its titles / playlists are listed to import">Open DVD / Blu-ray folder…</button>
         </div>
       </div>
 
@@ -178,6 +178,7 @@
           <div class="seg" data-bind="halo_method"><button data-v="ai" title="Neural model: halos, ringing after edges and short echoes (up to 16 px). Luma only, keeps grain.">AI</button><button data-v="classic" title="DeHalo filter: halos only">Classic</button></div></div>
         <div class="field" data-key="ghost_strength" data-show="ghost=auto&ai_model!field&ai_model!uni|ghost=auto&uni_halo=0"><label>Strength</label>
           <div class="stepper" data-bind="ghost_strength" data-step="0.25" data-min="0.25" data-max="2"></div></div>
+        <div class="note rn-note hidden" id="rnNoteHalo"></div>
       </div>
 
       <div class="group">
@@ -187,6 +188,7 @@
         <div class="field" data-key="sy" data-show="ai_model!field&ai_model!uni|uni_chroma=0"><label>Shift ↓ down</label>
           <div class="stepper" data-bind="sy" data-step="0.25" data-min="-4" data-max="4" data-unit="px"></div></div>
         <div class="field" data-key="bleed" data-show="ai_model!field&ai_model!uni|uni_chroma=0"><label>Bleed fix</label><select data-bind="bleed" data-opts="bleed"></select></div>
+        <div class="note rn-note hidden" id="rnNoteColour"></div>
         <div class="field" data-key="warp" data-show="bleed^awarp&ai_model!field&ai_model!uni|bleed^awarp&uni_chroma=0"><label>AWarp depth</label>
           <div class="stepper" data-bind="warp" data-step="1" data-min="1" data-max="16"></div></div>
         <div class="field" data-key="neutral"><label>Clean white / black</label>
@@ -205,100 +207,7 @@
       </div>
 
       <div id="autoResult" class="note"></div>
-      <div class="panel-foot"><button data-goto="source">← Source</button><button class="primary" data-goto="colour">Next: Colour →</button></div>
-    </section>
-
-    <!-- ============ 4 COLOUR ============ -->
-    <section class="panel hidden" data-panel="colour">
-      <header class="panel-head"><h2>Colour</h2><p>Applied after all repairs, in the order of the left rail (drag Colour and Crop &amp; size there to change it). Everything at its default = picture untouched. <i>Before</i> is never corrected, so Split shows exactly this step. Double-click any slider, wheel or curve point to reset it.</p></header>
-
-      <div class="group accent">
-        <div class="group-head"><h3>Automatic</h3><button id="btnGradeReset" class="link">Reset all</button></div>
-        <div class="auto-row">
-          <button id="btnAutoColour" class="primary" title="Measure black level, white level, white balance and clipped colour of this source and set them">Auto colour</button>
-          <button id="btnAutoWB" title="Measure the colour of the whites and set temperature / tint so they are neutral. Leaves everything else.">Auto white balance</button>
-        </div>
-        <div id="autoNote" class="note">Auto colour sets black / white point, white balance and clipped colour - a suggestion, check the scopes and the picture.</div>
-      </div>
-
-      <div class="group" id="layerGroup">
-        <div class="group-head"><h3>Adjustment layers</h3><button id="btnLayerAdd" class="primary" title="New adjustment layer at the playhead (5 s)">+ Adjustment layer</button></div>
-        <div id="layerTarget" class="scene-target"></div>
-        <div id="layerList" class="layer-list"></div>
-        <div class="note">As in Premiere: put adjustment layers on the tracks of the timeline under the picture, where and as long as you want. A layer grades everything under it - the base grade and the layers on lower tracks; a higher track works on top. Click a layer to edit it with the controls below; <b>Base grade</b> is the whole video.</div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>Scopes</h3><span class="hint">frame shown, After</span></div>
-        <div class="seg scope-seg" id="scopeSeg"><button data-v="waveform">Waveform</button><button data-v="parade">Parade</button><button data-v="vectorscope">Vectorscope</button><button data-v="histogram">Histogram</button></div>
-        <div class="scope-box"><img id="scopeImg" alt=""><div id="scopeWait" class="scope-wait">open a source</div></div>
-        <div id="scopeNote" class="note"></div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>Levels &amp; tone</h3></div>
-        <div class="field" data-key="grade.black"><label title="Source brightness that becomes black. DVD black is 16. Higher = washed-out source; lower = detail under black that screens cut off.">Black point</label>
-          <div class="slider" data-bind="grade.black" data-min="0" data-max="60" data-step="1" data-def="16"></div></div>
-        <div class="field" data-key="grade.white"><label title="Source brightness that becomes white. DVD white is 235.">White point</label>
-          <div class="slider" data-bind="grade.white" data-min="180" data-max="255" data-step="1" data-def="235"></div></div>
-        <div class="field"><label>Contrast</label>
-          <div class="slider" data-bind="grade.contrast" data-min="0.6" data-max="1.6" data-step="0.01" data-def="1"></div></div>
-        <div class="field"><label title="Midtone brightness. Above 1 = brighter.">Midtones</label>
-          <div class="slider" data-bind="grade.gamma" data-min="0.6" data-max="1.8" data-step="0.01" data-def="1"></div></div>
-        <div class="field"><label title="Brightens the dark tones only; midtones and whites stay. Opens crushed blacks that still hold detail.">Shadow lift</label>
-          <div class="slider" data-bind="grade.shadows" data-min="-0.5" data-max="1.5" data-step="0.05" data-def="0"></div></div>
-        <div id="levelNote" class="note"></div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>Colour wheels</h3><span class="hint">drag the dot · Shift = fine</span></div>
-        <div class="wheels">
-          <div class="wheel" data-wheel="lift" data-label="Shadows"></div>
-          <div class="wheel" data-wheel="gamma_w" data-label="Midtones"></div>
-          <div class="wheel" data-wheel="gain_w" data-label="Highlights"></div>
-        </div>
-        <div class="note">Shadows = lift, Midtones = gamma, Highlights = gain. The dot tints that range toward its colour; the slider under each wheel makes it brighter / darker.</div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>Colour</h3></div>
-        <div class="field"><label>Saturation</label>
-          <div class="slider" data-bind="grade.sat" data-min="0" data-max="2" data-step="0.01" data-def="1"></div></div>
-        <div class="field"><label title="Saturation for weakly coloured areas mostly - strong colours and skin change less">Vibrance</label>
-          <div class="slider" data-bind="grade.vibrance" data-min="-1" data-max="1" data-step="0.01" data-def="0"></div></div>
-        <div class="field"><label title="Rotates every colour (degrees)">Hue</label>
-          <div class="slider" data-bind="grade.hue" data-min="-60" data-max="60" data-step="1" data-def="0"></div></div>
-        <div class="field" data-key="grade.temp"><label title="Negative = cooler (blue), positive = warmer (amber)">Temperature</label>
-          <div class="slider temp" data-bind="grade.temp" data-min="-1" data-max="1" data-step="0.01" data-def="0"></div></div>
-        <div class="field" data-key="grade.tint"><label title="Negative = green, positive = magenta">Tint</label>
-          <div class="slider tint" data-bind="grade.tint" data-min="-1" data-max="1" data-step="0.01" data-def="0"></div></div>
-        <div class="field"><label title="Extra saturation in the dark tones only: colour crushed together with the blacks">Shadow colour</label>
-          <div class="slider" data-bind="grade.dark_sat" data-min="0" data-max="2" data-step="0.05" data-def="0"></div></div>
-        <div class="field" data-key="grade.gamut"><label title="Strong reds and blues that a screen cuts off flat. Compress: the disc still stores them, they are squeezed back into range. AI rebuild: they were cut off before the disc or capture was made, a neural model puts the gradation back.">Clipped colour</label>
-          <select data-bind="grade.gamut" data-opts="gamut"></select></div>
-        <div id="wbNote" class="note"></div>
-        <div id="gamutNote" class="note"></div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>Curves</h3><span><button id="btnCurveReset" class="link">Reset curve</button></span></div>
-        <div class="seg curve-seg" id="curveSeg"><button data-v="m">Master</button><button data-v="r">Red</button><button data-v="g">Green</button><button data-v="b">Blue</button></div>
-        <canvas id="curveCanvas" width="300" height="300"></canvas>
-        <div class="note">Click to add a point, drag it, double-click to remove it. Master works on all three channels.</div>
-      </div>
-
-      <div class="group">
-        <div class="group-head"><h3>LUTs</h3><button id="btnLutLoad" title="Add one or more .cube files">+ Add LUT…</button></div>
-        <div id="lutList" class="lut-list"></div>
-        <div class="note">.cube files (3D or 1D) from Resolve, Premiere or a LUT pack. Applied last, after the wheels and curves, top to bottom: each LUT works on the result of the one above. They expect normal TV-range picture as input.</div>
-      </div>
-      <div class="panel-foot"><button data-goto="adjust">← Repair</button><button class="primary" data-goto="frame">Next: Crop &amp; size →</button></div>
-    </section>
-
-    <!-- ============ 5 CROP & SIZE ============ -->
-    <section class="panel hidden" data-panel="frame">
-      <header class="panel-head"><h2>Crop &amp; size</h2><p>Borders first, then the shape and size of the output.</p></header>
-      <div class="group">
+      <div class="group cs-group">
         <div class="group-head"><h3>Crop</h3><span><span id="cropSize" class="hint"></span> <button id="btnAutoCrop" title="Find the black borders of this source and set the crop">Auto</button></span></div>
         <div class="field" data-key="crop.l"><label>Left</label><div class="stepper" data-bind="crop.l" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
         <div class="field" data-key="crop.r"><label>Right</label><div class="stepper" data-bind="crop.r" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
@@ -306,7 +215,7 @@
         <div class="field" data-key="crop.b"><label>Bottom</label><div class="stepper" data-bind="crop.b" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
       </div>
 
-      <div class="group">
+      <div class="group cs-group">
         <div class="group-head"><h3>Shape and size</h3><span id="outRes" class="hint"></span></div>
         <div class="field"><label title="Shape of the whole (uncropped) picture when it is shown. A DVD stores 4:3 and 16:9 in the same 720 pixels.">Aspect ratio</label><select data-bind="aspect" data-opts="aspects"></select></div>
         <div class="field" data-show="aspect=custom"><label>Ratio</label><input type="text" data-bind="aspect_custom" placeholder="1.85 or 16:9"></div>
@@ -326,7 +235,7 @@
         <div id="sizeNote" class="note"></div>
       </div>
 
-      <div class="group">
+      <div class="group cs-group">
         <div class="group-head"><h3>Sharpen &amp; lines</h3><span class="hint">at the output size</span></div>
         <div class="field"><label title="Sharpening of brightness detail">Luma sharpening</label>
           <div class="stepper" data-bind="sharp.luma" data-step="0.1" data-min="0" data-max="2"></div></div>
@@ -340,9 +249,19 @@
           <div class="stepper" data-bind="sharp.lines" data-step="0.05" data-min="0" data-max="1"></div></div>
         <div id="sharpNote" class="note"></div>
       </div>
-      <div class="panel-foot"><button data-goto="colour">← Colour</button><button class="primary" data-goto="script">Next: Script →</button></div>
+      <div class="vsf-new"><button class="ghost" id="vsfNewGroup" title="A group of your own VapourSynth filters (any installed plugin or vs-jetpack function). Drag it by ⠿ to where it should run; duplicate it with ⧉.">+ VapourSynth filters</button>
+        <span class="note">Drag a group by ⠿ between the groups above: it runs at that point.</span></div>
+      <div class="panel-foot"><button data-goto="source">← Source</button><button class="primary" data-goto="colour">Next: Colour →</button></div>
     </section>
 
+    <!-- ============ 4 COLOUR ============ -->
+    <section class="panel hidden" data-panel="colour">
+      <header class="panel-head"><h2>Colour</h2><p>Runs after all repairs. Everything at its default = picture untouched; <i>Before</i> is never corrected, so Split shows exactly this step. Double-click any slider, wheel or curve point to reset it. Click a section title to fold it.</p></header>
+
+      <div class="panel-foot"><button data-goto="adjust">← Repair</button><button class="primary" data-goto="frame">Next: Crop &amp; size →</button></div>
+    </section>
+
+    <!-- ============ 5 CROP & SIZE ============ -->
     <!-- ============ 6 SCRIPT ============ -->
     <section class="panel hidden" data-panel="script">
       <header class="panel-head"><h2>Script</h2><p>Everything you set, as a VapourSynth script. Edit it here: the preview and the export use your version.</p></header>
@@ -405,6 +324,7 @@
 <!-- ============ preview ============ -->
 <section class="viewer">
   <div class="toolbar">
+    <div class="undo-redo"><button id="btnUndo" disabled>↶</button><button id="btnRedo" disabled>↷</button></div>
     <div class="seg" id="segView" title="B / A / S">
       <button data-v="before">Before</button><button data-v="after">After</button><button data-v="split">Split</button>
     </div>
@@ -419,15 +339,46 @@
     <span id="scriptFlag" class="chip edited hidden" title="The preview's After view runs your edited script">edited script</span>
     <button id="btnVsview" class="primary" title="Open in vsview (its own window): Source, Before, FINAL and comparison tabs. It reloads by itself when you change a setting, keeping its tab and frame.">Preview in vsview</button>
   </div>
-  <div id="stage" class="stage">
+    <div class="stage-row">
+    <aside id="gradeSide" class="grade-side">
+<div class="group fold" data-fold="scopes">
+        <div class="group-head"><h3>Scopes</h3><span class="hint">frame shown, After</span></div>
+        <div class="fold-body">
+          <div class="seg scope-seg" id="scopeSeg"><button data-v="waveform">Waveform</button><button data-v="parade">Parade</button><button data-v="vectorscope">Vectorscope</button><button data-v="histogram">Histogram</button></div>
+          <div class="scope-box"><img id="scopeImg" alt=""><div id="scopeWait" class="scope-wait">open a source</div></div>
+          <div id="scopeNote" class="note"></div>
+        </div>
+      </div>
+<div class="group accent" id="autoGroup" title="Corrects the transfer, not the art: black / white level, a cast on the whites and on the black line art, a heavy fade and clipped colour. With a reference of the same show it also matches saturation, contrast, midtones, shadow lift, shadow colour and hue. Untick a line to leave that part out.">
+        <div class="group-head"><h3>Auto correction</h3><button id="btnGradeReset" class="link">Reset all</button></div>
+        <div class="auto-row">
+          <button id="btnAutoColour" class="primary" title="Measure this source and correct what its transfer got wrong: black / white level, tinted whites and blacks, faded colour, clipped colour. A source that is already right is left as it is.">Auto colour</button>
+          <button id="btnAutoWB" title="Measure the colour of the whites and the black line art and make both neutral (Highlights and Shadows wheels). Levels, saturation and clipped colour stay as they are.">White balance only</button>
+        </div>
+        <div class="ref-row">
+          <button id="btnRefAdd" title="Images or video of the SAME show that look right: a better release or remaster (screenshots are fine), or a well-transferred episode. With it, auto colour also matches saturation, contrast, midtones, shadow lift, shadow colour and hue to it - things a source alone cannot tell from the show's own look.">Reference…</button>
+          <span id="refName" class="ref-name">no reference - saturation, tone and hue are only corrected when clearly wrong</span>
+          <button id="btnRefClear" class="link hidden" title="Remove the reference">✕</button>
+        </div>
+        <div id="autoFindings" class="findings"></div>
+        <div class="field hidden" id="autoStrengthRow"><label title="How much of the measured correction is applied: 100 % = all of it, 0 % = none. Applies to every ticked line above.">Strength</label>
+          <div class="slider" data-bind="autoStrength" data-min="0" data-max="1.5" data-step="0.05" data-def="1"></div></div>
+        <div id="autoNote" class="note">Corrects the transfer, not the art: black / white level, a cast on the whites and on the black line art, a heavy fade and clipped colour. With a reference of the same show it also matches saturation, contrast, midtones, shadow lift, shadow colour and hue. A cast that changes from shot to shot is the art and is left alone. Untick a line to leave that part out.</div>
+      </div>
+    </aside>
+    <div id="stage" class="stage">
     <div id="placeholder" class="placeholder"><div><div class="ph-big">▣</div>Open a source to see the preview.</div></div>
     <div id="imgWrap" class="img-wrap hidden">
       <img id="imgBefore" alt="">
       <img id="imgAfter" alt="">
       <div id="splitBar" class="split-bar hidden"><span>Before | After</span></div>
     </div>
-    <div id="spinner" class="spinner hidden"></div>
+    <div id="spinner" class="spinner hidden"><div class="spin"></div><span id="spinnerText">Rendering preview…</span></div>
   </div>
+  </div>
+
+  
+
   <!-- whole-video timeline: other episodes faint, the selected one highlighted with In / Out handles -->
   <div id="tl" class="tl hidden" title="Click or drag to seek · drag the handles to trim (they snap to chapters; hold Shift for single frames) · click another episode to open it">
     <div class="tl-track"></div>
@@ -469,12 +420,104 @@
       <button id="btnTrimReset" class="link hidden" title="Back to the start / end found when the file was opened">Undo trim</button>
     </div>
   </div>
+  <!-- Colour step, laid out like Resolve's Colour page: palettes on the left, scopes on the right -->
+  <div id="gradeDock" class="grade-dock">
+    <div class="gd-main">
+      <div class="gd-bar"><nav id="gradeTabs" class="grade-tabs"></nav><div id="layerTarget" class="scene-target edit-target"></div></div>
+      <div class="gd-page" data-page="primaries">
+
+<div class="group fold" data-fold="wheels" title="Shadows = lift, Midtones = gamma, Highlights = gain: the dot tints that range toward its colour, the slider under each wheel makes it brighter / darker. Auto colour puts its cast corrections here.">
+        <div class="group-head"><h3>Colour wheels</h3><span class="hint">drag the dot · Shift = fine</span></div>
+        <div class="fold-body">
+          <div class="wheels">
+            <div class="wheel" data-wheel="lift" data-label="Shadows"></div>
+            <div class="wheel" data-wheel="gamma_w" data-label="Midtones"></div>
+            <div class="wheel" data-wheel="gain_w" data-label="Highlights"></div>
+          </div>
+          <div class="note">Shadows = lift, Midtones = gamma, Highlights = gain: the dot tints that range toward its colour, the slider under each wheel makes it brighter / darker. Auto colour puts its cast corrections here (Highlights = whites, Shadows = blacks).</div>
+          <div id="wbNote" class="note"></div>
+        </div>
+      </div>
+<div class="group fold" data-fold="light">
+        <div class="group-head"><h3>Light</h3><span class="hint">levels &amp; tone</span></div>
+        <div class="fold-body">
+          <div class="field" data-key="grade.black"><label title="Source brightness that becomes black. DVD black is 16. Higher = washed-out source; lower = detail under black that screens cut off.">Black point</label>
+            <div class="slider" data-bind="grade.black" data-min="0" data-max="60" data-step="1" data-def="16"></div></div>
+          <div class="field" data-key="grade.white"><label title="Source brightness that becomes white. DVD white is 235.">White point</label>
+            <div class="slider" data-bind="grade.white" data-min="180" data-max="255" data-step="1" data-def="235"></div></div>
+          <div class="field"><label title="Around mid grey. Above 1 = more contrast.">Contrast</label>
+            <div class="slider" data-bind="grade.contrast" data-min="0.6" data-max="1.6" data-step="0.01" data-def="1"></div></div>
+          <div class="field"><label title="Midtone brightness. Above 1 = brighter.">Midtones</label>
+            <div class="slider" data-bind="grade.gamma" data-min="0.6" data-max="1.8" data-step="0.01" data-def="1"></div></div>
+          <div class="field"><label title="Brightens the dark tones only; midtones and whites stay. Opens crushed blacks that still hold detail.">Shadow lift</label>
+            <div class="slider" data-bind="grade.shadows" data-min="-0.5" data-max="1.5" data-step="0.05" data-def="0"></div></div>
+          <div id="levelNote" class="note"></div>
+        </div>
+      </div>
+<div class="group fold" data-fold="colour">
+        <div class="group-head"><h3>Colour</h3><span class="hint">balance &amp; strength</span></div>
+        <div class="fold-body">
+          <div class="field" data-key="grade.temp"><label title="Negative = cooler (blue), positive = warmer (amber)">Temperature</label>
+            <div class="slider temp" data-bind="grade.temp" data-min="-2" data-max="2" data-step="0.01" data-def="0"></div></div>
+          <div class="field" data-key="grade.tint"><label title="Negative = green, positive = magenta">Tint</label>
+            <div class="slider tint" data-bind="grade.tint" data-min="-2" data-max="2" data-step="0.01" data-def="0"></div></div>
+          <div class="field" data-key="grade.sat"><label title="Strength of every colour. 0 = black and white.">Saturation</label>
+            <div class="slider" data-bind="grade.sat" data-min="0" data-max="2" data-step="0.01" data-def="1"></div></div>
+          <div class="field"><label title="Saturation for weakly coloured areas mostly - strong colours and skin change less">Vibrance</label>
+            <div class="slider" data-bind="grade.vibrance" data-min="-1" data-max="1" data-step="0.01" data-def="0"></div></div>
+          <div class="field" data-key="grade.gamut"><label title="Strong reds and blues that a screen cuts off flat. Compress: the disc still stores them, they are squeezed back into range. AI rebuild: they were cut off before the disc or capture was made, a neural model puts the gradation back.">Clipped colour</label>
+            <select data-bind="grade.gamut" data-opts="gamut"></select></div>
+          <div id="gamutNote" class="note"></div>
+        </div>
+      </div>
+<div class="group fold" data-fold="more" data-closed="1">
+        <div class="group-head"><h3>More</h3><span class="hint">hue, shadow colour</span></div>
+        <div class="fold-body">
+          <div class="field"><label title="Rotates every colour (degrees)">Hue</label>
+            <div class="slider" data-bind="grade.hue" data-min="-60" data-max="60" data-step="1" data-def="0"></div></div>
+          <div class="field"><label title="Extra saturation in the dark tones only: colour crushed together with the blacks">Shadow colour</label>
+            <div class="slider" data-bind="grade.dark_sat" data-min="0" data-max="2" data-step="0.05" data-def="0"></div></div>
+        </div>
+      </div>
+<div class="group fold" data-fold="curves" data-closed="1">
+        <div class="group-head"><h3>Curves</h3><button id="btnCurveReset" class="link">Reset curve</button></div>
+        <div class="fold-body">
+          <div class="seg curve-seg" id="curveSeg"><button data-v="m">Master</button><button data-v="r">Red</button><button data-v="g">Green</button><button data-v="b">Blue</button></div>
+          <canvas id="curveCanvas" width="300" height="300"></canvas>
+          <div class="note">Click to add a point, drag it, double-click to remove it. Master works on all three channels.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="gd-page" data-page="layers">
+<div class="group fold" data-fold="layers" id="layerGroup">
+        <div class="group-head"><h3>Adjustment layers</h3><span class="hint" id="layerCount"></span><button id="btnLayerAdd" title="New adjustment layer at the playhead (5 s)">+ Layer</button></div>
+        <div class="fold-body">
+          <div id="layerList" class="layer-list"></div>
+          <div class="note">A grade for part of the video (one scene, a flashback): put layers on the tracks of the timeline under the picture. A layer grades everything under it - the base grade and lower tracks. Click a layer to edit it with the controls above; click it again for the <b>Base grade</b> (whole video).</div>
+        </div>
+      </div>
+      </div>
+      <div class="gd-page" data-page="luts">
+<div class="group fold" data-fold="luts" data-closed="1">
+        <div class="group-head"><h3>LUTs</h3><span class="hint" id="lutCount"></span><button id="btnLutLoad" title="Add one or more .cube files">+ Add LUT…</button></div>
+        <div class="fold-body">
+          <div id="lutList" class="lut-list"></div>
+          <div class="note">.cube files (3D or 1D) from Resolve, Premiere or a LUT pack. Applied last, after the wheels and curves, top to bottom: each LUT works on the result of the one above. They expect normal TV-range picture as input.</div>
+        </div>
+      </div>
+      </div>
+
+    </div>
+
+  </div>
   <div id="trimInfo" class="hidden"></div>
 
   <div class="statusbar">
     <span id="busyDot" class="busy-dot"></span>
     <span id="statusText" class="status-text">Ready</span>
     <div class="progress"><div id="progBar"></div></div>
+    <span id="progText" class="prog-text mono"></span>
     <button id="btnStop" class="danger hidden">Stop</button>
     <button id="btnLog" class="link">Log ▴</button>
   </div>
@@ -483,6 +526,67 @@
 </div>
 
 <!-- ============ settings dialog ============ -->
+<div id="vsfDlg" class="modal hidden">
+  <div class="dialog vsf-dlg">
+    <header><h2>Add a VapourSynth filter</h2><span id="vsfDlgFor" class="vsf-dlg-for"></span><button id="vsfDlgClose" class="link close" title="Close (Esc)">✕</button></header>
+    <input type="text" id="vsfDlgSearch" spellcheck="false" placeholder="Search by name, function, category or what it does: denoise, dehalo, VFM, bwdif, deband, sharpen, mask…">
+    <div class="vsf-dlg-body">
+      <nav id="vsfDlgCats" class="vsf-cats"></nav>
+      <div class="vsf-dlg-main">
+        <div id="vsfAiBar" class="vsf-ai-bar hidden"></div>
+        <div id="vsfMyBar" class="vsf-ai-bar hidden"></div>
+        <div class="vsf-table-wrap"><table class="vsf-table">
+          <thead><tr><th>Filter</th><th>Function</th><th>From</th><th>Settings</th><th>What it does</th></tr></thead>
+          <tbody id="vsfDlgRows"></tbody></table></div>
+        <div id="vsfDlgInfo" class="vsf-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="engineDlg" class="modal hidden">
+  <div class="dialog wide">
+    <header><h2>Engine settings</h2><button id="btnEngineClose" class="link close" title="Cancel (Esc)">✕</button></header>
+    <div class="group">
+      <div class="group-head"><h3>Model</h3></div>
+      <div id="engModel" class="src-name"></div>
+      <div id="engInfo" class="badges"></div>
+    </div>
+    <div class="group eng-switches">
+      <div class="group-head"><h3>Configuration switches</h3></div>
+      <div class="note">These switches update the TensorRT command below with good defaults. You can edit the command by hand.</div>
+      <div class="eng-grid">
+        <div><div class="eng-cap">MODEL TYPE</div><div id="engTypeTxt" class="eng-val"></div>
+          <div class="seg" id="engType"><button data-v="image">Image</button><button data-v="vsr">VSR</button></div></div>
+        <div><div class="eng-cap">SHAPE MODE</div><div id="engShapeTxt" class="eng-val"></div>
+          <div class="seg" id="engShape"><button data-v="dynamic">Dynamic</button><button data-v="static">Static</button></div></div>
+        <div><div class="eng-cap">PRECISION</div><div id="engPrecTxt" class="eng-val"></div>
+          <div class="seg" id="engPrecision"><button data-v="fp16">FP16</button><button data-v="bf16">BF16</button><button data-v="fp32">FP32</button></div></div>
+      </div>
+      <div class="eng-grid" style="margin-top:4px">
+        <div><div class="eng-cap">OPTIMIZATION LEVEL</div><div class="eng-val">0-5: higher = longer build, sometimes faster</div>
+          <div class="seg" id="engOpt"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
+        <div><div class="eng-cap">WORKSPACE</div><div class="eng-val">GPU memory TensorRT may use while building</div>
+          <div class="seg" id="engWs"><button data-v="2048">2 GB</button><button data-v="4096">4 GB</button><button data-v="8192">8 GB</button></div></div>
+        <div><div class="eng-cap">STRENGTH</div><div class="eng-val">0-1: less = blended with a plain resize</div>
+          <input type="text" id="engStrength" class="eng-num" spellcheck="false"></div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>TensorRT build command</h3></div>
+      <div class="note">Made from the switches above; edit it if needed. Understood: --minShapes / --optShapes / --maxShapes, --shapes (static; H / W as letters = the picture size), --builderOptimizationLevel, --fp16 / --bf16, --memPoolSize=workspace:…M, --noTF32. --saveEngine is ignored: engines are kept in engines\.</div>
+      <div class="eng-cap" style="margin-top:8px">ENGINE BUILD PARAMETERS (TRTEXEC SYNTAX)</div>
+      <textarea id="engArgs" class="code eng-args" spellcheck="false" rows="3"></textarea>
+      <div id="engArgsNote" class="note"></div>
+      <div id="engNote" class="note"></div>
+    </div>
+    <div class="actions" style="justify-content:flex-end">
+      <button id="btnEngineCancel">Cancel</button>
+      <button id="btnEngineSave">Save</button>
+      <button id="btnEngineBuild" class="primary" title="Save, and build the engine now for this video's picture size (instead of on the first preview)">Save &amp; build now</button>
+    </div>
+  </div>
+</div>
 <div id="settingsDlg" class="modal hidden">
   <div class="dialog">
     <header><h2>Settings</h2><button id="btnSettingsClose" class="link close">✕</button></header>
@@ -490,6 +594,8 @@
       <div class="group-head"><h3>Neural models</h3></div>
       <div class="field"><label>Run on</label>
         <div class="seg" data-bind="backend"><button data-v="pytorch">PyTorch</button><button data-v="tensorrt">TensorRT</button></div></div>
+      <div class="field"><label title="AI halo removal and AI colour bleed fix: RepairNet does both in one pass (about twice as fast, keeps ink lines and small whites); off = the separate HaloNet and ChromaNet">Halos + bleed</label>
+        <div class="seg" data-bind="repairnet"><button data-v="on">RepairNet (one pass)</button><button data-v="off">HaloNet + ChromaNet</button></div></div>
       <div id="backendNote" class="note"></div>
       <div id="envInfo" class="env"></div>
     </div>

@@ -7,11 +7,15 @@ contextBridge.exposeInMainWorld("api", {
   openVideo: () => ipcRenderer.invoke("open-video"),
   openFolder: (title) => ipcRenderer.invoke("open-folder", title),
   openLut: () => ipcRenderer.invoke("open-lut"),
+  openModel: () => ipcRenderer.invoke("open-model"),
+  openMyFilter: () => ipcRenderer.invoke("open-my-filter"),
+  openRefs: () => ipcRenderer.invoke("open-refs"),
   showItem: (p) => ipcRenderer.invoke("show-item", p),
   showPath: (p) => ipcRenderer.invoke("show-path", p),
   openGithub: () => ipcRenderer.invoke("open-github"),
   isDir: (p) => ipcRenderer.invoke("is-dir", p),
   saveText: (name, text, filters) => ipcRenderer.invoke("save-text", name, text, filters),
+  openText: (filters) => ipcRenderer.invoke("open-text", filters),
   pathForFile: (f) => webUtils.getPathForFile(f),          // drag & drop
   // Dependencies window
   depsCheck: () => ipcRenderer.invoke("deps-check"),

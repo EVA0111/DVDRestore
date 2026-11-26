@@ -64,7 +64,7 @@ def one(kind, call, skip=()):
     if ok:
         return {"status": "ok", "formats": ok, "format": outfmt}
     try:                                                 # filters made for the telecined / interlaced stream
-        c = core.std.SetFieldBased(base, 2)
+        c = core.std.SetFieldBased(core.std.AssumeFPS(base, fpsnum=30000, fpsden=1001), 2)   # 29.97 telecined / interlaced
         out = blocks.block(c, {"source": "", "dar": 4 / 3}, kind, {"call": call, "args": dict(args), "prep": prep, "native": True}, {"sar": 0.889})
         out.get_frame(5)
         blocks.run_output(out, job, {}, {}).get_frame(5)
@@ -74,7 +74,9 @@ def one(kind, call, skip=()):
     return {"status": "error", "error": errs[0], "error_last": errs[-1]}
 
 
-def scan():
+def scan(new_only=False):
+    """new_only: keep the results already made for these versions, try only what has none yet (or needed settings
+    before: a filter the catalog has since given defaults to)"""
     sys.path.insert(0, HERE)
     import blocks
     import eva_toolbox
@@ -89,17 +91,31 @@ def scan():
     for f in blocks.vs_catalogue():
         if "vs:" + f["call"] in res:
             continue
-        if any(not a["opt"] for a in f["args"]):
-            res["vs:" + f["call"]] = {"status": "args", "need": [a["name"] for a in f["args"] if not a["opt"]]}
+        need = [a["name"] for a in f["args"] if not a["opt"] and a["name"] not in cat["defaults"].get(f["call"], {})
+                and not blocks.auto_fills(f['call'], a['name'])]
+        if need:
+            res["vs:" + f["call"]] = {"status": "args", "need": need}
         else:
             todo.append(("vs", f["call"]))
     for f in blocks.jet_catalogue():
         if "jet:" + f["call"] in res:
             continue
-        if any(a["required"] for a in f["args"]):
-            res["jet:" + f["call"]] = {"status": "args", "need": [a["name"] for a in f["args"] if a["required"]]}
+        need = [a["name"] for a in f["args"] if a["required"] and a["name"] not in cat["defaults"].get(f["call"], {})
+                ]
+        if need:
+            res["jet:" + f["call"]] = {"status": "args", "need": need}
         else:
             todo.append(("jet", f["call"]))
+    if new_only:
+        try:
+            old = json.load(open(OUT, encoding="utf-8"))
+            old = old.get("results", {}) if old.get("versions") == versions() else {}
+        except Exception:                                # noqa: BLE001
+            old = {}
+        keep = [it for it in todo if old.get(f"{it[0]}:{it[1]}", {}).get("status") in ("ok", "error")]
+        for it in keep:
+            res[f"{it[0]}:{it[1]}"] = old[f"{it[0]}:{it[1]}"]
+        todo = [it for it in todo if it not in keep]
     t0 = time.time()
     print(f"{len(todo)} functions to try, {len(res)} need settings", flush=True)
 
@@ -154,4 +170,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 3 and sys.argv[1] == "one":
         print("RESULT " + json.dumps(one(sys.argv[2], sys.argv[3], [f for f in (sys.argv[4] if len(sys.argv) > 4 else "").split(",") if f])), flush=True)
     else:
-        scan()
+        scan(new_only="new" in sys.argv[1:])

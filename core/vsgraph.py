@@ -14,6 +14,7 @@ Command line (used by the job runner):
 import json
 import math
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -28,6 +29,7 @@ import numpy as np
 import vapoursynth as vs
 
 import nnbackend
+import paths  # noqa: E402  (core/paths.py: every folder in one place)
 
 core = vs.core
 # VapourSynth keeps rendered frames up to max_cache_size - by default HALF the RAM (15.9 GB here), so the preview
@@ -61,8 +63,14 @@ DEFAULTS = {
     "ghost": "off",        # ghost / halo removal: off auto
     "ghost_strength": 1.0, # halo removal: AI 0.25-1 = blend, above 1 = part of a second pass; classic = passes
     "halo_method": "ai",   # ai (HaloNet: halos + ringing + short echoes, needs models/halonet.pt) classic (DeHalo)
+    "vs_filters_pos": "repairs",   # where Repair -> VapourSynth filters run: source (before IVTC, also what the VFR
+                           # analysis sees), ivtc (INSTEAD of the app's IVTC / PAL handling: your own field matching),
+                           # after_ivtc, repairs (after the colour alignment), end (after crop, stabilizer, colour, size)
+    "repairnet": "on",     # on = AI halos and AI colour bleed in ONE RepairNet pass (models/repairnet.pt) in place of
+                           # HaloNet + ChromaNet; off = the two separate models
     "deblock": "off",      # MPEG blocking / mosquito noise / blocky colour (BlockNet, models/blocknet.pt): off light normal
     "pal_mode": "auto",    # PAL: auto progressive fieldmatch deint50 deint25
+    "pal_film": "on",      # PAL deint50 / deint25: film frames in a mixed source are field-matched whole, not bobbed
     "kernel": "spline36",  # resizer for the output size (see KERNELS)
     "ai_model": "temporal", # neural dots + rainbows cleanup: temporal (5-frame, best) precise (single frame) off
     "ivtc_repair": "ai",   # frames field matching cannot clean: ai (CombNet in the combed areas) / masked (NNEDI3 +
@@ -764,14 +772,87 @@ def fix_fps(src, job):
     return core.std.AssumeFPS(src, fpsnum=25 if pal else 30000, fpsden=1 if pal else 1001)
 
 
+_BAD_RE = re.compile(r"No frame returned for frame number (\d+)")
+
+
+def _bad_file(path):
+    """where the undecodable frames of this source are listed (temp\\bad_frames, keyed by path + size + date)"""
+    import hashlib
+    st = os.stat(path)
+    key = hashlib.sha1(f"{os.path.abspath(path).lower()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:16]
+    return os.path.join(paths.TEMP, "bad_frames", key + ".json")
+
+
+def _bad_info(path):
+    """{"bad": [frames], "scanned": True once the whole file was checked} (an older file is a plain list)"""
+    try:
+        with open(_bad_file(path), encoding="utf-8") as fh:
+            d = json.load(fh)
+        if isinstance(d, list):
+            d = {"bad": d}
+        return {"bad": sorted({int(n) for n in d.get("bad", [])}), "scanned": bool(d.get("scanned"))}
+    except Exception:                                  # noqa: BLE001  (none known, or no file)
+        return {"bad": [], "scanned": False}
+
+
+def _save_bad(path, info):
+    f = _bad_file(path)
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    with open(f, "w", encoding="utf-8") as fh:
+        json.dump(info, fh)
+
+
+def bad_frames(path):
+    return _bad_info(path)["bad"]
+
+
+def note_bad_frame(path, err):
+    """An undecodable frame reported by BestSource ("No frame returned for frame number N": a damaged picture in the
+    file - Kishin Douji Zenki 01 frame 7532, even with threads=1): list it, so source() replaces it from now on.
+    Returns the frame number, or None when err is a different error."""
+    m = _BAD_RE.search(str(err))
+    if not m:
+        return None
+    n = int(m.group(1))
+    info = _bad_info(path)
+    info["bad"] = sorted(set(info["bad"]) | {n})
+    _save_bad(path, info)
+    print(f"Source frame {n} cannot be decoded (damaged in the file): it is replaced by its neighbour", file=sys.stderr, flush=True)
+    return n
+
+
+def _skip_bad(src, bad):
+    """every undecodable frame becomes a copy of the nearest decodable one before it (after it at the start);
+    FreezeFrames never asks the decoder for the replaced frame"""
+    bad = [b for b in bad if 0 <= b < src.num_frames]
+    if not bad:
+        return src
+    bs, first, last, repl = set(bad), [], [], []
+    for b in bad:
+        r = b - 1
+        while r in bs:
+            r -= 1
+        if r < 0:
+            r = b + 1
+            while r in bs:
+                r += 1
+        first.append(b); last.append(b); repl.append(min(r, src.num_frames - 1))
+    return core.std.FreezeFrames(src, first=first, last=last, replacement=repl)
+
+
 def source(job, clean=True):
     src = core.bs.VideoSource(job["source"], rff=True)
+    if not job.get("image"):
+        src = _skip_bad(src, bad_frames(job["source"]))
     if job.get("image"):                               # a still: a short clip of identical frames (runner.IMAGE_FRAMES)
         n = int(job.get("end") or 24)
         src = core.std.AssumeFPS(src[0] * max(1, n), fpsnum=job.get("fps_num", 30000), fpsden=job.get("fps_den", 1001))
     src = fix_fps(src, job)
     tff = opt(job, "order") != "bff"
-    src = core.std.SetFieldBased(src, 2 if tff else 1)
+    # an image / progressive source has no fields: marked field-based, the 4:2:0 conversion below resized each FIELD
+    # (an image 708x530 = two fields of 265 lines, odd -> "Resize error 1027")
+    interlaced = not (job.get("image") or job.get("progressive"))
+    src = core.std.SetFieldBased(src, (2 if tff else 1) if interlaced else 0)
     start, end = job.get("start", 0), job.get("end") or src.num_frames
     src = src[start:end]
     # DVDs often carry no colour tags ("unspecified") - tag them so viewers and resizers know the space
@@ -780,6 +861,9 @@ def source(job, clean=True):
         # captures / intermediates (RGB Lagarith, 4:2:2 ...) instead of a DVD stream: bring them to the DVD
         # format the rest of the chain (field matching, the neural models) is built for
         kw = {"matrix": m, "range": vs.RANGE_LIMITED} if src.format.color_family == vs.RGB else {}
+        vm = 4                                           # 4:2:0 needs even sizes, the field-based crawl stage even fields: an image
+        if src.width % 2 or src.height % vm:             # of 708x531 failed with "Resize error 1027" - a few px off
+            src = core.std.Crop(src, right=src.width % 2, bottom=src.height % vm)
         src = core.resize.Bicubic(src, format=vs.YUV420P8, dither_type="error_diffusion", **kw)
     src = core.std.SetFrameProps(src, _Matrix=m, _Primaries=p, _Transfer=t, _Range=vs.RANGE_LIMITED)
     GUARD["on"] = opt(job, "temporal_guard") != "off"
@@ -788,6 +872,8 @@ def source(job, clean=True):
         src = composite_restore(src, job)            # StableNet does the composite repair itself (trained on raw input)
     if clean and not is_pal(job):
         src = xtalk_stage_a(src, job)
+    if clean and vsf_at(job, "source"):                # your filters on the raw source (field matching / VFR analysis see them)
+        src = vs_filters(src, job, "source")
     return src
 
 
@@ -948,6 +1034,38 @@ def vinverse(clip, sstr=2.7, scl=0.25):
     return core.std.MergeDiff(vblur, core.std.Expr([vshrp_d, vblur_d], expr))
 
 
+SPIKE_MIN = 30        # fine-comb value (motion-gated interlace signature, densest 5x5 area, 0-255) a frame needs ...
+SPIKE_RATIO = 3.0     # ... and how many times the largest of its 2 + 2 neighbours'
+
+
+def fine_comb(clip, prop="CF"):
+    """per frame <prop>Max: densest 5x5 area (0-255) of MOVING pixels with the interlace signature (_combmask's test),
+    the picture's 8-px edges left out"""
+    y = core.std.ShufflePlanes(clip, 0, vs.GRAY)
+    y = core.resize.Point(y, format=vs.GRAY8) if y.format.id != vs.GRAY8 else y
+    sig = core.akarin.Expr([y], "x x[0,-1] - x x[0,1] - * 400 > x x[0,-2] - abs 12 < x x[0,2] - abs 12 < and and 255 0 ?")
+    yb = core.std.BoxBlur(y, hradius=3, vradius=3)
+    dif = core.std.BoxBlur(core.std.Expr([yb, yb[0] + yb[:-1], yb[1:] + yb[-1]], "x y - abs x z - abs max"), hradius=4, vradius=4)
+    m = core.std.BoxBlur(core.std.Expr([sig, dif], "y 3 > x 0 ?"), hradius=2, vradius=2)
+    return core.std.PlaneStats(core.std.Crop(m, 8, 8, 8, 8), prop=prop)
+
+
+def comb_spikes(clip):
+    """per frame: CombFine = densest 5x5 area of moving pixels with the interlace signature (_combmask's test), and
+    CombNb = the largest of the 2 frames before and after. A frame field matching left combed stands out against its
+    neighbours; drawn detail (hatching, mesh, fine lines) is there in every frame, so it does not."""
+    fine = fine_comb(clip)
+    nb = [_shift(fine, o) for o in (-2, -1, 1, 2)]
+    return core.akarin.PropExpr([clip, fine] + nb, lambda: {"CombFine": "y.CFMax", "CombNb": "z.CFMax a.CFMax max b.CFMax c.CFMax max max"})
+
+
+def is_spike(f, overlay=None):
+    if overlay and f.props.get("SrcN", -1) in overlay:   # a frame of a combed overlay (overlay_comb_frames)
+        return True
+    v = f.props.get("CombFine", 0)
+    return v >= SPIKE_MIN and v >= SPIKE_RATIO * max(1, f.props.get("CombNb", 0))
+
+
 def comb_safety_net(clip, job):
     """Last line of defence after IVTC: combing that field matching could not fix (true interlaced
     footage, bad edits, orphan fields).
@@ -958,18 +1076,21 @@ def comb_safety_net(clip, job):
     if mode == "off":
         return clip
     order = _order(job)
+    ov = job.get("_overlay") or None
+    spike = lambda f: is_spike(f, ov)
     clip = core.std.SetFieldBased(clip, 0)
     st = core.std.PlaneStats(_combmask(clip), plane=0)
+    st = core.std.CopyFrameProps(comb_spikes(clip), st, props=["PlaneStatsMax"])
     if mode == "safe":
         deint = core.bwdif.Bwdif(core.std.SetFieldBased(clip, 2 if order else 1), field=order)
         deint = core.std.SetFieldBased(deint, 0)
-        out = core.std.FrameEval(clip, lambda n, f: deint if f.props["PlaneStatsMax"] > 110 else clip, prop_src=st)
+        out = core.std.FrameEval(clip, lambda n, f: deint if f.props["PlaneStatsMax"] > 110 or spike(f) else clip, prop_src=st)
         return core.std.SetFieldBased(out, 0)
     limit = 60 if mode == "strong" else 110
     if opt(job, "ivtc_repair") in ("masked", "ai"):
         # same detection, but only the combed areas of the frame are rebuilt
-        stc = core.std.CopyFrameProps(clip, st, props=["PlaneStatsMax"]) if hasattr(core.std, "CopyFrameProps") else st
-        out = comb_repair(stc, job, flagged=lambda f: f.props["PlaneStatsMax"] > limit)
+        stc = core.std.CopyFrameProps(clip, st, props=["PlaneStatsMax", "CombFine", "CombNb"] + (["SrcN"] if ov else []))
+        out = comb_repair(stc, job, flagged=lambda f: f.props["PlaneStatsMax"] > limit or spike(f))
         if mode == "strong":
             out = vinverse(out)
         return core.std.SetFieldBased(out, 0)
@@ -977,7 +1098,7 @@ def comb_safety_net(clip, job):
     nn = core.znedi3.nnedi3(clip, field=order, nsize=0, nns=3, qual=2)
     bw = core.std.SetFieldBased(core.bwdif.Bwdif(core.std.SetFieldBased(clip, 2 if order else 1), field=order, edeint=nn), 0)
     # whole frame: a comb mask misses low-contrast combing (e.g. colour-only lines in flat areas)
-    out = core.std.FrameEval(clip, lambda n, f: bw if f.props["PlaneStatsMax"] > limit else clip, prop_src=st)
+    out = core.std.FrameEval(clip, lambda n, f: bw if f.props["PlaneStatsMax"] > limit or spike(f) else clip, prop_src=st)
     if mode == "strong":
         out = vinverse(out)
     return core.std.SetFieldBased(out, 0)
@@ -1186,10 +1307,106 @@ def _with_diff(tfm):
     SCA1 held frames 40, real changes 60, a slow pan 45)"""
     y = core.resize.Bilinear(core.std.ShufflePlanes(tfm, 0, vs.GRAY), 240, 160, format=vs.GRAYS)
     st = core.std.PlaneStats(y, y[0] + y[:-1], prop="VDiff")
-    return core.std.CopyFrameProps(tfm, st, props=["VDiffDiff"])
+    # + "VBlkMax": the change of the most-changed area (15 x 10 areas of ~48 px): credits / captions moving over a film
+    # picture change one strip only - the frame mean showed the film's repeat and the section was decimated to 24p
+    d = core.std.Expr([y, y[0] + y[:-1]], "x y - abs")
+    b = core.resize.Bilinear(d, 15, 10)
+    blk = core.std.PlaneStats(b, prop="VBlk")
+    # + "VLocRMax": per area, this frame's change against the larger change of its two neighbours (areas changing
+    # >= 6 levels only), the largest over the frame. An overlay moving at video rate changes as much at the film's
+    # repeat as around it (Bebop's titles 0.90-1.02); a blended / noisy part of the film picture about half as much
+    # (GTO's arm 0.64-0.82)
+    t = 6 / 255
+    lr = core.std.Expr([b, b[0] + b[:-1], b[1:] + b[-1]], f"x {t} >= x y z max 0.0001 max / 0 ?")
+    loc = core.std.PlaneStats(lr, prop="VLocR")
+    st = core.std.CopyFrameProps(st, blk, props=["VBlkMax"])
+    st = core.std.CopyFrameProps(st, loc, props=["VLocRMax"])
+    # + "VCombMax": combing left in the matched frame (fine_comb) - an overlay laid on at 60 fields/s stays combed in
+    # every frame (Bleach 190's credits), a blend (GTO's arm) does not
+    st = core.std.CopyFrameProps(st, fine_comb(tfm, prop="VComb"), props=["VCombMax"])
+    return core.std.CopyFrameProps(tfm, st, props=["VDiffDiff", "VBlkMax", "VLocRMax", "VCombMax"])
+
+
+SEEK_PREROLL = 20          # BestSource's default seekpreroll (frames decoded before a seek target)
+
+
+_SCAN_LOCKS = {}
+
+
+def scan_source(path, progress=True):
+    """(once per file; a second caller - the background scan started when the file was opened, and an analysis that
+    needs it - waits for the first instead of scanning again)"""
+    import threading
+    lk = _SCAN_LOCKS.setdefault(os.path.normcase(os.path.abspath(path)), threading.Lock())
+    with lk:
+        return _scan_source(path, progress)
+
+
+def _scan_source(path, progress=True):
+    """Decode every frame of the source once (BestSource alone, no filters) and list the frames that cannot be decoded.
+    Done once per file (remembered in temp\bad_frames). Frame by frame on ONE decoder: BestSource reports a damaged
+    frame at once while it reads straight on, but asking again for it - or restarting a read inside the damaged
+    stretch - sends it back to the start of the file to recover, ~150 s each (Zenki 01: 36 min -> about a minute)."""
+    import time
+    info = _bad_info(path)
+    if info["scanned"]:
+        return info["bad"]
+    src = core.bs.VideoSource(path, rff=True)
+    n, bad, t0 = src.num_frames, set(info["bad"]), time.time()
+    if progress:
+        print("Checking the source for damaged frames (once per file)...", file=sys.stderr, flush=True)
+    for k in range(n):
+        try:
+            src.get_frame(k)
+        except vs.Error as e:
+            if not _BAD_RE.search(str(e)):
+                raise
+            # the 20 frames after it too: reaching any of them by a jump (a filter that skips the replaced frame)
+            # makes BestSource seek 20 frames back (its seekpreroll) and decode through the damage again - each such
+            # miss cost about a minute in the VFR pass 1 (Zenki 01: 7532 -> 7533..7552 all failed that way)
+            bad.update(range(k, min(n, k + SEEK_PREROLL + 1)))
+        if progress and k % 5000 == 0:
+            print(f"PROGRESS {k} {n}", flush=True)
+    info = {"bad": sorted(bad), "scanned": True}
+    _save_bad(path, info)
+    if progress:
+        print(f"Source checked in {time.time() - t0:.0f} s" + (f": {len(bad)} damaged frame(s), each replaced by its neighbour" if bad else ""),
+              file=sys.stderr, flush=True)
+    return info["bad"]
 
 
 def vfr_pass1(job):
+    """VFR pass 1. Damaged frames are found first by one fast scan of the file (scan_source) and replaced by their
+    neighbours; if one still turns up, it is listed and the pass starts again."""
+    try:
+        scan_source(job["source"])
+    except Exception as e:                             # noqa: BLE001  (the scan is a speed-up: pass 1 still copes)
+        print(f"Damaged-frame scan skipped: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    for _ in range(200):
+        try:
+            return _vfr_pass1(job)
+        except vs.Error as e:
+            n = note_bad_frame(job["source"], e)
+            if n is None:
+                raise
+            _scan_bad_run(job["source"], n)
+    raise RuntimeError("too many undecodable frames in the source")
+
+
+def _scan_bad_run(path, n, reach=600):
+    """a damaged GOP usually loses a run of frames (Zenki 01: 7532-7552): list the whole run now, so the pass
+    restarts once instead of once per frame. Stops at the first frame that decodes."""
+    src = core.bs.VideoSource(path, rff=True)
+    for k in range(n + 1, min(src.num_frames, n + reach)):
+        try:
+            src.get_frame(k)
+            return
+        except vs.Error as e:
+            if note_bad_frame(path, e) is None:
+                return
+
+
+def _vfr_pass1(job):
     clip = source(job)
     if _clean_decisions(job):                         # VFR pass 1 (metrics) on the crawl-free copy too
         tfm = _decision_tfm(clip, job, output=job["work"] + "/tfm.txt")
@@ -1198,17 +1415,106 @@ def vfr_pass1(job):
         tfm = _tfm(clip, job, output=job["work"] + "/tfm.txt")
         dec = _tdec(_with_diff(tfm), job, mode=4, output=job["work"] + "/tdec.txt")
     total = dec.num_frames
-    diff = []
+    diff, blk, loc, comb = [], [], [], []
     for n, f in enumerate(dec.frames(close=True)):
         diff.append(float(f.props.get("VDiffDiff", -1)) * 255)
+        blk.append(float(f.props.get("VBlkMax", -1)) * 255)
+        loc.append(float(f.props.get("VLocRMax", 0)))
+        comb.append(float(f.props.get("VCombMax", 0)))
         if n % 500 == 0:
             print(f"PROGRESS {n} {total}", flush=True)
     print(f"PROGRESS {total} {total}", flush=True)
     with open(job["work"] + "/diff.txt", "w") as fh:
         fh.writelines("%.3f\n" % d for d in diff)
+    with open(job["work"] + "/blk.txt", "w") as fh:
+        fh.writelines("%.3f\n" % d for d in blk)
+    with open(job["work"] + "/loc.txt", "w") as fh:
+        fh.writelines("%.3f\n" % d for d in loc)
+    with open(job["work"] + "/comb.txt", "w") as fh:
+        fh.writelines("%.1f\n" % d for d in comb)
 
 
-def video_sections(diff, matches=None, run=4, window=6, shifted=0.6):
+def _local_video(blk, diff, cyc, floor_min=4.0, focus=10.0, loc=None, keep=0.85):
+    """per 5-frame cycle: a PART of the picture moves at video rate over telecined film - credits or a caption
+    scrolling over a film picture (blk: VBlkMax = change of the most-changed of 150 areas, diff: VDiffDiff = mean
+    change of the frame, both levels). Telecined film repeats every area once per cycle; at that repeat frame the
+    overlay still changes in its own area while the rest of the picture stands still, so the change is concentrated:
+    most-changed area / frame mean >= focus. Measured at the repeat: synthetic credits over a film pan ~32, Bebop's
+    video-rate opening titles 13-19. MPEG noise on the duplicate of a fast film pan is spread over the whole picture
+    and can be strong in the busiest area (GTO opening 10-23 levels) but stays at 3-7.5 (GTO, Angel Densetsu,
+    Shin Hakkenden film parts, Golden Boy), so those stay film. The overlay also has to change visibly in every
+    frame of the cycle (>= floor_min levels and 4x the source's floor).
+    loc (VLocRMax): and the overlay changes at the repeat about as much as in the frames around it (>= keep). GTO's
+    opening has an arm that is a double image (blend) at the face's repeat: concentrated (ratio ~15) but only half
+    the change -> kept 30p it only brought the uneven 3:2 rhythm back to the face. Without loc.txt (older pass 1):
+    off - the rule does nothing."""
+    if not blk or not diff or not loc:
+        return [False] * cyc
+    floor = max(0.1, float(np.percentile(blk, 5)))
+    out = []
+    for k in range(cyc):
+        v, d = blk[5 * k:5 * k + 5], diff[5 * k:5 * k + 5]
+        if len(v) < 5 or len(d) < 5:
+            out.append(False)
+            continue
+        r = int(np.argmin(d))                             # the film's repeat (smallest frame change)
+        lr = loc[5 * k + r] if 5 * k + r < len(loc) else 0.0
+        out.append(min(v) >= max(floor_min, 4 * floor) and v[r] >= focus * max(d[r], 0.05) and lr >= keep)
+    return out
+
+
+OVERLAY_COMB = 11     # median fine-comb value (0-255) of a cycle's matched frames: the overlay is interlaced
+OVERLAY_RUN = 6       # cycles (~1 s) in a row
+OVERLAY_GAP = 3       # cycles without it (text standing still, between two cards) bridged inside a run
+
+
+def overlay_comb_frames(blk, diff, comb, floor_min=4.0, focus=0.0):
+    """source frames (pass 1 numbering) of a COMBED video-rate overlay over film: credits / captions laid on at 60
+    fields/s. Like _local_video, the overlay changes in every frame of the cycle (>= floor_min levels; its other test,
+    concentration at the film's repeat, passed only half of Bleach's credit cycles and is not needed: changing in
+    every frame AND combed marked 0 cycles of the rest of the episode) - but it fails _local_video's
+    repeat test (it changes only about half as much there: 0.56 on Bleach 190's ending, where a 30p overlay keeps
+    >= 0.85), and keeping it 30p would not help: it is combed in every field-matched frame. So it stays film (24p)
+    and comb_safety_net rebuilds its combed, moving pixels. GTO's blended arm is concentrated too, but not combed."""
+    if not blk or not diff or not comb:
+        return set()
+    cyc = min(len(blk), len(diff), len(comb)) // 5
+    floor = max(0.1, float(np.percentile(blk, 5)))
+    hit = []
+    for k in range(cyc):
+        v, d, c = blk[5 * k:5 * k + 5], diff[5 * k:5 * k + 5], comb[5 * k:5 * k + 5]
+        r = int(np.argmin(d))
+        hit.append(min(v) >= max(floor_min, 4 * floor) and v[r] >= focus * max(d[r], 0.05) and float(np.median(c)) >= OVERLAY_COMB)
+    idx = [k for k in range(cyc) if hit[k]]               # short gaps (text standing still, a cut) bridged
+    for a, b in zip(idx[:-1], idx[1:]):
+        if 1 < b - a <= OVERLAY_GAP + 1:
+            for k in range(a + 1, b):
+                hit[k] = True
+    out, a = set(), None
+    for k in range(cyc + 1):
+        h = k < cyc and hit[k]
+        if h and a is None:
+            a = k
+        elif not h and a is not None:
+            if k - a >= OVERLAY_RUN:
+                out.update(range(5 * a, 5 * k))
+            a = None
+    return out
+
+
+def _overlay_frames(job):
+    """overlay_comb_frames from the work folder's pass 1 (comb.txt only from pass 1 version 7 on)"""
+    w = job.get("work") or ""
+    try:
+        if not os.path.exists(w + "/comb.txt"):
+            return set()
+        return overlay_comb_frames(_read_diff(w + "/blk.txt"), _read_diff(w + "/diff.txt"), _read_diff(w + "/comb.txt"))
+    except Exception as e:                               # noqa: BLE001
+        print(f"overlay check failed: {e}", file=sys.stderr)
+        return set()
+
+
+def video_sections(diff, matches=None, run=4, window=6, shifted=0.6, blk=None, loc=None):
     """Sections (of whole 5-frame cycles) that are NOT telecined film, from the frame changes of pass 1 (levels).
     After field matching, telecined film repeats one frame per cycle AT THE SAME POSITION cycle after cycle (hard
     or soft pulldown). Animation made at 29.97p (SCA1) also repeats frames - drawings held 3 or 2 frames - but the
@@ -1263,8 +1569,11 @@ def video_sections(diff, matches=None, run=4, window=6, shifted=0.6):
             if sum(win) >= shifted * len(win):
                 film[k] = True
     # everything without that evidence stays 30p: a still shot looks the same either way, and SCA1's near-still
-    # slow pans (changes 0.6-1.0 levels, at its noise floor) were decimated by TDecimate otherwise
-    video = [not f for f in film]
+    # slow pans (changes 0.6-1.0 levels, at its noise floor) were decimated by TDecimate otherwise.
+    # A part of the picture moving at video rate (credits / captions over film, blk) stays 30p even over film: the film
+    # evidence (its repeat, its p / n matches) comes from the rest of the picture
+    loc = _local_video(blk, diff, cyc, loc=loc)
+    video = [not f or l_ for f, l_ in zip(film, loc)]
     out, a = [], None
     for k in range(cyc + 1):
         v = k < cyc and video[k]
@@ -1302,7 +1611,9 @@ def _video_ovr(job):
         return None
     w = job["work"]
     try:
-        sec = (video_sections(_read_diff(w + "/diff.txt"), _read_matches(w + "/tfm.txt"))
+        sec = (video_sections(_read_diff(w + "/diff.txt"), _read_matches(w + "/tfm.txt"),
+                              blk=_read_diff(w + "/blk.txt") if os.path.exists(w + "/blk.txt") else None,
+                              loc=_read_diff(w + "/loc.txt") if os.path.exists(w + "/loc.txt") else None)
                if os.path.exists(w + "/diff.txt") else [])
     except Exception as e:                               # noqa: BLE001
         print(f"video section check failed: {e}", file=sys.stderr)
@@ -1326,6 +1637,12 @@ def ivtc_vfr(clip, job):
         dec = _tdec(m_cl, job, mode=5, hybrid=2, input=w + "/tdec.txt", tfmIn=w + "/tfm.txt",
                     mkvOut=w + "/timecodes.txt", tcfv1=0, **{**kw, **dict(job.get("ivtc_tdec_kw") or {})})
         return _apply_decisions(dec, m_raw, job)
+    ov = _overlay_frames(job)
+    if ov and not raw_ivtc(job):                      # combed credits / captions: their source frames are marked
+        clip = core.akarin.PropExpr([clip], lambda: {"SrcN": "N"})
+        job = dict(job, _overlay=ov)
+        print(f"Combed video-rate overlay (credits / captions over film): {len(ov)} frames - its combing is rebuilt",
+              file=sys.stderr, flush=True)
     tfm = _tfm(clip, job, input=w + "/tfm.txt")
     dec = _tdec(tfm, job, mode=5, hybrid=2, input=w + "/tdec.txt", tfmIn=w + "/tfm.txt",
                 mkvOut=w + "/timecodes.txt", tcfv1=0, **kw)
@@ -1336,14 +1653,36 @@ def ivtc_vfr(clip, job):
 
 # ---------------------------------------------------------------- PAL
 
+def _ok_frames(clip, picks, path=None):
+    """the sample frames that can be decoded (a damaged frame is listed for the source and left out, so an analysis
+    that samples frames does not stop at it - Zorro DVD 01: "No frame returned for frame number 1360")"""
+    ok = []
+    for k in picks:
+        try:
+            clip.get_frame(int(k))
+            ok.append(int(k))
+        except vs.Error as e:
+            if not _BAD_RE.search(str(e)):
+                raise
+            if path:
+                note_bad_frame(path, e)
+    return ok
+
+
 def pal_detect(job, samples=240):
     """Classify a PAL source: progressive, field-shifted (fixable by field matching) or interlaced.
     Field matching is tried with both field orders; the one that removes the combing wins."""
+    if job.get("source") and not job.get("image"):
+        try:
+            scan_source(job["source"], progress=False)   # damaged frames known first: jumping onto one costs minutes
+        except Exception as e:                           # noqa: BLE001
+            print(f"Damaged-frame scan skipped: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
     src = source(job)
     n = src.num_frames
     picks = np.linspace(min(500, n // 10), n - 1 - min(500, n // 10), min(samples, n)).astype(int)
     moving = core.std.PlaneStats(src, src[1:] + src[-1:], plane=0)
-    picks = [int(k) for k in picks if moving.get_frame(int(k)).props["PlaneStatsDiff"] >= 0.004]
+    picks = _ok_frames(moving, [k for k in picks if k + 2 < n], job.get("source"))
+    picks = [k for k in picks if moving.get_frame(k).props["PlaneStatsDiff"] >= 0.004]
     if not picks:
         return {"mode": "progressive", "order": opt(job, "order"), "raw_combed": 0.0, "matched_combed": 0.0}
 
@@ -1389,6 +1728,49 @@ def _combmask(clip):
 _PAL_CACHE = {}
 
 
+def _shift(c, o):
+    """frame k of the result = frame k + o of c (edges repeated)"""
+    if o > 0:
+        return c[o:] + c[-1] * o
+    if o < 0:
+        return c[0] * (-o) + c[:o]
+    return c
+
+
+def pal_film_flags(m, radius=1):
+    """Per source frame of the field-matched clip m (TFM, PP=1): film (25p progressive or field-shifted) or true 50i
+    video? Film always has a clean match (TFM's comb value of the chosen match 0-5 on the synthetic mix), 50i video
+    in motion has none (150+). A frame counts as film when it and its +-radius neighbours matched clean, so a single
+    clean frame inside moving video (motion stopping for a moment) does not switch back and forth. -> prop _PalFilm"""
+    clips = [_shift(m, o) for o in range(-radius, radius + 1)]
+
+    def proc(n, f):
+        out = f[radius].copy()
+        out.props["_PalFilm"] = int(all(not x.props.get("_Combed", 0) for x in f))
+        return out
+    return core.std.ModifyFrame(m, clips=clips, selector=proc)
+
+
+def _pal_keep_film(bob, clip, job, mode):
+    """deint50 / deint25 on a source that mixes film with 50i video (PAL anime: field-shifted film + video-made credits
+    or CG): the film frames are field-matched whole (full vertical detail) instead of being rebuilt from single fields;
+    in 50p each is shown twice. Video frames stay QTGMC (bench_ivtc2, pal_* clips: see README "PAL")."""
+    order = _order(job)
+    m = core.tivtc.TFM(core.std.SetFieldBased(clip, 2 if order else 1), order=order, cthresh=int(opt(job, "cthresh")),
+                       MI=int(opt(job, "mi")), PP=1)
+    flags = pal_film_flags(m)
+    matched = core.std.SetFieldBased(m, 0)
+    matched = core.resize.Point(matched, format=bob.format.id) if matched.format.id != bob.format.id else matched
+    if mode == "deint25":
+        base = bob[::2]
+        out = core.std.FrameEval(base, lambda n, f: matched if f.props["_PalFilm"] else base, prop_src=flags)
+        return core.std.CopyFrameProps(out, base)
+    m2 = core.std.Interleave([matched, matched])
+    f2 = core.std.Interleave([flags, flags])
+    out = core.std.FrameEval(bob, lambda n, f: m2 if f.props["_PalFilm"] else bob, prop_src=f2)
+    return core.std.CopyFrameProps(out, bob)
+
+
 def pal_process(clip, job):
     mode = job.get("pal_mode_resolved") or opt(job, "pal_mode")
     if mode == "auto":                       # preview / vsview / auto-detect: classify once and reuse
@@ -1414,9 +1796,12 @@ def pal_process(clip, job):
     # field N % 2 of source frame N // 2
     s0 = int(job.get("start", 0))
     bob = core.akarin.PropExpr(bob, lambda: {"_SrcN": f"N 2 / floor {s0} +", "_Phase": "N 2 %"})
-    out = bob[::2] if mode == "deint25" else bob
-    if opt(job, "aa") == "repair":                        # every frame here is a deinterlaced one
-        out = _aa(out, job)
+    if opt(job, "aa") == "repair":                        # every bobbed frame is a deinterlaced one
+        bob = _aa(bob, job)
+    if opt(job, "pal_film") != "off" and not raw_ivtc(job):
+        out = _pal_keep_film(bob, clip, job, mode)
+    else:
+        out = bob[::2] if mode == "deint25" else bob
     return _deblend(out, job)
 
 
@@ -1913,6 +2298,33 @@ def _held_video(d, run=4, min_moving=5):
     return True
 
 
+def measure_order(job, samples=120):
+    """Field order from the picture (NTSC; the PAL detector has its own): every field bobbed to a frame, the step from
+    one bobbed field to the next. With the right order the fields run forward in time; with the wrong one they run
+    1, 0, 3, 2 ... and every second step spans three field times. Telecined film repeats fields, so its steps are
+    judged the same way (a repeated field is a zero step in either order). Only moving frames count.
+    -> {"order": "tff" / "bff" / None (undecided), "order_ratio": wrong-order step / right-order step}"""
+    src = source(job, clean=False)
+    n = src.num_frames
+    if n < 20:
+        return {"order": None, "order_ratio": 1.0}
+    sm = core.resize.Bilinear(core.std.ShufflePlanes(src, 0, vs.GRAY), 360, 480, format=vs.GRAY8)
+    mv = core.std.PlaneStats(sm, sm[1:] + sm[-1:])
+    picks = [int(k) for k in np.linspace(n * 0.03, n * 0.97 - 2, samples * 3).astype(int)]
+    picks = [k for k in picks if mv.get_frame(k).props["PlaneStatsDiff"] >= 0.01][:samples]
+    if len(picks) < 8:
+        return {"order": None, "order_ratio": 1.0}
+    step = {}
+    for o in (1, 0):
+        b = core.bwdif.Bwdif(core.std.SetFieldBased(sm, 2 if o else 1), field=o + 2)
+        d = core.std.PlaneStats(b, b[1:] + b[-1:])
+        # cross-frame step (2nd field of frame k -> 1st field of k+1) against the in-frame step (1st -> 2nd of k)
+        step[o] = sum(d.get_frame(2 * k + 1).props["PlaneStatsDiff"] + d.get_frame(2 * k).props["PlaneStatsDiff"] for k in picks)
+    good, bad = (1, 0) if step[1] <= step[0] else (0, 1)
+    ratio = step[bad] / max(step[good], 1e-9)
+    return {"order": ("tff" if good == 1 else "bff") if ratio >= 1.15 else None, "order_ratio": round(float(ratio), 3)}
+
+
 def measure_unmatched(job, samples=400):
     """What field matching leaves: share of frames TFM cannot match cleanly (they get rebuilt from one field),
     how strong their combing is, and whether the source was line-doubled before it got to the disc (every
@@ -1951,7 +2363,13 @@ def auto_group(kind, job, progress=None):
         if is_pal(job):
             d = pal_detect(job)
             return {"pal_mode": d["mode"], "order": d["order"], "raw_combed": d["raw_combed"], "matched_combed": d["matched_combed"]}
-        return {**measure_chroma_unmix(job), **measure_cadence(job), **measure_unmatched(job)}
+        od = measure_order(job)
+        if od["order"] and od["order"] != opt(job, "order"):
+            # the file's field order is wrong (ffmpeg-made MPEG-2 files, mislabelled rips): every match would be wrong
+            job = dict(job, order=od["order"])
+        res = {**measure_chroma_unmix(job), **measure_cadence(job), **measure_unmatched(job)}
+        res.update(order=opt(job, "order"), order_measured=od["order"], order_ratio=od["order_ratio"])
+        return res
     if kind == "composite":
         if is_pal(job):
             return {"crawl": "off", "rainbow": "off", "composite": "off", "note": "PAL: no NTSC dot crawl / rainbows"}
@@ -2151,8 +2569,8 @@ GRADE = {
     "contrast": 1.0,    # 0.6..1.6 around mid grey
     "sat": 1.0,         # 0..2 saturation
     "dark_sat": 0.0,    # 0..2 extra saturation in the dark tones only (colour that was crushed with the blacks)
-    "temp": 0.0,        # -1..1 blue <-> amber
-    "tint": 0.0,        # -1..1 green <-> magenta
+    "temp": 0.0,        # -2..2 blue <-> amber
+    "tint": 0.0,        # -2..2 green <-> magenta
     "gamut": "off",     # off / compress (colour stored beyond the screen range is squeezed in, not cut flat)
                         # / ai (ClipNet, models/clipnet.pt: rebuilds colour that is already clipped flat)
     "vibrance": 0.0,    # -1..1 saturation that acts mostly on weakly coloured areas (skin and saturated colour kept)
@@ -2386,96 +2804,135 @@ def _grade_one(clip, g, job):
 
 
 def measure_levels(job, samples=60):
-    """Black / white level of the picture (middle 60 % of the frame, so borders do not count) and the share
-    of pixels whose colour lies outside what a screen can show. Black = 5th percentile over the frames of
-    each frame's darkest 0.1 %, white = 95th percentile of each frame's brightest 0.1 %."""
+    """Auto colour (Colour step): samples frames of the source and lets autocolour.py measure them and solve the
+    grade - black / white point, white cast (Highlights wheel), black cast (Shadows wheel), fade (saturation),
+    clipped colour. Returns autocolour's report (levels, whites, blacks, ...) plus "grade": the settings it sets."""
+    import autocolour
     src = source(job, clean=False)
+    if src.format.id != vs.YUV420P8:
+        src = core.resize.Bicubic(src, format=vs.YUV420P8, dither_type="error_diffusion")
     n = src.num_frames
-    sc = (1 << src.format.bits_per_sample) / 256.0
-    lo, hi, og, dark, flat, whites = [], [], [], [], [], []
-    for t in np.linspace(40, max(41, n - 41), samples).astype(int):
-        f = src.get_frame(int(min(t, n - 1)))
-        Y = np.asarray(f[0], dtype=np.float32) / sc
-        H, W = Y.shape
-        Yc = Y[int(H * 0.2):int(H * 0.8), int(W * 0.2):int(W * 0.8)]
-        if Yc.mean() < 30:
+
+    seen, own = set(), []
+    for t in np.linspace(min(40, n // 10), max(min(40, n // 10), n - 41), samples).astype(int):
+        t = int(min(max(t, 0), n - 1))
+        if t in seen:
             continue
-        lo.append(np.percentile(Yc, 0.1)); hi.append(np.percentile(Yc, 99.9))
-        dark.append(float(np.mean(Yc < 16 + 6)))
-        if src.format.color_family == vs.YUV:
-            U, V = (np.asarray(f[p], dtype=np.float32) / sc for p in (1, 2))
-            ry, rx = Y.shape[0] // U.shape[0], Y.shape[1] // U.shape[1]
-            U, V = (np.repeat(np.repeat(c, ry, 0), rx, 1)[:H, :W] for c in (U, V))
-            y, cb, cr = (Y - 16) / 219, (U - 128) / 224, (V - 128) / 224
-            r, g, b = y + 1.402 * cr, y - 0.344 * cb - 0.714 * cr, y + 1.772 * cb
-            mx, mn = np.maximum(np.maximum(r, g), b), np.minimum(np.minimum(r, g), b)
-            og.append(100 * float(np.mean(((mx > 1.04) | (mn < -0.04))[int(H * 0.1):int(H * 0.9), int(W * 0.1):int(W * 0.9)])))
-            # coloured pixels with a channel sitting at the limit (not white, not black): clipped colour, or a
-            # flat fill painted in a pure colour - the number cannot tell which, so it is only reported
-            st = ((mx >= 0.985) | ((mn <= 0.015) & (mx > 0.25))) & (mx - mn > 0.15)
-            flat.append(100 * float(np.mean(st[int(H * 0.1):int(H * 0.9), int(W * 0.1):int(W * 0.9)])))
-            wp_ = white_point(y, cb, cr, H, W)
-            if wp_ is not None:
-                whites.append(wp_)
-    if not lo:
+        seen.add(t)
+        f = src.get_frame(t)
+        own.append((np.asarray(f[0]).copy(), np.asarray(f[1]).copy(), np.asarray(f[2]).copy()))
+    paths = job.get("colour_ref") or []
+    ref = ref_frames(paths, samples)
+    pair = None
+    if ref:
+        ref, pair = match_reference(src, own, ref, paths)
+    r = autocolour.analyze(own, ref, pair)
+    if not r:
         return {}
-    b, w = float(np.percentile(lo, 5)), float(np.percentile(hi, 95))
-    out = float(np.percentile(og, 90)) if og else 0.0
-    # Black point is only moved when it is clear: a washed-out source (nothing darker than 20 anywhere), or
-    # real picture area under legal black (2 % of the picture within 6 levels of black; a few outline
-    # pixels dipping under 16 are halo undershoot, e.g. Golden Boy, and say nothing about the black level).
-    dk = 100 * float(np.median(dark))
-    bp = int(round(min(b, 40))) if b >= 20 else (int(round(b)) if (b <= 12 and dk >= 2.0) else 16)
-    wp = int(round(min(w, 255))) if w >= 240 else 235
-    wb = white_balance(whites, len(lo))
-    return {"level_black": round(b, 1), "level_white": round(w, 1), "level_dark": round(100 * float(np.median(dark)), 1),
-            "gamut_out": round(out, 2), "clip_flat": round(float(np.percentile(flat, 90)) if flat else 0.0, 2), **wb["report"],
-            "grade": {"black": bp, "white": wp, "gamut": "compress" if out >= 1.0 else "off", "temp": wb["temp"], "tint": wb["tint"]}}
+    return {**r["report"], "grade": r["grade"]}
 
 
-def white_point(y, cb, cr, H, W):
-    """Colour of this frame's whites: pixels brighter than 80 % with weak colour (|Cb, Cr| < 6 %), middle 80 %
-    of the frame. The peak of their colour histogram (0.5-level bins, lightly smoothed) is the white - a
-    mean would be pulled by pale skin and pale skies. None when the frame has too few whites.
-    Returns (Cb, Cr in 8-bit levels, mean brightness of those whites 0..1)."""
-    from scipy.ndimage import gaussian_filter
-    sl = (slice(int(H * 0.1), int(H * 0.9)), slice(int(W * 0.1), int(W * 0.9)))
-    Y, U, V = y[sl], cb[sl] * 224 / 255, cr[sl] * 224 / 255
-    m = (Y > 0.80) & (np.hypot(U, V) < 0.06)
-    if m.sum() < 400:
+def _thumb_index(clip, step):
+    """thumb_z of every `step`-th frame of a clip (~20 s for an episode at step 15)."""
+    import autocolour
+    small = core.resize.Bilinear(core.std.SelectEvery(clip, step, 0) if step > 1 else clip, 80, 60, format=vs.GRAY8)
+    return np.stack([autocolour.thumb_z(np.asarray(f[0])) for f in small.frames()])
+
+
+def _yuv(f):
+    return tuple(np.asarray(f[p]).copy() for p in range(3))
+
+
+def _exact_twin(clip, around, target_y, step):
+    """The frame of `clip` within +-step/2 of `around` that best matches the picture target_y (the index found
+    the right half second; motion inside the shot would still make the two sides differ)."""
+    import autocolour
+    t = autocolour.thumb_z(target_y)
+    small = core.resize.Bilinear(clip, 80, 60, format=vs.GRAY8)
+    lo, hi = max(0, around - step // 2), min(clip.num_frames - 1, around + step // 2)
+    best = max(range(lo, hi + 1), key=lambda k: float(autocolour.thumb_z(np.asarray(small.get_frame(k)[0])) @ t))
+    return _yuv(clip.get_frame(best))
+
+
+def match_reference(src, own, ref, paths):
+    """Pairs of frames that show the same picture in the source and in the reference (another release is timed
+    differently, may be a different length or cut). Both ways: the reference frames searched in a thumbnail index
+    of the whole source, and the source's own sampled frames searched in an index of each reference video - a short
+    clip against a whole episode only matches the second way. Returns (reference frames, source frames) of the
+    matched pairs when enough match (then auto colour compares exactly the same pictures), else (all reference
+    frames, None): "other scenes"."""
+    import os
+    import autocolour
+    n = src.num_frames
+    step = 15 if n > 300 else 1
+    twin, _ = autocolour.find_twins(_thumb_index(src, step), np.stack([autocolour.thumb_z(f[0]) for f in ref]))
+    hit = [i for i in range(len(ref)) if twin[i] >= 0]
+    pairs_a = ([ref[i] for i in hit], [_exact_twin(src, int(min(twin[i] * step, n - 1)), ref[i][0], step) for i in hit])
+    share_a = len(hit) / max(1, len(ref))
+    best = (share_a, pairs_a)
+    own_t = np.stack([autocolour.thumb_z(f[0]) for f in own])
+    for p in paths:
+        if not (p and os.path.isfile(p)):
+            continue
+        c = _ref_clip(p)
+        if c.num_frames <= 2:
+            continue
+        st = 15 if c.num_frames > 300 else 1
+        tw, _ = autocolour.find_twins(_thumb_index(c, st), own_t)
+        got = [i for i in range(len(own)) if tw[i] >= 0]
+        share = len(got) / max(1, len(own))
+        if share > best[0]:
+            best = (share, ([_exact_twin(c, int(min(tw[i] * st, c.num_frames - 1)), own[i][0], st) for i in got],
+                            [own[i] for i in got]))
+    share, (rf, sf) = best
+    print(f"colour reference: {round(100 * share)} % of the frames found on the other side ({len(rf)} pairs)", file=sys.stderr)
+    if len(rf) >= 3 and share >= autocolour.REF_SAME_SHARE:
+        return rf, sf
+    return ref, None
+
+
+def _ref_clip(p):
+    c = core.bs.VideoSource(p)
+    if c.format.color_family == vs.RGB:
+        c = core.resize.Bicubic(c, format=vs.YUV444P8, matrix=6, range=0, dither_type="error_diffusion")
+    elif c.format.id not in (vs.YUV420P8, vs.YUV444P8):
+        c = core.resize.Bicubic(c, format=vs.YUV444P8 if c.format.subsampling_w == 0 else vs.YUV420P8,
+                                dither_type="error_diffusion")
+    return c
+
+
+def ref_frames(paths, samples=60):
+    """Frames of the colour reference (images and / or videos of the same show, a better release or a good
+    episode): every image once, the videos sampled evenly with what is left of `samples`. None without one."""
+    import os
+    paths = [p for p in paths if p and os.path.isfile(p)]
+    if not paths:
         return None
-    h, ue, ve = np.histogram2d(U[m] * 255, V[m] * 255, bins=60, range=[[-15, 15], [-15, 15]])
-    i, j = np.unravel_index(gaussian_filter(h, 1.5).argmax(), h.shape)
-    return float(ue[i] + ue[i + 1]) / 2, float(ve[j] + ve[j + 1]) / 2, float(Y[m].mean())
-
-
-def white_balance(whites, frames):
-    """Temperature / tint that make the whites neutral - only when the cast is real: whites in at least a
-    quarter of the sampled frames, at least 1.5 levels off grey, and the same cast in at least 30 % of those
-    frames (within 2 levels of the median). Painted white is neutral on every DVD measured (within 1 level:
-    Golden Boy, Lodoss, Courage, Bebop, One Piece, Naruto, Blue Dragon); the MOTU capture's whites sit at
-    U -7.8 V -3.8 (yellow-green) in 37 % of frames. A cast that changes from shot to shot is the art
-    (warm sunset, cold night), not the transfer: left alone.
-    grade(): U += Y * (tint*0.035 - temp*0.05), V += Y * (tint*0.035 + temp*0.05)."""
-    rep = {"wb_frames": len(whites)}
-    if not whites or len(whites) < max(4, 0.25 * frames):
-        return {"temp": 0.0, "tint": 0.0, "report": dict(rep, wb_u=None, wb_v=None, wb_consistent=0)}
-    a = np.array(whites)
-    mu, mv = float(np.median(a[:, 0])), float(np.median(a[:, 1]))
-    cons = float(np.mean(np.hypot(a[:, 0] - mu, a[:, 1] - mv) < 2.0))
-    rep.update(wb_u=round(mu, 2), wb_v=round(mv, 2), wb_consistent=round(100 * cons))
-    if np.hypot(mu, mv) < 1.5 or cons < 0.30:
-        return {"temp": 0.0, "tint": 0.0, "report": rep}
-    yw = float(np.median(a[:, 2]))
-    cu, cv = mu / 255 / yw, mv / 255 / yw              # cast per unit of brightness
-    ti, t = -(cu + cv) / 2, (cu - cv) / 2
-    r2 = lambda v: round(max(-1.0, min(1.0, v)) / 0.05) * 0.05
-    return {"temp": round(r2(t / 0.05), 2), "tint": round(r2(ti / 0.035), 2), "report": rep}
+    clips = [_ref_clip(p) for p in paths]
+    stills = [c for c in clips if c.num_frames <= 2]
+    vids = [c for c in clips if c.num_frames > 2]
+    per = max(8, (samples - len(stills)) // max(1, len(vids))) if vids else 0
+    out = []
+    for c in stills:
+        f = c.get_frame(0)
+        out.append(tuple(np.asarray(f[i]).copy() for i in range(3)))
+    for c in vids:
+        n = c.num_frames
+        for t in np.linspace(0.04 * n, 0.96 * n, per).astype(int):
+            f = c.get_frame(int(min(t, n - 1)))
+            out.append(tuple(np.asarray(f[i]).copy() for i in range(3)))
+    return out
 
 
 def crop(clip, job):
     l, r, t, b = crop_values(job)
-    return core.std.Crop(clip, l, r, t, b) if (l or r or t or b) else clip
+    if not (l or r or t or b):
+        return clip
+    sw, sh = job.get("src_w") or clip.width, job.get("src_h") or clip.height
+    if (clip.width, clip.height) != (sw, sh) and sw and sh:   # an AI upscale in a filter group: crop at that scale
+        kx, ky = clip.width / sw, clip.height / sh
+        l, r, t, b = (int(round(v * k / 2)) * 2 for v, k in ((l, kx), (r, kx), (t, ky), (b, ky)))
+    return core.std.Crop(clip, l, r, t, b)
 
 
 # Order of the Colour and Crop & size steps (the GUI's rail can reorder them). Crop itself always runs first (it is in
@@ -2508,19 +2965,74 @@ def output_format(clip, job):
     return resize_output(clip, dict(job, out_w=clip.width, out_h=clip.height))
 
 
-def finalize(clip, job):
+VSF_POINTS = ("source", "ivtc", "after_ivtc", "after_cleanup", "after_halos", "repairs", "after_stab", "after_size", "end")
+
+
+def vsf_groups(job):
+    """[(point, [filters])]: the user's VapourSynth filter groups (Repair step, each dragged to its place), in order.
+    The older single list (job "vs_filters" + "vs_filters_pos") counts as one more group."""
+    ok = lambda fl: [f for f in (fl or []) if isinstance(f, dict) and f.get("on", True) and f.get("type") in ("vs", "jet", "ai", "my", "code")]
+    out = []
+    for g in job.get("vs_groups") or []:
+        if isinstance(g, dict) and g.get("on", True) and ok(g.get("filters")):
+            out.append((g.get("pos") if g.get("pos") in VSF_POINTS else "repairs", ok(g.get("filters"))))
+    if ok(job.get("vs_filters")):
+        p = opt(job, "vs_filters_pos")
+        out.append((p if p in VSF_POINTS else "repairs", ok(job.get("vs_filters"))))
+    return out
+
+
+def vsf_at(job, point):
+    """the filters that run at this point (all groups placed there, in order)"""
+    return [f for p, fl in vsf_groups(job) if p == point for f in fl]
+
+
+def vsf_pos(job):
+    """compatibility: the first point that has filters, or None"""
+    g = vsf_groups(job)
+    return g[0][0] if g else None
+
+
+def vs_filters(clip, job, point="repairs"):
+    """Repair -> VapourSynth filters: any installed plugin function or vs-jetpack function, in the user's order, after the
+    colour alignment and before crop / stabilizer. Each entry {"type": "vs" | "jet", "p": {"call", "args"}, "on"} runs
+    through blocks.block (the EVA toolbox: typed arguments, the picture converted to a format the filter accepts and
+    back). Whatever the filters do to the format, the chain continues in its own format; a changed size is kept."""
+    fl = vsf_at(job, point)
+    if not fl:
+        return clip
+    import blocks
+    fmt = clip.format
+    ctx = {"sar": 1.0, "group_in": clip, "prev_in": clip}   # @group / @prev in a filter's clip settings
+    last_in = clip
+    for f in fl:
+        ctx["prev_in"], last_in = last_in, clip
+        try:
+            clip = blocks.block(clip, job, f["type"], f.get("p") or {}, ctx)
+        except Exception as e:                           # noqa: BLE001
+            raise RuntimeError(f"VapourSynth filter {f.get('p', {}).get('call', '?')}: {type(e).__name__}: {e}") from e
+    if clip.format.id != fmt.id:                         # back to the chain's format (RGB / grey results: BT.601 YUV)
+        kw = {"matrix_s": "170m"} if clip.format.color_family != vs.YUV and fmt.color_family == vs.YUV else {}
+        clip = core.resize.Bicubic(clip, format=fmt.id, dither_type="error_diffusion", **kw)
+    return clip
+
+
+def finalize(clip, job, clean=True):
     clip = crop(clip, job)
     # FieldNet has its own steadiness stages (mc + gtfix + ttemp + still lock, or v5's TStab): no second stabilizer
     if not (opt(job, "ai_model") == "field" and str(job.get("field_stab", "filters")) != "off"):
         clip = stabilize(clip, job)
+    if clean:
+        clip = vs_filters(clip, job, "after_stab")     # a filter group dragged below the stabilizer
     order = stage_order(job)
     for s in order:
         if s == "colour":
             clip = grade(clip, job)
-        elif s == order[-1]:                     # size last (default): resize straight to the output format
-            clip = sharpen(line_darken(resize_output(clip, job), job), job)
-        else:
-            clip = sharpen(line_darken(resize_size(clip, job), job), job)
+        else:                                    # size last (default): resize straight to the output format
+            clip = resize_output(clip, job) if s == order[-1] else resize_size(clip, job)
+            if clean:
+                clip = vs_filters(clip, job, "after_size")   # a filter group dragged below Shape and size
+            clip = sharpen(line_darken(clip, job), job)
     return clip if order[-1] == "size" else output_format(clip, job)
 
 
@@ -2658,7 +3170,35 @@ def anti_alias(clip, job):
     return _aa(clip, job) if opt(job, "aa") == "all" else clip
 
 
+def repair_dials(job, ch=None):
+    """(halo, bleed) dials when RepairNet does the AI halos and / or AI bleed, else None (the separate models run).
+    halo = the halo strength (capped at 1) when halo removal is on with the AI method; bleed = the ChromaNet strength
+    (light 0.6, normal / strong 1.0) when the bleed fix is AI. One of the two may be 0."""
+    if opt(job, "repairnet") != "on":
+        return None
+    ch = job.get("chroma", {}) if ch is None else ch
+    halo_on = opt(job, "ghost") != "off" and bool(job.get("halo_rx") or job.get("ghost_taps")) and opt(job, "halo_method") == "ai"
+    bleed_on = ch.get("method", "off") == "ai"
+    if not (halo_on or bleed_on):
+        return None
+    import repairnet
+    if not repairnet.available():
+        return None
+    h = max(0.0, min(1.0, float(opt(job, "ghost_strength")))) if halo_on else 0.0
+    b = {"light": 0.6}.get(ch.get("strength", "normal"), 1.0) if bleed_on else 0.0
+    return h, b
+
+
+def repair_colour(clip, job, ch, dials):
+    """colour shift (as before), then one RepairNet pass for halos + bleed (dials), steadied like the other models"""
+    import repairnet
+    before = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), 0, "off")
+    return temporal_guard(before, repairnet.repairnet(before, halo=dials[0], bleed=dials[1]))
+
+
 def halos(clip, job):
+    if repair_dials(job) and opt(job, "halo_method") == "ai":
+        return clip                                    # RepairNet does the halos in the colour step
     if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")):
         return ghost_halo(clip, job)
     return clip
@@ -2666,8 +3206,12 @@ def halos(clip, job):
 
 def colour_fix(clip, job):
     ch = job.get("chroma", {})
-    clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
-                      ch.get("method", "off"), ch.get("strength", "normal"))
+    dials = repair_dials(job, ch)
+    if dials:
+        clip = repair_colour(clip, job, ch, dials)
+    else:
+        clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
+                          ch.get("method", "off"), ch.get("strength", "normal"))
     return neutralize(clip) if ch.get("neutral", False) else clip
 
 
@@ -2729,27 +3273,42 @@ def script_text(job, title=""):
         return "\n".join(L)
     clean = lambda key: opt(job, key) != "off"
     L.append("clip = dr.source(job)" + ("                          # load; dot crawl / rainbow cancellation before IVTC" if ntsc else "                          # load"))
-    if pal:
+    vn = lambda pt: ", ".join(f.get("p", {}).get("call", "?") for f in vsf_at(job, pt))
+
+    def vline(pt, what="your VapourSynth filters"):
+        if vsf_at(job, pt):
+            L.append(f'clip = dr.vs_filters(clip, job, "{pt}")'.ljust(47) + f"  # {what}: {vn(pt)}")
+    if vsf_at(job, "source"):
+        L[-1] += f"   (+ your VapourSynth filters on the source: {vn('source')})"
+    own_ivtc = bool(vsf_at(job, "ivtc"))
+    if own_ivtc:
+        vline("ivtc", "your own IVTC (instead of the app's)")
+    elif pal:
         L.append("clip = dr.pal_process(clip, job)               # PAL: progressive / field-shifted / interlaced")
     elif job.get("mode") == "vfr":
         L.append("clip = dr.ivtc_vfr(clip, job)                  # inverse telecine, VFR (needs the app's pass 1 files in job['work'])")
     else:
         L.append("clip = dr.ivtc_cfr(clip, job)                  # inverse telecine to 23.976 fps")
-    if opt(job, "deblend") == "ai":
+    if opt(job, "deblend") == "ai" and not own_ivtc:
         L.append("clip = dr.deblend_ai(clip, job)                # AI blend removal (DeblendNet)")
+    vline("after_ivtc")
     if opt(job, "aa") == "all":
         L.append("clip = dr.anti_alias(clip, job)                # AANet on every frame")
     if clean("deblock"):
         L.append(f"clip = dr.deblock(clip, job)                   # MPEG repair: {opt(job, 'deblock')}")
     if ntsc and (clean("crawl") or clean("rainbow")):
         L.append(f"clip = dr.xtalk_stage_b(clip, job)             # dots + rainbows after IVTC: {opt(job, 'crawl')} / {opt(job, 'rainbow')}")
+    vline("after_cleanup")
     if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")):
         L.append(f"clip = dr.halos(clip, job)                     # halo removal: {opt(job, 'halo_method')}")
+    vline("after_halos")
     L.append("clip = dr.colour_fix(clip, job)                # colour shift, bleed, clean white / black")
+    vline("repairs")
     if any(crop_values(job)):
         L.append("clip = dr.crop(clip, job)")
     if clean("stab"):
         L.append(f"clip = dr.stabilize(clip, job)                 # temporal stabilizer: {opt(job, 'stab')}")
+    vline("after_stab")
     order = stage_order(job)
     if order != list(STAGES):
         L.append(f"# step order: {' -> '.join(order)} (job['stage_order'])")
@@ -2763,6 +3322,7 @@ def script_text(job, title=""):
                 L.append("clip = dr.resize_output(clip, job)             # output size, 10-bit, colour tags")
             else:
                 L.append("clip = dr.resize_size(clip, job)               # output size (format and tags at the end)")
+            vline("after_size")
             sg = sharp_settings(job)
             if float(sg["lines"]) > 0:
                 L.append(f"clip = dr.line_darken(clip, job)               # line darkening {sg['lines']}")
@@ -2770,6 +3330,7 @@ def script_text(job, title=""):
                 L.append(f"clip = dr.sharpen(clip, job)                   # sharpening ({sg['mode']}): luma {sg['luma']}, colour {sg['chroma']}")
     if order[-1] != "size":
         L.append("clip = dr.output_format(clip, job)             # 10-bit, colour tags (size as it is now)")
+    vline("end", "your VapourSynth filters at the end")
     L += ["", "clip.set_output()", ""]
     return "\n".join(L)
 
@@ -2832,12 +3393,16 @@ def build(job, ivtc=True, chroma=True, clean=True):
     clip = source(job, clean=clean)
     if ivtc and job.get("progressive"):
         pass                                           # progressive source / image: nothing to field-match or deinterlace
+    elif ivtc and vsf_at(job, "ivtc"):
+        clip = vs_filters(clip, job, "ivtc")           # your own IVTC / deinterlacing instead of the app's
     elif ivtc:
         if is_pal(job):
             clip = pal_process(clip, job)
         else:
             clip = ivtc_vfr(clip, job) if job.get("mode") == "vfr" else ivtc_cfr(clip, job)
         clip = deblend_ai(clip, job)
+    if clean:
+        clip = vs_filters(clip, job, "after_ivtc")
     if opt(job, "aa") == "all" and not (opt(job, "ai_model") == "field" and raw_ivtc(job)):
         clip = _aa(clip, job)                          # not before FieldNet: it repairs from the raw IVTC itself
     # the all-in-one model (ai_model "uni") also does MPEG repair, halos and colour alignment: the single-frame
@@ -2850,16 +3415,28 @@ def build(job, ivtc=True, chroma=True, clean=True):
             clip = deblock(clip, job)
         if not is_pal(job) or uni:
             clip = xtalk_stage_b(clip, job)
-        if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")) and not (uni and ud["halo"] > 0):
+        clip = vs_filters(clip, job, "after_cleanup")
+        rn = repair_dials(job) if not uni else None
+        if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")) and not (uni and ud["halo"] > 0)                 and not (rn and opt(job, "halo_method") == "ai"):
             clip = ghost_halo(clip, job)
+        clip = vs_filters(clip, job, "after_halos")
     ch = job.get("chroma", {}) if chroma else {}
     if uni and ud["chroma"] > 0:
         ch = dict(ch, method="off", shift_x=0.0, shift_y=0.0)
-    clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
-                      ch.get("method", "off"), ch.get("strength", "normal"))
+    dials = repair_dials(job, ch) if clean and not uni else None
+    if dials:                                          # RepairNet: halos + bleed in one pass (after the colour shift)
+        clip = repair_colour(clip, job, ch, dials)
+    else:
+        clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
+                          ch.get("method", "off"), ch.get("strength", "normal"))
     if chroma and ch.get("neutral", False):
         clip = neutralize(clip)
-    return finalize(clip, job)
+    if clean:
+        clip = vs_filters(clip, job, "repairs")
+    clip = finalize(clip, job, clean=clean)
+    if clean:
+        clip = vs_filters(clip, job, "end")
+    return clip
 
 
 def detect_scenes(job, progress=None, cancelled=None, min_len=12):
@@ -2989,7 +3566,20 @@ def preview(job, after=True):
     if job.get("chain"):
         import blocks
         return to_display(blocks.build_chain(dict(job, mode=tm), before=not after), job)
-    clip = build(pjob, ivtc=True, chroma=after, clean=after)
+    try:
+        clip = build(pjob, ivtc=True, chroma=after, clean=after)
+    except vs.Error as e:
+        # a VFR analysis made for a slightly different clip (TDecimate: "crc32 in input file does not match"): set it
+        # aside so it is made again, and show 24p meanwhile instead of failing the preview
+        if "crc32" not in str(e) or tm != "vfr" or not job.get("work"):
+            raise
+        sig = os.path.join(job["work"], "pass1.sig")
+        try:
+            os.replace(sig, sig + ".stale")
+        except OSError:
+            pass
+        print("The saved VFR analysis no longer matches this clip: it is made again (24p preview meanwhile)", file=sys.stderr, flush=True)
+        clip = build(dict(pjob, mode="cfr", preview_vfr=False), ivtc=True, chroma=after, clean=after)
     return to_display(clip, job)
 
 

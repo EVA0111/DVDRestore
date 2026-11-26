@@ -19,20 +19,25 @@ const S = {
   layers: [], layerSel: -1, src: null,   // adjustment layers [{name, track, start, end (source frames), on, opacity, grade}]
   tracks: 3, trackOff: {},              // layer tracks L1 (bottom) .. Ln; trackOff[n] = hidden (eye)
   stage_order: ["colour", "size"], vfrAuto: null,
-  levels: null, srcDir: "",
+  levels: null, srcDir: "", autoStrength: 1, colourRef: [],
+  autoUse: { levels: true, tone: true, white: true, black: true, fade: true, shadow: true, hue: true, gamut: true },
   aspect: "auto", aspect_custom: "", custom_w: 960, custom_h: 720, custom_lock: true,
   size: "keep", kernel: "spline36", kernel_b: 0.33, kernel_c: 0.33, tfix_strength: 2.0, encoder: "x264", crf: 16, out_dir: "", name: "Episode_{n:02d}",
   enc_rate: "q", enc_bitrate: 8000, enc_preset: "", enc_tune: "", enc_depth: 10, enc_chroma: "420", enc_keyint: 0, enc_extra: "",
   audio_codec: "copy", audio_bitrate: 192,
   busy: false, view: "after", zoom: "Fit", split: 50, img: null, frame: null, total: 0,
-  backend: "pytorch", env: null,
+  backend: "pytorch", repairnet: "on", env: null,
+  ai_dirs: [], ai_files: [],            // your AI model folders / single files (filter window: AI upscale & restore models)
   sharp: { luma: 0, chroma: 0, mode: "faithful", radius: "fine", lines: 0 },
+  vs_filters: [],                       // Repair -> VapourSynth filters: [{type: "vs"|"jet", on, p: {call, args, ...}}]
+  vs_filters_pos: "repairs",            // where they run: source | ivtc (instead of the app's) | after_ivtc | repairs | end
+  vs_groups: [],                        // Repair -> VapourSynth filter groups (draggable, duplicable): see renderVsGroups
   upscale: { models: [] },              // [{path, name, info, strength, on, engine: {...}}]
   script: null, scriptGen: "",          // script = the user's edited text (null = follow the settings)
 };
 // Preferences: kept between sessions and for every DVD. Picture settings (PICTURE below) are not: they belong to
 // one episode of one source and start from the defaults for every new DVD.
-const SAVED = ["temp_dir", "stage_order", "backend", "ai_model", "encoder", "crf", "name", "adv",
+const SAVED = ["temp_dir", "stage_order", "backend", "repairnet", "ai_model", "ai_dirs", "ai_files", "encoder", "crf", "name", "adv",
                "enc_rate", "enc_bitrate", "enc_preset", "enc_tune", "enc_depth", "enc_chroma", "enc_keyint", "enc_extra", "audio_codec", "audio_bitrate"];
 // Picture settings: Repair, Colour (with its adjustment layers), Crop & size, and what Auto measured.
 // Every episode has its own (S.epSet[k]); a new episode starts from the defaults.
@@ -40,7 +45,8 @@ const PICTURE = ["mode", "order", "pal_mode", "comb", "ivtc_repair", "chroma_unm
                  "deblock", "ghost", "ghost_strength", "ghost_taps", "halo_rx", "halo_method", "sx", "sy", "bleed", "warp", "neutral",
                  "stab", "stab_level", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
                  "uni_crawl", "uni_rainbow", "uni_mpeg", "uni_halo", "uni_chroma", "uni_grain", "uni_detail",
-                 "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "gradeAll", "layers", "tracks", "trackOff", "auto", "levels"];
+                 "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "gradeAll", "layers", "tracks", "trackOff", "auto", "levels", "autoStrength", "autoUse", "colourRef",
+                 "vs_filters", "vs_filters_pos", "vs_groups"];
 const GRADE0 = { black: 16, white: 235, shadows: 0, gamma: 1, contrast: 1, sat: 1, dark_sat: 0, temp: 0, tint: 0, gamut: "off",
                  vibrance: 0, hue: 0, lift: [0, 0, 0], gamma_w: [0, 0, 0], gain_w: [0, 0, 0], curves: {}, luts: [] };
 // S.grade = the grade being edited: the selected adjustment layer's, or the base grade (S.gradeAll).
@@ -120,16 +126,16 @@ function backendState(selected) {
     crawl: S.crawl, rainbow: S.rainbow, composite: S.composite,
     ghost: S.ghost, ghost_strength: S.ghost_strength, ghost_taps: S.ghost_taps, halo_rx: S.halo_rx, halo_method: S.halo_method, deblock: S.deblock,
     ivtc_repair: S.ivtc_repair, chroma_unmix: S.chroma_unmix, deblend: S.deblend, aa: S.aa, rainbow_fill: S.rainbow_fill,
-    sx: S.sx, sy: S.sy, bleed: S.bleed, warp: S.warp, neutral: S.neutral,
+    sx: S.sx, sy: S.sy, bleed: S.bleed, warp: S.warp, neutral: S.neutral, vs_filters: S.vs_filters, vs_filters_pos: S.vs_filters_pos, vs_groups: S.vs_groups,
     crop: S.crop, size: S.size, kernel: S.kernel, kernel_b: S.kernel_b, kernel_c: S.kernel_c, encoder: S.encoder, crf: S.crf,
     enc_rate: S.enc_rate, enc_bitrate: S.enc_bitrate, enc_preset: S.enc_preset, enc_tune: S.enc_tune, enc_depth: S.enc_depth,
     enc_chroma: S.enc_chroma, enc_keyint: S.enc_keyint, enc_extra: S.enc_extra, audio_codec: S.audio_codec, audio_bitrate: S.audio_bitrate,
-    grade: S.gradeAll, layers: [...S.layers].sort((p, q) => (p.track || 1) - (q.track || 1) || p.start - q.start)     // bottom track first
+    colour_ref: S.colourRef, grade: S.gradeAll, layers: [...S.layers].sort((p, q) => (p.track || 1) - (q.track || 1) || p.start - q.start)     // bottom track first
       .map((l) => ({ start: l.start, end: l.end, on: l.on !== false && !S.trackOff[l.track || 1], opacity: l.opacity ?? 1, grade: l.grade })),
     stage_order: S.stage_order,
     aspect: S.aspect, aspect_custom: S.aspect_custom,
     custom_w: S.custom_w, custom_h: S.custom_h, custom_lock: S.custom_lock,
-    out_dir: S.out_dir, name: S.name, temp_dir: S.temp_dir || "", backend: S.backend, sharp: S.sharp, upscale: S.upscale,
+    out_dir: S.out_dir, name: S.name, temp_dir: S.temp_dir || "", backend: S.backend, repairnet: S.repairnet, sharp: S.sharp, upscale: S.upscale,
     script: S.script,
   };
 }
@@ -140,6 +146,147 @@ function saveSettings() {
   window.api.rpc("save_settings", { settings: s });
 }
 
+
+// ---------------------------------------------------------------- undo / redo
+// Every change of the picture settings ends in schedulePreview(); half a second after the last one the state is
+// recorded, so a slider drag or a typed number is one step. One history per source and episode.
+const HIST = { stacks: {}, timer: 0, busy: false };
+function histStack() {
+  const k = `${S.info ? S.info.path : ""}#${S.current || 0}`;
+  return HIST.stacks[k] || (HIST.stacks[k] = { undo: [], redo: [], cur: null });
+}
+function histArm() {
+  if (HIST.busy || !S.info) return;
+  clearTimeout(HIST.timer);
+  HIST.timer = setTimeout(histCommit, 500);
+}
+function histCommit() {
+  clearTimeout(HIST.timer);
+  if (!S.info) return;
+  const h = histStack(), now = JSON.stringify(pictureSnap());
+  if (h.cur === null) { h.cur = now; histButtons(); return; }      // the state the episode opened with
+  if (now === h.cur) return;
+  h.undo.push(h.cur); if (h.undo.length > 300) h.undo.shift();
+  h.redo = []; h.cur = now;
+  histButtons();
+}
+function histGo(dir) {
+  if (!S.info) return;
+  histCommit();
+  const h = histStack(), from = dir < 0 ? h.undo : h.redo, to = dir < 0 ? h.redo : h.undo;
+  if (!from.length) { status(dir < 0 ? "Nothing to undo" : "Nothing to redo"); return; }
+  to.push(h.cur); h.cur = from.pop();
+  HIST.busy = true;
+  try {
+    togglePlay(false);
+    const keep = S.layerSel;
+    pictureLoad(JSON.parse(h.cur)); S.layerSel = keep;
+    sync(); schedulePreview(); scheduleScript();
+    if (typeof syncColourUi === "function") syncColourUi();
+    trimTracks(); renderLayerTrack();
+  } finally { HIST.busy = false; }
+  histButtons();
+  status(dir < 0 ? `Undone (${h.undo.length} more)` : `Redone (${h.redo.length} more)`);
+}
+function histButtons() {
+  const h = S.info ? histStack() : { undo: [], redo: [] };
+  $("btnUndo").disabled = !h.undo.length; $("btnRedo").disabled = !h.redo.length;
+  $("btnUndo").title = `Undo (Ctrl+Z)${h.undo.length ? " - " + h.undo.length + " step(s)" : ""}`;
+  $("btnRedo").title = `Redo (Ctrl+Y / Ctrl+Shift+Z)${h.redo.length ? " - " + h.redo.length + " step(s)" : ""}`;
+}
+
+// ---------------------------------------------------------------- workflows
+// A workflow = the picture settings of an episode (Repair, Crop & size, Colour, your filter groups and AI models) in
+// a .json file you can keep, send to someone and load onto another source. The field order is the source's own.
+const WF_SKIP = new Set(["order"]);
+async function saveWorkflow() {
+  if (!S.info) { status("Open a source first: a workflow is the settings of the episode shown.", "err"); return; }
+  histCommit();
+  const settings = {};
+  for (const [k, v] of Object.entries(pictureSnap())) if (!WF_SKIP.has(k)) settings[k] = v;
+  const name = (S.info.path.split(/[\\/]/).pop() || "workflow").replace(/\.[^.]+$/, "");
+  const wf = { app: "DVD Restore", kind: "workflow", version: 1, saved_with: document.querySelector(".brand .ver")?.textContent || "",
+               created: new Date().toISOString(), name, source: S.info.path.split(/[\\/]/).pop(), settings };
+  const p = await window.api.saveText(`${name}.dvdrestore.json`, JSON.stringify(wf, null, 1),
+                                      [{ name: "DVD Restore workflow", extensions: ["json"] }]);
+  if (p) { log(`Workflow saved: ${p}`, "ok"); status(`Workflow saved: ${p}`, "ok"); }
+}
+async function loadWorkflow() {
+  if (!S.info) { status("Open a source first: a workflow is applied to its episodes.", "err"); return; }
+  const r = await window.api.openText([{ name: "DVD Restore workflow", extensions: ["json"] }]);
+  if (!r) return;
+  let wf;
+  try { wf = JSON.parse(r.text); } catch { status("Not a workflow file (not JSON).", "err"); return; }
+  const st = wf && wf.kind === "workflow" && wf.settings;
+  if (!st || typeof st !== "object") { status("Not a DVD Restore workflow file.", "err"); return; }
+  const known = Object.keys(st).filter((k) => PICTURE.includes(k) && !WF_SKIP.has(k));
+  if (!known.length) { status("This workflow holds no settings this version knows.", "err"); return; }
+  const all = S.episodes.length > 1 && confirm(`Apply the workflow "${wf.name || ""}" to all ${S.episodes.length} episodes?\nOK = all episodes, Cancel = only episode ${S.current + 1}.`);
+  histCommit();
+  const apply = (o) => { const x = structuredClone(o || pictureFresh()); for (const k of known) x[k] = structuredClone(st[k]); return x; };
+  epSetAlign();
+  if (all) S.epSet = S.episodes.map((_, k) => apply(k === S.current ? pictureSnap() : S.epSet[k]));
+  pictureLoad(apply(pictureSnap()));
+  sync(); schedulePreview(); scheduleScript();
+  if (typeof syncColourUi === "function") syncColourUi();
+  renderLayerTrack();
+  const missing = (S.vs_groups || []).flatMap((g) => g.filters).filter((f) => f.type === "ai" && f.p && f.p.args && f.p.args.model).length;
+  log(`Workflow loaded from ${r.path}: ${known.length} settings${all ? " on all episodes" : ` on episode ${S.current + 1}`}` +
+      (missing ? " (AI model filters point to model files on the PC it was saved on - check their paths)" : ""), "ok");
+  status(`Workflow "${wf.name || r.path}" applied`, "ok");
+}
+
+// ---- Colour step panel under the preview (as Resolve's Colour page): Primaries = wheels + light + colour side by
+// side; Curves / Layers / LUTs / More on their own page; the scopes always on the right
+function initGradeTabs() {
+  const nav = $("gradeTabs"), pages = [...document.querySelectorAll("#gradeDock .gd-page")];
+  const names = { primaries: "Primaries", curves: "Curves", layers: "Layers", luts: "LUTs", more: "More" };
+  const tips = { primaries: "Colour wheels, light, colour, hue / shadow colour and curves", layers: "Adjustment layers: grades for a part of the video",
+                 luts: "LUTs (.cube)" };
+  let cur = "primaries";
+  try { cur = localStorage.getItem("gradePage") || cur; } catch { /* no storage */ }
+  const show = (id) => {
+    for (const pg of pages) pg.classList.toggle("on", pg.dataset.page === id);
+    for (const b of nav.children) b.classList.toggle("on", b.dataset.v === id);
+    try { localStorage.setItem("gradePage", id); } catch { /* no storage */ }
+    setTimeout(() => { try { syncColourUi(); } catch { /* not ready */ } }, 0);
+  };
+  pages.forEach((pg, i) => {
+    const b = el("button"); b.dataset.v = pg.dataset.page; b.onclick = () => show(pg.dataset.page);
+    b.append(el("kbd", null, String(i + 1)), el("span", null, names[pg.dataset.page] || pg.dataset.page));
+    b.title = `${tips[pg.dataset.page] || ""} (key ${i + 1})`;
+    nav.appendChild(b);
+  });
+  window.addEventListener("keydown", (e) => {        // 1-5 switch the page while in Colour (not while typing)
+    if (S.step !== "colour" || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.type !== "range") return;
+    const k = parseInt(e.key, 10);
+    if (k >= 1 && k <= pages.length) { e.preventDefault(); show(pages[k - 1].dataset.page); }
+  });
+  show(pages.some((pg) => pg.dataset.page === cur) ? cur : "primaries");
+  // collapse: only this bar stays, the picture gets the height (remembered; key H in Colour)
+  const dock = $("gradeDock"), tog = el("button", "gd-collapse");
+  const setCollapsed = (on) => {
+    dock.classList.toggle("collapsed", on);
+    document.body.classList.toggle("grade-collapsed", on);     // Auto correction + Scopes stack in one column
+    tog.textContent = on ? "▴ Show panel" : "▾ Hide panel";
+    tog.title = (on ? "Show the grading controls" : "Hide the grading controls - a bigger picture") + " (H)";
+    try { localStorage.setItem("gradeCollapsed", on ? "1" : ""); } catch { /* no storage */ }
+    setTimeout(layoutImage, 0);
+  };
+  tog.onclick = () => setCollapsed(!dock.classList.contains("collapsed"));
+  nav.parentNode.appendChild(tog);
+  for (const b of nav.children) b.addEventListener("click", () => { if (dock.classList.contains("collapsed")) setCollapsed(false); });
+  let start = false;
+  try { start = localStorage.getItem("gradeCollapsed") === "1"; } catch { /* no storage */ }
+  setCollapsed(start);
+  window.addEventListener("keydown", (e) => {
+    if (S.step !== "colour" || e.ctrlKey || e.altKey || e.metaKey || (e.key !== "h" && e.key !== "H")) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.type !== "range") return;
+    e.preventDefault(); setCollapsed(!dock.classList.contains("collapsed"));
+  });
+}
+
 // ---------------------------------------------------------------- generic bound controls
 // data-bind="key" (or "crop.l") on a select, .seg, .stepper, checkbox or text input.
 function getv(key) { return key.split(".").reduce((o, k) => o[k], S); }
@@ -148,6 +295,7 @@ function setv(key, v) { const ks = key.split("."), last = ks.pop(); ks.reduce((o
 function changed(key, v) {
   if (PLAY.on && !NO_PREVIEW.has(key)) togglePlay(false);
   setv(key, v);
+  if (key === "autoStrength") { applyAuto(); return; }
   if (SAVED.includes(key)) saveSettings();
   sync();
   if (!NO_PREVIEW.has(key)) schedulePreview();
@@ -202,6 +350,517 @@ function showRule(rule) {
 }
 
 // state -> every control
+// RepairNet (Settings -> Neural models -> Halos + bleed): the AI halo removal and the AI bleed fix run as ONE
+// RepairNet pass. The Repair step says so, so it is clear which model does the work.
+const RN_BLEED = { "ai|normal": "AI RepairNet (best)", "ai|strong": "AI RepairNet - strong (same as normal: one pass)",
+                   "ai|light": "AI RepairNet - light (60 %)" };
+function repairNetLabels() {
+  const rn = S.repairnet !== "off";
+  const hb = document.querySelector('[data-bind="halo_method"] button[data-v="ai"]');
+  if (hb) hb.textContent = rn ? "AI · RepairNet" : "AI";
+  for (const o of document.querySelectorAll('select[data-bind="bleed"] option')) {
+    if (!(o.value in RN_BLEED)) continue;
+    if (!o.dataset.orig) o.dataset.orig = o.textContent;
+    o.textContent = rn ? RN_BLEED[o.value] : o.dataset.orig;
+  }
+  const haloAi = S.ghost === "auto" && S.halo_method === "ai";
+  const bleedAi = String(S.bleed || "").startsWith("ai|");
+  const msg = haloAi && bleedAi
+    ? "Halos and the colour bleed fix run together in one RepairNet pass (switch: Settings → Neural models → Halos + bleed)."
+    : "Runs as RepairNet (switch: Settings → Neural models → Halos + bleed).";
+  $("rnNoteHalo").textContent = msg;
+  $("rnNoteColour").textContent = msg;
+  $("rnNoteHalo").classList.toggle("hidden", !(rn && haloAi));
+  $("rnNoteColour").classList.toggle("hidden", !(rn && bleedAi));
+}
+
+// ---------------------------------------------------------------- Repair -> VapourSynth filter groups
+// Groups of your own VapourSynth plugin / vs-jetpack functions (EVA toolbox library: names, arguments, defaults,
+// compatibility scan). Each group is dragged by its handle between the Repair groups: where it sits is where it runs
+// (vsgraph.vs_filters at that point); a group before / right after Telecine can do the IVTC itself. ⧉ duplicates it.
+// S.vs_groups = [{id, slot 0-6, own_ivtc, on, filters: [{type, on, label, doc, argspec, p: {call, args, ...}}]}]
+let VSF_LIB = null, VSF_GROUPS = null;
+const vsfOpen = {};                               // group id -> index of the filter whose settings are shown
+const VSF_SLOTS = ["before Telecine & interlacing", "after Telecine & interlacing", "after Composite artifacts",
+                   "after Compression", "after Halos", "after Colour alignment", "after the Temporal stabilizer",
+                   "after Crop", "after Shape and size (before sharpening)", "at the very end (after Sharpen & lines)"];
+function vsfPoint(g) {                            // slot -> the engine's point (vsgraph.VSF_POINTS)
+  if (g.own_ivtc && g.slot <= 1) return "ivtc";
+  return ["source", "after_ivtc", "after_cleanup", "after_cleanup", "after_halos", "repairs", "after_stab", "after_stab",
+          "after_size", "end"][g.slot] || "repairs";
+}
+async function vsfLibrary() {
+  if (!VSF_LIB) {
+    const r = await rpc("block_library", {});
+    VSF_GROUPS = [VSF_AI_GROUP, VSF_MY_GROUP, ...(r.groups || [])];
+    VSF_MYDIR = r.my_dir || "";
+    VSF_LIB = [...(await vsfAiModels()), VSF_CODE, ...(r.my || []), ...(r.vs || []), ...(r.jet || [])].filter((f) => f.status !== "error" || f.kind === "my");
+  }
+  return VSF_LIB;
+}
+// ---- your own AI models (core/aiupscale.py via blocks "ai"): every .onnx / .pth / .safetensors in your model folders
+// ---- your own filters: Custom code, functions in my_filters\*.py, plugins in my_filters\plugins
+let VSF_MYDIR = "";
+const VSF_MY_GROUP = ["my", "Your own filters",
+  "Custom code (a few lines of VapourSynth Python), your Python functions (my_filters\\*.py: every function taking the clip first) and plugins you added (my_filters\\plugins\\*.dll)."];
+const VSF_CODE = { kind: "code", call: "code", name: "Custom code", group: "my", status: "ok", shown: "Python",
+  doc: "Your own VapourSynth code on `clip` (core, vs and the vs-jetpack modules are there; `group` = the picture as it entered this group). Change `clip`, e.g. clip = core.std.BoxBlur(clip, hradius=2)",
+  args: [{ name: "code", type: "Python" }], defaults: { code: "clip = clip" } };
+async function vsfMyAdd() {
+  const files = await window.api.openMyFilter();
+  if (!files || !files.length) return;
+  let r;
+  try { r = await rpc("my_filter_add", { paths: files }); } catch { return; }
+  log(`Added to your filters: ${r.added.join(", ")}${r.loaded.length ? " (plugins loaded: " + r.loaded.join(", ") + ")" : ""}`, "ok");
+  VSF_LIB = null; $("vsfDlgRows").textContent = "";
+  await vsfLibrary(); VSFB.cat = "my"; vsfBrowserRender();
+}
+function vsfMyBar() {
+  const bar = $("vsfMyBar"); bar.textContent = "";
+  bar.classList.toggle("hidden", VSFB.cat !== "my");
+  if (VSFB.cat !== "my") return;
+  const add = el("button", null, "+ Add Python file / plugin…"); add.onclick = vsfMyAdd;
+  add.title = "A .py file (its functions become filters) or a VapourSynth plugin .dll - copied into my_filters";
+  const open = el("button", null, "Open my_filters folder"); open.onclick = () => VSF_MYDIR && window.api.showPath(VSF_MYDIR);
+  const re = el("button", null, "Read again"); re.title = "After editing your .py files"; re.onclick = async () => { VSF_LIB = null; await vsfLibrary(); vsfBrowserRender(); };
+  bar.append(add, open, re, el("span", "dim", "A function's first argument is the clip, the others are its settings; its docstring is the help."));
+}
+const VSF_AI_GROUP = ["ai", "AI upscale & restore models",
+  "Your own models (VapourKit, chaiNNer, OpenModelDB): .onnx on TensorRT, .pth / .safetensors on PyTorch. Upscalers make the picture bigger - best in a group after the stabilizer, so the slow steps run at DVD size."];
+const VSF_AI_ARGS = [{ name: "model", type: "file", opt: false }, { name: "strength", type: "float", opt: true },
+                     { name: "colour_fix", type: "off / on", opt: true }];
+async function vsfAiModels() {
+  let r = { models: [] };
+  try { r = await rpc("ai_models", { dirs: S.ai_dirs || [], files: S.ai_files || [] }); } catch { /* none */ }
+  return (r.models || []).map((m) => {
+    const ext = m.file.split(".").pop().toLowerCase();
+    return { kind: "ai", call: "ai.model", shown: (ext === "onnx" ? "ONNX" : "PyTorch ." + ext) + (m.scale ? ` · ${m.scale}x` : ""),
+      name: m.file.replace(/\.(onnx|pth|safetensors)$/i, ""), group: "ai", plugin: m.folder, status: "ok", path: m.path, mb: m.mb, scale: m.scale,
+      doc: (m.scale === 1 ? "1x restore model (same size)" : m.scale ? `${m.scale}x upscaler` : "AI model") + ` · ${m.mb} MB · ${m.path}`,
+      args: VSF_AI_ARGS, defaults: { model: m.path, strength: "1", colour_fix: "off" } };
+  });
+}
+async function vsfAiReload() {
+  saveSettings();
+  if (!VSF_LIB) return;
+  VSF_LIB = [...(await vsfAiModels()), ...VSF_LIB.filter((f) => f.kind !== "ai")];
+  VSFB.cat = "ai"; vsfBrowserRender();
+}
+function vsfAiBar() {                              // above the table in the AI category: your folders / files
+  const bar = $("vsfAiBar"); bar.textContent = "";
+  bar.classList.toggle("hidden", VSFB.cat !== "ai");
+  if (VSFB.cat !== "ai") return;
+  const addDir = el("button", null, "+ Add model folder");
+  addDir.onclick = async () => { const d = await window.api.openFolder("Folder with your AI models (.onnx / .pth / .safetensors)");
+    if (d && !S.ai_dirs.includes(d)) { S.ai_dirs = [...S.ai_dirs, d]; vsfAiReload(); } };
+  const addFile = el("button", null, "+ Add model file");
+  addFile.onclick = async () => { const fs = await window.api.openModel();
+    const add = (fs || []).filter((f) => !S.ai_files.includes(f)); if (add.length) { S.ai_files = [...S.ai_files, ...add]; vsfAiReload(); } };
+  bar.append(addDir, addFile);
+  const list = el("div", "vsf-ai-src");
+  for (const [k, label] of [["ai_dirs", "folder"], ["ai_files", "file"]])
+    for (const p of S[k] || []) {
+      const chip = el("span", "vsf-ai-chip"); chip.title = `${label}: ${p}`;
+      const x = el("button", "link", "✕"); x.title = "Remove from the list (the file stays)";
+      x.onclick = () => { S[k] = S[k].filter((q) => q !== p); vsfAiReload(); };
+      chip.append(el("span", null, p), x); list.appendChild(chip);
+    }
+  if (!(S.ai_dirs.length || S.ai_files.length))
+    list.appendChild(el("span", "dim", "Add the folder that holds your models, or single model files."));
+  bar.appendChild(list);
+}
+function vsgChanged() {
+  for (const g of S.vs_groups) g.pos = vsfPoint(g);
+  changed("vs_groups", S.vs_groups.map((g) => structuredClone(g)));
+}
+function vsfArgsOf(f) {                          // [{name, hint}] for the settings form
+  if (f.kind === "code") return [{ name: "code", hint: "Python: change `clip`" }];
+  if (f.kind === "ai") return [{ name: "model", hint: "model file (.onnx / .pth / .safetensors)" }, { name: "strength", hint: "0-1, default 1 (less = blend with a plain resize)" },
+    { name: "colour_fix", hint: "off / on (keep the colours of the picture before the model)" }];
+  if (f.kind === "vs") return (f.args || []).map((a) => ({ name: a.name, hint: !a.type.startsWith("vnode") ? a.type + (a.opt ? "" : " (required)")
+    : a.auto ? "clip - made automatically (or @group / @prev / @self)" : "clip: @group, @prev or @self" + (a.opt ? "" : " (required)") }));
+  return (f.args || []).map((a) => ({ name: a.name, hint: /VideoNode/.test(a.type || "") && a.default === "" ? "clip: group, prev or current"
+    : a.default !== "" ? `default ${a.default}` : (a.required ? "required" : "") }));
+}
+function vsfNewGroup(slot = 5, filters = []) {
+  return { id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), slot, own_ivtc: false, on: true, filters };
+}
+function vsfMigrate() {                           // the earlier single list -> one group
+  if (S.vs_filters && S.vs_filters.length && !(S.vs_groups || []).length) {
+    const slot = { source: 0, ivtc: 0, after_ivtc: 1, repairs: 5, end: 9 }[S.vs_filters_pos] ?? 5;
+    S.vs_groups = [Object.assign(vsfNewGroup(slot, S.vs_filters.map((f) => structuredClone(f))), { own_ivtc: S.vs_filters_pos === "ivtc" })];
+    S.vs_filters = [];
+  }
+  if (!Array.isArray(S.vs_groups)) S.vs_groups = [];
+}
+function vsfStaticGroups() {                      // the Repair step's own groups, in order (the drop slots between them)
+  return [...document.querySelectorAll('[data-panel="adjust"] > .group:not(.vsf-group)')];   // incl. Crop, Shape and size, Sharpen
+}
+
+function vsfFilterRow(g, i) {
+  const f = g.filters[i];
+  const item = el("div", "vsf-item" + (f.on === false ? " off" : ""));
+  const head = el("div", "vsf-head");
+  const on = document.createElement("input"); on.type = "checkbox"; on.checked = f.on !== false; on.title = "On / off";
+  on.onchange = () => { f.on = on.checked; vsgChanged(); };
+  const name = el("div", "vsf-name", f.label || f.p.call); name.appendChild(el("small", null, f.p.call));
+  name.title = "Show / hide its settings";
+  name.onclick = () => { vsfOpen[g.id] = vsfOpen[g.id] === i ? -1 : i; renderVsGroups(); };
+  const btn = (t, tip, fn, dis) => { const b = el("button", "ghost", t); b.title = tip; b.disabled = !!dis; b.onclick = fn; return b; };
+  head.append(on, name,
+    btn("↑", "Earlier", () => { [g.filters[i - 1], g.filters[i]] = [g.filters[i], g.filters[i - 1]]; vsfOpen[g.id] = -1; vsgChanged(); }, i === 0),
+    btn("↓", "Later", () => { [g.filters[i + 1], g.filters[i]] = [g.filters[i], g.filters[i + 1]]; vsfOpen[g.id] = -1; vsgChanged(); }, i === g.filters.length - 1),
+    ...(f.type === "ai" ? [btn("⚙ Engine", "TensorRT engine settings (precision, shapes, build command)", () => vsfEngineOpen(g, i, false))] : []),
+    btn("✕", "Remove this filter", () => { g.filters.splice(i, 1); vsfOpen[g.id] = -1; vsgChanged(); }));
+  item.appendChild(head);
+  if (vsfOpen[g.id] === i) {
+    const form = el("div", "vsf-args");
+    if (f.doc) form.appendChild(el("div", "vsf-doc", f.doc));
+    const spec = f.argspec || [];
+    if (!spec.length) form.appendChild(el("div", "vsf-doc", "No settings."));
+    for (const a of spec) {
+      const lab = el("label", null, a.name); lab.title = a.name;
+      const inp = document.createElement(a.name === "code" && f.type === "code" ? "textarea" : "input");
+      if (inp.tagName === "INPUT") inp.type = "text"; else { inp.rows = 6; inp.className = "vsf-code"; }
+      inp.spellcheck = false;
+      inp.value = f.p.args && f.p.args[a.name] !== undefined ? f.p.args[a.name] : ""; inp.placeholder = a.hint || "";
+      inp.onchange = () => { f.p.args = { ...(f.p.args || {}), [a.name]: inp.value }; vsgChanged(); };
+      form.append(lab, inp);
+    }
+    form.appendChild(el("div", "vsf-doc", f.type === "code" ? "Python. `clip` in, `clip` out; core, vs, vs-jetpack modules and `group` are there." : f.type === "vs" ? "Empty = the plugin's default. Lists: comma separated (e.g. 1,0,0)."
+                                                           : "Empty = the default. Values are Python (e.g. 2.0, True, [1, 2], 'text')."));
+    item.appendChild(form);
+  }
+  return item;
+}
+
+
+// ---- TensorRT engine dialog (VapourKit-style) for AI model filters: the switches write a trtexec-style command, and
+// the command is what is built (aiupscale.engine_settings / parse_args). Stored on the filter: f.p.engine.
+const ENG = { gid: null, i: -1, info: {}, e: null, isNew: false, strength: 1 };   // the group by id: saving replaces S.vs_groups with copies
+function engTarget() {
+  const g = (S.vs_groups || []).find((x) => x.id === ENG.gid);
+  return g && g.filters[ENG.i] ? { g, f: g.filters[ENG.i] } : {};
+}
+function engineArgs(e, i) {
+  const nm = i.input_name || "input";
+  const vsr = e.type === "vsr", T = e.frames || i.frames || 5;
+  const dims = (h, w) => (vsr ? (i.layout === "4d" ? `1x${3 * T}x${h}x${w}` : `1x${T}x3x${h}x${w}`) : `1x3x${h}x${w}`);
+  let s;
+  if (i.fixed) s = `--shapes=${nm}:${dims(i.fixed[1], i.fixed[0])}`;                       // the model has one size
+  else if (e.shape === "static") s = `--shapes=${nm}:${dims("H", "W")}`;                   // one engine per picture size
+  else s = `--minShapes=${nm}:${dims(240, 240)} --optShapes=${nm}:${dims(720, 1280)} --maxShapes=${nm}:${dims(1080, 1920)}`;
+  s += ` --saveEngine=OUTPUT_PATH --builderOptimizationLevel=${e.opt_level ?? 3}`;
+  if (e.workspace && +e.workspace !== 4096) s += ` --memPoolSize=workspace:${e.workspace}M`;
+  if (e.precision === "fp16") s += " --fp16"; else if (e.precision === "bf16") s += " --bf16";
+  return s;
+}
+function parseEngineArgs(text) {
+  const o = { precision: "fp32" }, unknown = [];
+  let shapes = null;
+  for (const tok of String(text).split(/\s+/).filter(Boolean)) {
+    const [k, v = ""] = tok.split(/=(.*)/s);
+    if (["--minShapes", "--optShapes", "--maxShapes", "--shapes"].includes(k)) { shapes = shapes || {}; shapes[k] = v.split(":").pop().split("x"); }
+    else if (k === "--builderOptimizationLevel") o.opt_level = parseInt(v, 10);
+    else if (k === "--fp16") o.precision = "fp16";
+    else if (k === "--bf16") o.precision = "bf16";
+    else if (k === "--memPoolSize") { const n = v.split(":").pop(); o.workspace = Math.round(parseFloat(n) * (/g/i.test(n) ? 1024 : 1)); }
+    else if (!["--saveEngine", "--onnx", "--noTF32"].includes(k)) unknown.push(tok);
+  }
+  if (shapes) {
+    o.shape = shapes["--shapes"] ? "static" : "dynamic";
+    const d = shapes["--optShapes"] || shapes["--shapes"];
+    if (d) { o.type = d.length === 5 || (d.length === 4 && +d[1] > 3) ? "vsr" : "image"; if (o.type === "vsr") o.frames = d.length === 5 ? +d[1] : (+d[1]) / 3; }
+  }
+  o.unknown = unknown;
+  return o;
+}
+async function vsfEngineOpen(g, i, isNew) {
+  g = (S.vs_groups || []).find((x) => x.id === g.id) || g;
+  const f = g.filters[i];
+  let info = {};
+  try { info = await rpc("model_info", { path: f.p.args.model }); } catch { /* shown below */ }
+  if (info.error) { status(info.error, "err"); if (isNew) { g.filters.splice(i, 1); vsgChanged(); } return; }
+  Object.assign(ENG, { gid: g.id, i, info, isNew, label: f.label, strength: parseFloat(f.p.args.strength ?? "1") || 1 });
+  const e = { type: info.vsr ? "vsr" : "image", shape: info.fixed ? "static" : "dynamic", precision: info.precision === "bf16" ? "bf16" : "fp16",
+              opt_level: 3, workspace: 4096, frames: info.frames || 0, ...(f.p.engine || {}) };
+  if (!e.args) e.args = engineArgs(e, info);
+  ENG.e = e;
+  $("engModel").textContent = f.label || f.p.args.model; $("engModel").title = f.p.args.model;
+  const box = $("engInfo"); box.textContent = "";
+  const add = (t) => box.appendChild(el("span", "badge", t));
+  add(info.kind === "onnx" ? "ONNX" : `PyTorch · ${info.arch}`); if (info.scale) add(`${info.scale}x`);
+  add(info.fixed ? `fixed input ${info.fixed[0]}x${info.fixed[1]}` : "any input size");
+  if (info.vsr) add(`video model: ${info.frames || "?"} frames in`);
+  add(`stored as ${info.precision}`);
+  engineUi();
+  $("engineDlg").classList.remove("hidden");
+}
+function engineUi(fillText = true) {
+  const e = ENG.e, i = ENG.info || {};
+  const seg = (id, v) => { for (const b of $(id).children) b.classList.toggle("on", b.dataset.v === String(v)); };
+  seg("engType", e.type); seg("engShape", e.shape); seg("engPrecision", e.precision); seg("engOpt", e.opt_level ?? 3); seg("engWs", e.workspace ?? 4096);
+  $("engShape").querySelector('[data-v="dynamic"]').disabled = !!i.fixed;
+  $("engType").querySelector('[data-v="vsr"]').disabled = i.kind !== "onnx";
+  $("engTypeTxt").textContent = e.type === "vsr" ? `VSR (${e.frames || i.frames || 5} frames in, the middle one out)` : "Image (single frame)";
+  $("engShapeTxt").textContent = i.fixed ? `Static (the model has one size: ${i.fixed[0]}x${i.fixed[1]})` : e.shape === "dynamic" ? "Dynamic (multiple resolutions)" : "Static (one engine per picture size)";
+  $("engPrecTxt").textContent = { fp16: "FP16 (build + inference, recommended)", bf16: "BF16 (fp32's number range: no overflow)", fp32: "FP32 (exact, slower)" }[e.precision] || "";
+  if (fillText && document.activeElement !== $("engArgs")) $("engArgs").value = e.args || "";
+  if (document.activeElement !== $("engStrength")) $("engStrength").value = ENG.strength;
+  const p = parseEngineArgs($("engArgs").value);
+  $("engArgsNote").textContent = p.unknown.length ? `Not understood (ignored): ${p.unknown.join(" ")}` : "";
+  $("engArgsNote").classList.toggle("err", !!p.unknown.length);
+  $("engNote").textContent = (e.precision !== "fp32" ? `The first frame checks the ${e.precision} engine against fp32; if the picture differs by more than 0.75 levels on average, fp32 is used for this model. ` : "")
+    + (e.shape === "dynamic" && !i.fixed ? "Dynamic: one engine for every picture size in the range (no rebuild when the size changes); if TensorRT cannot build the whole range, a static engine per size is used. " : "")
+    + (i.kind !== "onnx" ? "PyTorch models (.pth / .safetensors): the engine is built per picture size; the precision applies. " : "")
+    + "Engines are kept in engines\\.";
+}
+function engineDone(save, build) {
+  $("engineDlg").classList.add("hidden");
+  const { g, f } = engTarget(), i = ENG.i;
+  if (!f) return;
+  if (!save) { if (ENG.isNew) { g.filters.splice(i, 1); vsfOpen[g.id] = -1; vsgChanged(); } return; }
+  f.p.engine = { ...ENG.e };
+  f.p.args = { ...f.p.args, strength: String(ENG.strength) };
+  delete f.p.args.preset;                          // the engine settings replace the preset
+  vsgChanged();
+  if (build) {
+    const w = (S.info && S.info.width) || 720, h = (S.info && S.info.height) || 480;
+    status(`Building the TensorRT engine for ${f.label} (${w}x${h}) - see the log`);
+    rpc("build_ai_engine", { model: f.p.args.model, engine: f.p.engine, w, h, backend: S.backend })
+      .then((r) => { if (r && r.error) { status(r.error, "err"); log(r.error, "err"); } else status(`Engine ready: ${f.label}`, "ok"); })
+      .catch(() => {});
+  }
+}
+function initEngineDialog() {
+  const pick = (id, key, num) => { for (const b of $(id).children) b.onclick = () => {
+    if (b.disabled) return;
+    ENG.e[key] = num ? +b.dataset.v : b.dataset.v;
+    if (key === "type" && ENG.e.type === "vsr" && !ENG.e.frames) ENG.e.frames = ENG.info.frames || 5;
+    ENG.e.args = engineArgs(ENG.e, ENG.info); engineUi(); }; };
+  pick("engType", "type"); pick("engShape", "shape"); pick("engPrecision", "precision"); pick("engOpt", "opt_level", true); pick("engWs", "workspace", true);
+  $("engArgs").oninput = () => {                   // a hand-edited command: the switches follow it
+    const p = parseEngineArgs($("engArgs").value);
+    for (const k of ["precision", "opt_level", "workspace", "shape", "type", "frames"]) if (p[k] !== undefined && !Number.isNaN(p[k])) ENG.e[k] = p[k];
+    ENG.e.args = $("engArgs").value; engineUi(false);
+  };
+  $("engStrength").onchange = () => { const v = parseFloat($("engStrength").value); ENG.strength = Number.isNaN(v) ? ENG.strength : Math.max(0, Math.min(1, v)); engineUi(false); };
+  $("btnEngineClose").onclick = $("btnEngineCancel").onclick = () => engineDone(false);
+  $("btnEngineSave").onclick = () => engineDone(true, false);
+  $("btnEngineBuild").onclick = () => engineDone(true, true);
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("engineDlg").classList.contains("hidden")) engineDone(false); });
+}
+
+// the filter browser (+ Add filter): search, categories, a table of every filter with its settings and what it does,
+// details of the selected one, Add. Data: the EVA toolbox library (names, groups with descriptions, arguments, formats).
+const VSFB = { g: null, cat: "all", sel: null };
+function vsfAddTo(g, f) {
+  const p = { call: f.call, args: { ...(f.defaults || {}) } };
+  for (const k of ["formats", "adapt", "prep"]) if (f[k] !== undefined) p[k] = structuredClone(f[k]);
+  g.filters.push({ type: f.kind, on: true, label: f.name || f.call, doc: (f.doc || f.note || vsfCatInfo(f.group)[1] || "").slice(0, 300), argspec: vsfArgsOf(f), p });
+  vsfOpen[g.id] = g.filters.length - 1;
+  vsgChanged();
+  if (f.kind === "ai") vsfEngineOpen(g, g.filters.length - 1, true);   // the engine settings first (Cancel = not added)
+}
+function vsfRequired(f) {
+  return (f.args || []).filter((a) => (f.kind === "vs" ? !a.opt && !a.auto : a.required) && !(f.defaults && f.defaults[a.name] !== undefined)).map((a) => a.name);
+}
+function vsfCatInfo(key) {                        // [name, description] of a category
+  const c = (VSF_GROUPS || []).find((x) => x[0] === key);
+  return c ? [c[1], c[2] || ""] : [key || "Other", ""];
+}
+function vsfMatches(f, words) {
+  const [cn, cd] = vsfCatInfo(f.group);
+  const t = `${f.name} ${f.call} ${f.plugin || ""} ${cn} ${cd} ${f.doc || ""} ${f.note || ""} ${(f.args || []).map((a) => a.name).join(" ")}`.toLowerCase();
+  return words.every((w) => t.includes(w));
+}
+function vsfBrowserRender() {
+  const words = $("vsfDlgSearch").value.toLowerCase().split(/\s+/).filter(Boolean);
+  const all = (VSF_LIB || []).filter((f) => vsfMatches(f, words));
+  // categories, with how many filters (matching the search) each holds
+  const cats = $("vsfDlgCats"); cats.textContent = "";
+  const counts = {}; for (const f of all) counts[f.group] = (counts[f.group] || 0) + 1;
+  const catBtn = (key, label, n, tip) => {
+    const b = el("button", "vsf-cat" + (VSFB.cat === key ? " on" : "") + (n ? "" : " empty"));
+    b.append(el("span", null, label), el("small", null, String(n))); b.title = tip || "";
+    b.onclick = () => { VSFB.cat = key; vsfBrowserRender(); };
+    cats.appendChild(b);
+  };
+  catBtn("all", "All filters", all.length, "Every installed VapourSynth plugin and vs-jetpack function");
+  for (const [key, name, desc] of VSF_GROUPS || []) catBtn(key, name, counts[key] || 0, desc);
+  // the table
+  const rows = $("vsfDlgRows"); rows.textContent = "";
+  const shown = all.filter((f) => VSFB.cat === "all" || f.group === VSFB.cat);
+  const order = (VSF_GROUPS || []).map((x) => x[0]);
+  shown.sort((a, b) => (order.indexOf(a.group) - order.indexOf(b.group)) || (a.name || a.call).localeCompare(b.name || b.call));
+  if (!VSF_LIB) { const tr = el("tr"); const td = el("td", "vsf-empty", "Loading the filter list… (the first time after plugins changed, every filter is tested once: up to a minute)"); td.colSpan = 5; tr.appendChild(td); rows.appendChild(tr); }
+  else if (!shown.length) { const tr = el("tr"); const td = el("td", "vsf-empty", "No filter found - try other words or All filters."); td.colSpan = 5; tr.appendChild(td); rows.appendChild(tr); }
+  let lastCat = null;
+  for (const f of shown) {
+    if (VSFB.cat === "all" && f.group !== lastCat) {
+      lastCat = f.group;
+      const [cn, cd] = vsfCatInfo(f.group);
+      const tr = el("tr", "vsf-cat-row"); const td = el("td"); td.colSpan = 5;
+      td.append(el("b", null, cn), el("span", null, cd ? "  ·  " + cd : "")); tr.appendChild(td); rows.appendChild(tr);
+    }
+    const tr = el("tr", "vsf-row" + (VSFB.sel === f ? " sel" : ""));
+    const name = el("td"); name.appendChild(el("b", null, f.name || f.call));
+    if (f.status === "args") { const b = el("span", "vsf-badge", "you fill in"); b.title = f.needs || "Fill in: " + vsfRequired(f).join(", "); name.appendChild(b); }
+    else if (f.status && f.status !== "ok") name.appendChild(el("span", "vsf-badge", "untested"));
+    const args = (f.args || []).map((a) => a.name);
+    tr.append(name, el("td", "mono", f.shown || f.call), el("td", null, f.kind === "jet" ? "vs-jetpack" : (f.plugin || "plugin")),
+              el("td", "mono dim", args.length ? args.slice(0, 5).join(", ") + (args.length > 5 ? ` … +${args.length - 5}` : "") : "—"),
+              el("td", "dim", f.doc || f.note || vsfCatInfo(f.group)[1]));
+    for (const td of tr.children) if (!td.title) td.title = td.innerText;   // the whole text on hover
+    tr.onclick = () => { VSFB.sel = f; vsfBrowserRender(); };
+    tr.ondblclick = () => { vsfAddTo(VSFB.g, f); vsfBrowserClose(); };
+    rows.appendChild(tr);
+  }
+  if (VSFB.cat === "ai" && VSF_LIB && !shown.length && !words.length) {
+    rows.textContent = ""; const tr = el("tr"); const td = el("td", "vsf-empty", "No models yet: add a folder or files above."); td.colSpan = 5; tr.appendChild(td); rows.appendChild(tr);
+  }
+  vsfAiBar(); vsfMyBar();
+  vsfBrowserInfo();
+}
+function vsfBrowserInfo() {
+  const box = $("vsfDlgInfo"); box.textContent = "";
+  const f = VSFB.sel;
+  if (!f) { box.appendChild(el("div", "dim", "Click a filter to see what it does and its settings; double-click (or Add) puts it in the group.")); return; }
+  const [cn, cd] = vsfCatInfo(f.group);
+  const head = el("div", "vsf-info-head");
+  const t = el("div"); t.append(el("b", null, f.name || f.call), el("span", "mono dim", "  " + f.call));
+  const add = el("button", "primary", "Add to this group"); add.onclick = () => { vsfAddTo(VSFB.g, f); vsfBrowserClose(); };
+  head.append(t, add); box.appendChild(head);
+  box.appendChild(el("div", "dim", `${f.kind === "vs" ? "VapourSynth plugin: " + (f.plugin || "") : f.kind === "ai" ? "Your model: " + f.path : "vs-jetpack function"}  ·  ${cn}${cd ? " - " + cd : ""}`));
+  if (f.kind === "ai") {
+    const mi = el("div", "vsf-info-doc dim", "Reading the model…"); box.appendChild(mi);
+    rpc("model_info", { path: f.path }).then((i) => {
+      if (VSFB.sel !== f) return;
+      mi.textContent = i.error ? i.error : [i.kind === "onnx" ? "ONNX (TensorRT)" : `PyTorch: ${i.arch}`, i.scale ? `${i.scale}x` : "",
+        i.precision, i.fixed ? `fixed input ${i.fixed[0]}x${i.fixed[1]} (the picture is resized to it first)` : "any picture size",
+        i.vsr ? `video model, ${i.frames || "?"} frames` : ""].filter(Boolean).join(" · ") + ". The first run builds its TensorRT engine once (up to a few minutes).";
+    }).catch(() => { mi.textContent = ""; });
+  }
+  if (f.doc) box.appendChild(el("div", "vsf-info-doc", f.doc));
+  if (f.note) box.appendChild(el("div", "vsf-info-doc", f.note));
+  const tbl = el("table", "vsf-args-table");
+  const th = el("tr"); th.append(el("th", null, "Setting"), el("th", null, "Type"), el("th", null, "Default")); tbl.appendChild(th);
+  for (const a of f.args || []) {
+    const tr = el("tr");
+    const clipArg = f.kind === "vs" ? a.type.startsWith("vnode") : /VideoNode/.test(a.type || "");
+    const def = a.auto ? "made automatically" : f.kind === "vs" ? (a.opt ? "the plugin's default" : "required") : (a.required ? "required" : a.default);
+    if (clipArg) tr.classList.add("clip-arg");
+    tr.append(el("td", "mono", a.name), el("td", "mono dim", a.type || ""), el("td", "mono dim", (f.defaults && f.defaults[a.name] !== undefined) ? `${f.defaults[a.name]} (preset)` : def));
+    tbl.appendChild(tr);
+  }
+  if ((f.args || []).length) box.appendChild(tbl); else box.appendChild(el("div", "dim", "No settings."));
+  if (f.formats && f.formats.length) box.appendChild(el("div", "dim", "Works on: " + f.formats.join(", ") + " (other formats are converted automatically)"));
+  if (f.status === "args") box.appendChild(el("div", "vsf-warn", "You fill in: " + (f.needs || vsfRequired(f).join(", ")) + " - after adding it, in the filter's settings."));
+  if ((f.args || []).some((a) => (f.kind === "vs" ? a.type.startsWith("vnode") : /VideoNode/.test(a.type || ""))))
+    box.appendChild(el("div", "dim", f.kind === "vs"
+      ? "Clip settings: @group = the picture as it entered this group, @prev = before the previous filter, @self = this filter's own input."
+      : "Clip settings: group = the picture as it entered this group, prev = before the previous filter, current = this filter's own input. Sizes: w, h."));
+}
+async function vsfBrowser(g) {
+  VSFB.g = g; VSFB.sel = null;
+  $("vsfDlgFor").textContent = "→ group " + (VSF_SLOTS[g.slot] ? "running " + VSF_SLOTS[g.slot] : "");
+  $("vsfDlg").classList.remove("hidden");
+  $("vsfDlgSearch").value = ""; $("vsfDlgSearch").focus();
+  vsfBrowserRender();
+  try { await vsfLibrary(); vsfBrowserRender(); } catch { $("vsfDlgRows").textContent = "The filter list could not be loaded (see the log)."; }
+}
+function vsfBrowserClose() { $("vsfDlg").classList.add("hidden"); }
+
+function vsfGroupEl(g, gi) {
+  const box = el("div", "group vsf-group" + (g.on === false ? " off" : ""));
+  box.dataset.gid = g.id;
+  const head = el("div", "group-head");
+  const grip = el("span", "vsf-grip", "⠿"); grip.title = "Drag to where this group should run";
+  grip.draggable = true;
+  grip.ondragstart = (e) => { e.dataTransfer.setData("text/plain", g.id); e.dataTransfer.effectAllowed = "move"; box.classList.add("dragging"); };
+  grip.ondragend = () => { box.classList.remove("dragging"); vsfDropMark(null); };
+  const title = el("h3", null, "VapourSynth filters");
+  const where = el("div", "vsf-where", vsfPoint(g) === "ivtc" ? "Runs instead of the app's IVTC" : "Runs " + VSF_SLOTS[g.slot]);
+  const sw = el("label", "switch"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = g.on !== false;
+  cb.onchange = () => { g.on = cb.checked; vsgChanged(); }; sw.append(cb, el("span")); sw.title = "This group on / off";
+  const btn = (t, tip, fn) => { const b = el("button", "ghost vsf-gbtn", t); b.title = tip; b.onclick = fn; return b; };
+  const add = btn("+ Add filter", "Browse and search every installed VapourSynth plugin and vs-jetpack function",
+    () => vsfBrowser(g));
+  const dup = btn("⧉", "Duplicate this group (with its filters)", () => {
+    const c = structuredClone(g); c.id = vsfNewGroup().id;
+    S.vs_groups.splice(gi + 1, 0, c); vsgChanged();
+  });
+  const del = btn("✕", "Delete this group", () => { S.vs_groups.splice(gi, 1); vsgChanged(); });
+  const tools = el("span", "vsf-gtools"); tools.append(sw, add, dup, del);
+  head.append(grip, title, tools);
+  box.append(head, where);
+  if (g.slot <= 1) {                             // next to Telecine: this group can do the IVTC itself
+    const f = el("div", "field");
+    const lab = el("label", null, "IVTC"); lab.title = "Replace the app's IVTC / PAL handling with this group";
+    const s2 = el("label", "switch"); const c2 = document.createElement("input"); c2.type = "checkbox"; c2.checked = !!g.own_ivtc;
+    c2.onchange = () => { g.own_ivtc = c2.checked; vsgChanged(); };
+    s2.append(c2, el("span"), el("em", null, "do the IVTC myself (replaces the app's)"));
+    f.append(lab, s2); box.appendChild(f);
+    if (g.own_ivtc) box.appendChild(el("div", "note", "This group gets the raw interlaced picture and must give progressive frames, e.g. vivtc.VFM (order 1) + vivtc.VDecimate, or tivtc.TFM + tivtc.TDecimate, or bwdif.Bwdif. The export uses its frame rate (constant), not the app's VFR."));
+  }
+  const list = el("div", "vsf-list");
+  g.filters.forEach((_, i) => list.appendChild(vsfFilterRow(g, i)));
+  if (!g.filters.length) list.appendChild(el("div", "note", "Empty: + Add filter."));
+  box.appendChild(list);
+  return box;
+}
+
+function vsfDropMark(beforeEl) {                  // the line that shows where a dragged group will land
+  let m = document.getElementById("vsfDropMark");
+  if (!beforeEl) { if (m) m.remove(); return; }
+  if (!m) { m = el("div", "vsf-drop"); m.id = "vsfDropMark"; }
+  beforeEl.parentNode.insertBefore(m, beforeEl);
+}
+function vsfSlotAt(y) {                           // mouse y -> slot 0-6 (before which static group)
+  const st = vsfStaticGroups();
+  for (let k = 0; k < st.length; k++) { const r = st[k].getBoundingClientRect(); if (y < r.top + r.height / 2) return k; }
+  return st.length;
+}
+function vsfBindDrop() {
+  const panel = document.querySelector('[data-panel="adjust"]');
+  if (!panel || panel.dataset.vsfDrop) return;
+  panel.dataset.vsfDrop = "1";
+  panel.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer.types.includes("text/plain")) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move";
+    const slot = vsfSlotAt(e.clientY), st = vsfStaticGroups();
+    vsfDropMark(st[slot] || document.querySelector('[data-panel="adjust"] .vsf-new'));
+  });
+  panel.addEventListener("dragleave", (e) => { if (!panel.contains(e.relatedTarget)) vsfDropMark(null); });
+  panel.addEventListener("drop", (e) => {
+    const id = e.dataTransfer.getData("text/plain");
+    const k = S.vs_groups.findIndex((g) => g.id === id);
+    vsfDropMark(null);
+    if (k < 0) return;
+    e.preventDefault();
+    const [g] = S.vs_groups.splice(k, 1);
+    g.slot = vsfSlotAt(e.clientY);
+    if (g.slot > 1) g.own_ivtc = false;
+    let at = S.vs_groups.length;                  // last of the groups already in that slot
+    for (let j = S.vs_groups.length - 1; j >= 0; j--) if (S.vs_groups[j].slot <= g.slot) { at = j + 1; break; } else at = j;
+    S.vs_groups.splice(at, 0, g);
+    vsgChanged();
+  });
+}
+
+function renderVsGroups() {
+  const panel = document.querySelector('[data-panel="adjust"]');
+  if (!panel) return;
+  vsfMigrate();
+  vsfBindDrop();
+  for (const old of panel.querySelectorAll(".vsf-group")) old.remove();
+  const st = vsfStaticGroups(), tail = panel.querySelector(".vsf-new");
+  S.vs_groups.forEach((g, gi) => {
+    const anchor = st[g.slot] || tail;
+    anchor.parentNode.insertBefore(vsfGroupEl(g, gi), anchor);
+  });
+}
+
 function sync() {
   const pal = !!(S.info && S.info.pal);
   for (const e of $$(".ntsc")) e.classList.toggle("hidden", pal);
@@ -225,6 +884,8 @@ function sync() {
     chip.title = has && !same ? `Back to the analysed value (${S.auto[k]})` : "";
     f.classList.toggle("edited", has && !same);
   }
+  repairNetLabels();
+  renderVsGroups();
   $("aiNote").textContent = {
     field: "FieldNet: one network for the whole cleanup - its own IVTC repair from the raw fields, dot crawl, rainbows, MPEG blocking, halos and colour bleed, recurrent over time. After it the picture is steadied (motion-compensated averaging, fine-detail and still-area smoothing, and a long still-area lock), so shimmer, flicker and wobble on still detail such as door mesh or rug lettering go away without losing sharpness. Each dial: 1 = remove fully, 0 = leave as on the disc; while a dial is above 0 the matching classic step below is left out. Grain keep 1 = film grain and noise stay. Detail recovery 1 = fine detail an old decoder cut out is rebuilt.",
     uni: "All-in-one network: dot crawl, rainbows, MPEG blocking / flicker, halos and colour bleed / shift in one pass, recurrent over time, so it flickers less than the other cleaners - for fully steady still detail (door mesh, rug lettering) add the Steady chain stabilizer. Each dial: 1 = remove fully, 0 = leave as on the disc. While a dial is above 0 the matching classic step (MPEG repair, halo removal, colour shift / bleed fix) is left out. Grain keep 1 = film grain and noise stay. Compared with StableNet it is a little softer on the finest detail.",
@@ -234,6 +895,10 @@ function sync() {
     precise: "Single-frame version of the same network (use if the temporal one shows ghosting on a source).",
     off: "Only the classic temporal filters (they soften fine detail - the AI is better).",
   }[S.ai_model] || "";
+  // the dots + rainbows models take their strength from Dot crawl / Rainbows: with both Off they do not run at all
+  // (vsgraph._ai_cleaner) - the Simpsons S1 preview then showed the disc's own crawl / rainbow flicker unfiltered
+  if (["precise", "temporal", "xnet", "stable"].includes(S.ai_model) && S.crawl === "off" && S.rainbow === "off")
+    $("aiNote").textContent += " Dot crawl and Rainbows are both Off, so this cleanup does not run now - press Auto (Composite artifacts) or set them.";
   $("frameNote").textContent = [
     { off: "", repair: "Anti-aliasing runs only where a frame had to be rebuilt from one field.", all: "Anti-aliasing runs on every frame: use it for sources that were deinterlaced badly before they got to you." }[S.aa],
     { off: "", ai: "AI blend removal: every blended frame is rebuilt as the picture of its own moment from the frames around it - no repeated frames, so pans stay smooth. Clean frames, fades and dissolves are left as they are.",
@@ -271,16 +936,12 @@ function sync() {
     $("sizeNote").textContent = note;
   }
   const L = S.levels;
-  $("levelNote").textContent = L ? `Measured: darkest picture tone ${L.level_black}, brightest ${L.level_white} (DVD black = 16, white = 235).` : "Press Auto colour to measure the black and white level of this source.";
+  $("levelNote").textContent = L ? `Measured: darkest picture tone ${L.level_black}, brightest ${L.level_white}` + (L.level_whites != null ? `, painted whites ${L.level_whites}` : "") + ` (DVD black = 16, white = 235).` : "Press Auto colour to measure the black and white level of this source.";
   $("gamutNote").textContent = (L ? `Measured: ${L.gamut_out} % of pixels are stored stronger than a screen can show, ${L.clip_flat} % sit flat at the limit (worst tenth of frames). ` : "") + ({
     off: "", compress: "Compress: uses the colour the disc really stores beyond the range. Right for DVDs.",
     ai: "AI rebuild: for colour that was cut off before the disc or capture was made. It estimates the lost gradation from the other colour channels and the surroundings; where all three channels are flat there is nothing to go on.",
   }[S.grade.gamut] || "");
-  $("wbNote").textContent = !L ? "Auto white balance measures the colour of the whites (paper, eyes, highlights) and makes them neutral."
-    : L.wb_u == null ? `Too few white areas in this source to judge the white balance (${L.wb_frames} frames with whites).`
-    : `Measured: whites sit at Cb ${sign(L.wb_u)} / Cr ${sign(L.wb_v)} levels from grey, the same in ${L.wb_consistent} % of the frames with whites` +
-      ((L.grade.temp || L.grade.tint) ? ` - a cast from the transfer: corrected with temperature ${L.grade.temp}, tint ${L.grade.tint}.`
-        : (Math.hypot(L.wb_u, L.wb_v) < 1.5 ? " - neutral, nothing to correct." : " - changes from shot to shot, so it is the art (warm / cold scenes), left alone."));
+  $("wbNote").textContent = "";
   const trt = S.backend === "tensorrt";
   $("backendBadge").textContent = trt ? "TensorRT" : "PyTorch"; $("backendBadge").classList.toggle("trt", trt);
   $("backendNote").textContent = trt ? "Each model is compiled for this GPU the first time it meets a frame size (5-25 s each, then cached). The status line says when it happens."
@@ -344,7 +1005,7 @@ function stageOrder() {
 }
 function applyStageOrder() {
   const nav = $("stepNav"), anchor = nav.querySelector('[data-step="script"]');
-  for (const s of stageOrder()) nav.insertBefore(nav.querySelector(`[data-step="${STAGE_STEP[s]}"]`), anchor);
+  for (const s of stageOrder()) { const b = nav.querySelector(`[data-step="${STAGE_STEP[s]}"]`); if (b) nav.insertBefore(b, anchor); }   // Crop & size is part of Repair now
   [...nav.children].forEach((b, i) => { b.querySelector(".dot").textContent = String(i + 1); });
   // the ← / Next buttons under each panel follow the rail
   const steps = [...nav.children].map((b) => [b.dataset.step, b.querySelector(".lbl").firstChild.textContent.trim()]);
@@ -386,9 +1047,12 @@ function initStageDrag() {
 }
 
 function goto(step) {
+  if (step === "frame") step = "adjust";           // Crop & size is part of Repair
   if (step !== "source" && !S.info) return;
   S.step = step;
   document.body.classList.toggle("step-script", step === "script");
+  document.body.classList.toggle("step-colour", step === "colour");   // the grading panel under the preview
+  if (step !== "colour") fitStageRow();
   if (step === "script") refreshScript();
   if (step === "colour") requestScopes();
   setTimeout(layoutImage, 0);
@@ -401,7 +1065,7 @@ function goto(step) {
 // ---------------------------------------------------------------- source
 async function openPath(p) {
   if (!p) return;
-  const isDisc = /\.iso$/i.test(p) || (await window.api.isDir(p));
+  const isDisc = /\.(iso|mpls)$/i.test(p) || (await window.api.isDir(p));   // DVD (ISO, VIDEO_TS) or Blu-ray (BDMV, a playlist)
   if (isDisc) showDisc(p); else loadVideo(p);
 }
 
@@ -450,11 +1114,13 @@ async function loadVideo(path) {
     S.order = r.info.order; S.pal_mode = "auto";
     S.out_dir = dirname(path) + "\\restored";
     S.analyzed = false; S.auto = {}; S.frame = null; S.total = 0;
+    { const rng = $("rngPos"); rng.value = Math.round(rng.max * 0.1); }   // start near the beginning, not at the
+                                                                          // previous video's slider position
     pictureLoad(pictureFresh());                 // picture settings start from the defaults for every new source
     S.epSet = S.episodes.map(() => null);
     resetCleanup();
     // colour correction belongs to a series: keep it for the next file of the same folder, reset otherwise
-    S.layers = []; S.layerSel = -1; S.tracks = 3; S.trackOff = {}; S.src = null; S.vfrAuto = null;   // layers belong to this file
+    S.layers = []; S.layerSel = -1; S.tracks = 1; S.trackOff = {}; S.src = null; S.vfrAuto = null;   // layers belong to this file
     S.gradeAll = structuredClone(GRADE0);
     S.srcDir = dirname(path); S.levels = null; S.aspect = "auto";
     $("discBox").classList.add("hidden");
@@ -463,7 +1129,8 @@ async function loadVideo(path) {
     $("anResults").classList.add("hidden");
     showSourceInfo(); renderEpisodes(); sync();
     log(`Opened ${path}: ${S.episodes.length} episode(s)`, "ok");
-    status(`Opened ${basename(path)} - ${S.episodes.length} episode${S.episodes.length > 1 ? "s" : ""}. Next: Repair.`, "ok");
+    status(S.info.image ? `Opened ${basename(path)} (${S.info.width} × ${S.info.height} image). Next: Repair.`
+                        : `Opened ${basename(path)} - ${S.episodes.length} episode${S.episodes.length > 1 ? "s" : ""}. Next: Repair.`, "ok");
     $("placeholder").classList.add("hidden");
     schedulePreview();
   } catch { /* logged */ }
@@ -475,6 +1142,22 @@ function showSourceInfo() {
   $("srcName").title = i.path;
   box.innerHTML = "";
   const add = (text, cls) => box.appendChild(el("span", "badge " + (cls || ""), text));
+  $("chapBox").classList.toggle("hidden", !!i.image || !(i.chapters || []).length);
+  $("epBox").classList.toggle("hidden", !!i.image);            // a still has no episodes or chapters
+  document.body.classList.toggle("image-mode", !!i.image);    // no frame stepping, timeline, play or trim for a still
+  if (i.image) { S.frame = null; $("rngPos").max = 1000; $("rngPos").value = 500; }   // the middle copy: temporal stages see both sides
+  if (i.image) {                                                // what matters for a picture, not video timing
+    const m = i.image_info || {};
+    const g = (a, b) => (b ? g(b, a % b) : a), d = g(i.width, i.height);
+    const ratio = i.width / d <= 50 ? `${i.width / d}:${i.height / d}` : `${(i.width / i.height).toFixed(2)}:1`;
+    add(`Image${m.format ? " · " + m.format : ""}`, "ntsc");
+    add(`${i.width} × ${i.height} px`);
+    add(`${ratio} ${i.width > i.height ? "landscape" : i.width < i.height ? "portrait" : "square"}`);
+    add(`${(i.width * i.height / 1e6).toFixed(1)} MP`);
+    if (m.colour) add(`${m.colour}${m.bits ? ", " + m.bits + "-bit" : ""}${m.alpha ? " + transparency" : ""}`);
+    if (m.bytes) add(m.bytes >= 1048576 ? `${(m.bytes / 1048576).toFixed(1)} MB` : `${Math.round(m.bytes / 1024)} KB`);
+    return;
+  }
   add(i.pal ? "PAL 25 fps" : "NTSC 29.97 fps", i.pal ? "pal" : "ntsc");
   add(`${i.width}x${i.height}`); add(i.dar > 1.5 ? "16:9" : "4:3"); add(tc(i.frames)); add(i.order === "bff" ? "bottom field first" : "top field first");
   add(`${i.chapters.length} chapters`);
@@ -640,7 +1323,7 @@ function pictureState(k) {
   for (const key of ["mode", "order", "pal_mode", "comb", "ivtc_repair", "chroma_unmix", "aa", "deblend", "crawl", "rainbow", "composite", "rainbow_fill",
                      "deblock", "ghost", "ghost_strength", "ghost_taps", "halo_rx", "halo_method", "sx", "sy", "bleed", "warp", "neutral",
                      "stab", "stab_level", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
-                     "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "grade", "layers"]) out[key] = st[key];
+                     "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "grade", "layers", "vs_filters", "vs_filters_pos", "vs_groups"]) out[key] = st[key];
   if (k !== S.current) pictureLoad(live);
   return out;
 }
@@ -684,7 +1367,7 @@ const lv = (v) => (v == null ? "not measurable" : `${(+v).toFixed(2)} levels`);
 const MPEG_DIAL = { off: 0, light: 0.6, normal: 1 };
 const haloDial = (r) => (r.halo_rx ? Math.min(1, Math.round((r.halo || 0) / 0.5 * 20) / 20) : 0);
 const AUTO_KEYS = {
-  frames: (r) => (r.pal_mode ? { pal_mode: r.pal_mode, order: r.order } : { chroma_unmix: r.chroma_unmix, mode: r.mode, comb: r.comb, ivtc_repair: r.ivtc_repair, aa: r.aa }),
+  frames: (r) => (r.pal_mode ? { pal_mode: r.pal_mode, order: r.order } : Object.assign({ chroma_unmix: r.chroma_unmix, mode: r.mode, comb: r.comb, ivtc_repair: r.ivtc_repair, aa: r.aa }, r.order_measured ? { order: r.order_measured } : {})),
   composite: (r) => ({ crawl: r.crawl, rainbow: r.rainbow, composite: r.composite || "off" }),
   block: (r) => (S.ai_model === "field" || S.ai_model === "uni" ? { deblock: r.deblock, uni_mpeg: MPEG_DIAL[r.deblock] ?? 1 } : { deblock: r.deblock }),
   ghost: (r) => Object.assign({ ghost: r.ghost_on || (r.halo_rx ? "auto" : "off") }, (S.ai_model === "field" || S.ai_model === "uni") ? { uni_halo: haloDial(r) } : {}),
@@ -697,7 +1380,8 @@ function autoText(kind, r) {
     frames: () => r.pal_mode ? `Telecine & interlacing: PAL ${r.pal_mode}, ${r.order === "bff" ? "bottom" : "top"} field first (combed ${(100 * r.raw_combed).toFixed(1)} % -> ${(100 * r.matched_combed).toFixed(1)} % after field matching).`
       : `Telecine & interlacing: ${r.mode === "vfr" ? `VFR - ${r.video_sections} video-rate section(s) found (captions / titles at 30p)` : "CFR 23.976 - film only, no video-rate sections"} `
         + `(${pc(r.video_share)} % of moving cycles). Unmatched frames ${pc(r.unmatched_share)} % (combing ${pc(r.comb_strength)} % of the picture) -> combing repair ${r.comb}, anti-aliasing ${r.aa}`
-        + `${r.line_doubled > 40 ? ` (source looks line-doubled: ${r.line_doubled} %)` : ""}. ICP ${r.chroma_unmix === "on" ? "found" : "not found"}.`,
+        + `${r.line_doubled > 40 ? ` (source looks line-doubled: ${r.line_doubled} %)` : ""}. ICP ${r.chroma_unmix === "on" ? "found" : "not found"}.`
+        + (r.order_measured ? ` Field order from the picture: ${r.order_measured === "bff" ? "bottom" : "top"} first${S.info && S.info.order !== r.order_measured ? " (the file says otherwise - corrected)" : ""}.` : ""),
     composite: () => (r.note ? r.note + " " : "") + `Composite: dot crawl ${r.crawl} (${lv(r.crawl_level)}${r.carrier ? `, carrier ${r.carrier} cycles/px` : ""}), rainbows ${r.rainbow} (${lv(r.rainbow_level)}).`,
     block: () => `Compression: the 8-px block grid adds a step of ${lv(r.block_step)} (worst tenth of frames; plainly visible from 0.9) - MPEG repair ${r.deblock}.`,
     ghost: () => r.halo_rx ? `Halos: ring ${r.halo_pos} px from edges, strength ${(r.halo || 0).toFixed(2)} - removal on.` : `Halos: none found (${(r.halo || 0).toFixed(2)}).`,
@@ -728,22 +1412,135 @@ async function autoGroup(kind, btn) {
   btn.classList.remove("running"); btn.textContent = old;
 }
 
-// Colour step: measure black / white level and clipped colour, set them (own button, not part of Analyze)
+const WHEEL0 = [0, 0, 0];
+const wheelSet = (w) => Array.isArray(w) && w.some((x) => Math.abs(x) > 1e-4);
+
+// Auto colour's findings, one line each: [id, title, what was found, what it sets]; COLOUR_AUTO_KEYS = the grade keys each owns
+const COLOUR_AUTO_KEYS = { levels: ["black", "white"], tone: ["contrast", "gamma", "shadows"], white: ["gain_w", "temp", "tint"],
+                           black: ["lift"], fade: ["sat"], shadow: ["dark_sat"], hue: ["hue"], gamut: ["gamut"] };
+function autoItems(r) {
+  const g = r.grade || {}, items = [];
+  const lv = g.black !== 16 || g.white !== 235;
+  items.push(["levels", "Levels", `picture spans ${r.level_black} - ${r.level_white} (DVD: 16 - 235)`,
+    lv ? `black ${g.black}, white ${g.white}` : null]);
+  const ref = r.ref_frames != null, same = !!r.ref_same;
+  const other = "the reference shows other scenes - for this, use the same episode from the better release (or screenshots of the same moments)";
+  if (ref) items.push(["refinfo", "Reference", same ? `same scenes: ${r.ref_pairs || r.ref_frames} frames matched picture for picture`
+    : `other scenes (${r.ref_match || 0} % of the frames found): only a clear fade (20 %+) is matched`, null]);
+  const tn = (g.gamma ?? 1) !== 1 || (g.shadows ?? 0) !== 0 || (g.contrast ?? 1) !== 1;
+  const tset = [(g.contrast ?? 1) !== 1 ? `contrast ${g.contrast}` : "", (g.gamma ?? 1) !== 1 ? `midtones ${g.gamma}` : "",
+                (g.shadows ?? 0) !== 0 ? `shadow lift ${g.shadows}` : ""].filter(Boolean).join(", ");
+  const est = r.prior_gamma != null, guess = " (learned estimate - a reference measures it)";
+  items.push(["tone", "Tone", !ref ? (!est ? "needs a reference to judge (contrast, midtones, shadow lift)"
+      : tn ? `midtones look ${(g.gamma ?? 1) > 1 ? "too dark" : "too bright"} for a good transfer` + guess : "midtones look right" + guess) : !same ? other
+    : tn ? "brightness curve differs from the reference" : "matches the reference", tn ? tset : null]);
+  let wv;
+  if (r.wb_u == null) wv = "too few white areas to judge";
+  else if (r.monochrome) wv = "one tinted look - the art, left alone";
+  else if (wheelSet(g.gain_w)) wv = `tinted (Cb ${sign(r.wb_u)} / Cr ${sign(r.wb_v)}) in ${r.wb_consistent} % of the frames - a transfer cast`;
+  else if (Math.hypot(r.wb_u, r.wb_v) < 1.5) wv = "neutral";
+  else wv = "change from shot to shot - the art, left alone";
+  // few different shots (a short clip, a still): a cast there may be that scene's own look - say so
+  const few = r.shots != null && r.shots < 8 ? ` · only ${r.shots} shot${r.shots === 1 ? "" : "s"} measured: if this scene is meant to look tinted, untick` : "";
+  items.push(["white", "Whites", wv + (wheelSet(g.gain_w) ? few : ""), wheelSet(g.gain_w) ? "Highlights wheel" : null]);
+  items.push(["black", "Blacks", r.bk_u == null ? "too few dark areas to judge" : wheelSet(g.lift) ? `line art tinted (Cb ${sign(r.bk_u)} / Cr ${sign(r.bk_v)})` + few : "neutral",
+    wheelSet(g.lift) ? "Shadows wheel" : null]);
+  const sf = (g.sat ?? 1) !== 1;
+  items.push(["fade", "Saturation", ref ? (sf ? `colour ${Math.round(100 / (g.sat || 1))} % as strong as the reference's` : "matches the reference")
+    : sf ? (r.prior_used && est ? `colour ${(g.sat ?? 1) > 1 ? "weaker" : "stronger"} than good transfers look` + guess : `faded: strongest colours ${r.sat_peak} (good transfers 0.17+)`)
+    : est ? "colour strength looks right" + guess : "not clearly faded (a reference judges a moderate fade)", sf ? `saturation ${g.sat}` : null]);
+  items.push(["shadow", "Shadow colour", !ref ? "needs a reference to judge" : !same ? other : (g.dark_sat || 0) > 0 ? "dark tones weaker in colour than the reference's"
+    : "matches the reference", (g.dark_sat || 0) > 0 ? `shadow colour ${g.dark_sat}` : null]);
+  items.push(["hue", "Hue", !ref ? (!est ? "needs a reference to judge" : (g.hue || 0) !== 0 ? `colours look turned by ${-g.hue}°` + guess : "colours look right" + guess) : !same ? other : (g.hue || 0) !== 0 ? `every colour turned ${-g.hue}° (NTSC phase)` : "matches the reference",
+    (g.hue || 0) !== 0 ? `hue ${g.hue > 0 ? "+" : ""}${g.hue}°` : null]);
+  items.push(["gamut", "Clipped colour", r.gamut_out >= 1 ? `${r.gamut_out} % beyond the screen range` : "within the screen range", g.gamut && g.gamut !== "off" ? g.gamut : null]);
+  return items;
+}
+
+// The measured grade, as ticked and at the chosen strength, into the base grade (only the keys of `which`)
+function applyAuto(which = Object.keys(COLOUR_AUTO_KEYS)) {
+  const r = S.levels; if (!r || !r.grade) return;
+  const g = r.grade, s = +S.autoStrength;
+  const mix = (v, d) => +(d + s * (v - d)).toFixed(3);
+  const val = {
+    black: Math.round(mix(g.black ?? 16, 16)), white: Math.round(Math.min(255, mix(g.white ?? 235, 235))),
+    gain_w: (g.gain_w || WHEEL0).map((x) => mix(x, 0)), temp: 0, tint: 0, lift: (g.lift || WHEEL0).map((x) => mix(x, 0)),
+    sat: +mix(g.sat ?? 1, 1).toFixed(2), gamut: g.gamut || "off",
+    contrast: +mix(g.contrast ?? 1, 1).toFixed(3), gamma: +mix(g.gamma ?? 1, 1).toFixed(2), shadows: +mix(g.shadows ?? 0, 0).toFixed(2),
+    dark_sat: +mix(g.dark_sat ?? 0, 0).toFixed(2), hue: Math.round(mix(g.hue ?? 0, 0)),
+  };
+  for (const id of which) for (const k of COLOUR_AUTO_KEYS[id]) {
+    const v = S.autoUse[id] ? val[k] : structuredClone(GRADE0[k]);
+    S.gradeAll[k] = v; S.auto[`grade.${k}`] = v;
+  }
+  sync(); syncColourUi(); schedulePreview(); scheduleScript();
+}
+
+function findingsUi() {
+  const box = $("autoFindings"), r = S.levels;
+  box.innerHTML = "";
+  $("autoStrengthRow").classList.toggle("hidden", !(r && r.grade));
+  if (!r || !r.grade) return;
+  for (const [id, title, found, sets] of autoItems(r)) {
+    const row = el("label", "finding" + (sets ? "" : " fine") + (id === "refinfo" ? " info" : "") + (found.startsWith("needs a reference") ? " na" : "") + (sets && !S.autoUse[id] ? " off" : ""));
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!sets && !!S.autoUse[id]; cb.disabled = !sets;
+    cb.onchange = () => { S.autoUse[id] = cb.checked; applyAuto([id]); };
+    row.append(cb, el("b", null, title), el("span", "found", found), el("span", "sets", sets ? `→ ${sets}` : "✓ fine"));
+    row.title = sets ? "Untick to leave this part out" : "Nothing to correct";
+    box.appendChild(row);
+  }
+}
+
+// Colour step: measure the source and set the grade auto colour solved (own button, not part of Analyze)
 async function autoColour(wbOnly = false) {
   try {
-    status(wbOnly ? "Measuring the colour of the whites..." : "Measuring black level, white level, white balance and clipped colour...");
+    status(wbOnly ? "Measuring the colour of the whites and blacks..." : "Measuring levels, white and black colour, fade and clipped colour...");
     const r = await rpc("detect", { kind: "levels", state: backendState([S.current]) });
     if (!r.grade) { status("Nothing to measure (no picture found).", "err"); return; }
     S.levels = r;
-    for (const k of (wbOnly ? ["temp", "tint"] : ["black", "white", "gamut", "temp", "tint"])) { S.auto[`grade.${k}`] = r.grade[k]; S.gradeAll[k] = r.grade[k]; }
-    sync(); schedulePreview(); scheduleScript();
-    const wb = r.grade.temp || r.grade.tint ? `white balance temperature ${r.grade.temp}, tint ${r.grade.tint}` : "white balance neutral";
-    const same = r.grade.black === 16 && r.grade.white === 235 && r.grade.gamut === "off";
-    const msg = wbOnly ? `Whites: ${r.wb_u == null ? "too few to judge" : `Cb ${sign(r.wb_u)} / Cr ${sign(r.wb_v)} levels`} - ${wb}.`
-      : `Colour: darkest tone ${r.level_black}, brightest ${r.level_white}, ${r.gamut_out} % beyond the screen range` +
-        (same ? "" : ` - set black ${r.grade.black}, white ${r.grade.white}, clipped colour ${r.grade.gamut}`) + `; ${wb}.`;
+    for (const id of Object.keys(COLOUR_AUTO_KEYS)) S.autoUse[id] = !wbOnly || id === "white" || id === "black";
+    refUi();
+    applyAuto(wbOnly ? ["white", "black"] : undefined);
+    const items = autoItems(r).filter(([id, , , sets]) => sets && S.autoUse[id]);
+    const msg = items.length ? "Auto colour: " + items.map(([, t, f, sets]) => `${t.toLowerCase()} ${f} → ${sets}`).join("; ") + "."
+      : "Auto colour: this source needs no correction (levels, whites, blacks and colour are right).";
     log(msg, "ok"); status(msg, "ok");
   } catch { /* logged */ }
+}
+
+// Colour step: the reference (images / video of the same show that look right)
+function refUi() {
+  const L = S.colourRef || [];
+  $("refName").textContent = L.length ? "Reference: " + L.map(basename).join(", ")
+    : "no reference - saturation, tone and hue are only corrected when clearly wrong";
+  $("refName").title = L.join("\n");
+  $("btnRefClear").classList.toggle("hidden", !L.length);
+}
+function initRef() {
+  $("btnRefAdd").onclick = async () => {
+    const p = await window.api.openRefs();
+    if (p && p.length) { S.colourRef = p; refUi(); status("Reference set - press Auto colour to match it.", "ok"); }
+  };
+  $("btnRefClear").onclick = () => { S.colourRef = []; refUi(); status("Reference removed - press Auto colour again to measure without it."); };
+  refUi();
+}
+
+// Colour step: fold / unfold a section by clicking its title (remembered between sessions)
+function buildFolds() {
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem("colourFolds") || "{}"); } catch { /* fresh */ }
+  for (const g of $$(".group.fold")) {
+    if (g.closest("#gradeDock")) { g.classList.remove("closed"); continue; }   // the panel under the preview: always open
+    const id = g.dataset.fold, h = g.querySelector(".group-head h3");
+    g.classList.toggle("closed", id in st ? !!st[id] : g.dataset.closed === "1");
+    h.title = "Fold / unfold";
+    h.onclick = () => {
+      g.classList.toggle("closed");
+      st[id] = g.classList.contains("closed");
+      localStorage.setItem("colourFolds", JSON.stringify(st));
+      if (!st[id]) syncColourUi();
+    };
+  }
 }
 
 // Crop & size step: find the black borders (own button, not part of Analyze)
@@ -805,6 +1602,7 @@ async function collectReport() {
 // ---------------------------------------------------------------- preview
 let previewTimer = null, previewSeq = 0;
 function schedulePreview() {
+  histArm();
   clearTimeout(previewTimer);
   previewTimer = setTimeout(renderPreview, 200);
   vsviewFollow();
@@ -935,9 +1733,25 @@ function trimFrames(which, v) {
   renderEpisodes(); trimInfo(); schedulePreview(); scheduleScript();
 }
 // ---------------------------------------------------------------- whole-video timeline
-const TL = { drag: null, snapPx: 7 };
-function tlFrameAtX(x) { const r = $("tl").getBoundingClientRect(); return Math.round(Math.max(0, Math.min(1, (x - r.left) / r.width)) * S.info.frames); }
-function tlPct(f) { return (100 * f / Math.max(1, S.info.frames)).toFixed(4) + "%"; }
+const TL = { drag: null, snapPx: 7, view: null };
+// The bar shows the selected episode only (+ a little on each side, so its ends can still be dragged outwards); it
+// keeps its range while a handle is dragged, then fits the new episode.
+function tlView() {
+  if (TL.drag && TL.view) return TL.view;
+  const [a, b] = S.episodes[S.current] || [0, S.info.frames];
+  const fps = (S.info.fps_num || 30000) / (S.info.fps_den || 1001);
+  const m = Math.max(2 * fps, 0.05 * (b - a));
+  TL.view = [Math.max(0, Math.floor(a - m)), Math.min(S.info.frames, Math.ceil(b + m))];
+  return TL.view;
+}
+function tlFrameAtX(x) {
+  const r = $("tl").getBoundingClientRect(), [v0, v1] = tlView();
+  return Math.round(v0 + Math.max(0, Math.min(1, (x - r.left) / r.width)) * (v1 - v0));
+}
+function tlPct(f, len) {                         // position (or, with len, width) inside the bar
+  const [v0, v1] = tlView();
+  return (100 * (len ? f : f - v0) / Math.max(1, v1 - v0)).toFixed(4) + "%";
+}
 function headSrcFrame() {                       // source frame shown in the preview
   const [a, b] = S.episodes[S.current] || [0, 0];
   if (!S.total || S.total < 2 || S.frame == null) return a + ($("rngPos").value / $("rngPos").max) * (b - a);
@@ -947,22 +1761,18 @@ function renderTimeline() {
   const tl = $("tl");
   if (!S.info || !S.episodes.length) { tl.classList.add("hidden"); return; }
   tl.classList.remove("hidden");
-  const eps = $("tlEps"); eps.innerHTML = "";
-  S.episodes.forEach(([a, b], k) => {
-    if (k === S.current) return;
-    const d = el("div"); d.style.left = tlPct(a); d.style.width = tlPct(b - a); d.title = `Episode ${k + 1}: ${tc(a)} – ${tc(b)} (click to open)`;
-    d.dataset.ep = k; eps.appendChild(d);
-  });
+  $("tlEps").innerHTML = "";                      // only the selected episode is on the bar
+  const [v0, v1] = tlView();
   const ticks = $("tlTicks"); ticks.innerHTML = "";
-  for (const f of chapFrames()) { const t = el("div"); t.style.left = tlPct(f); ticks.appendChild(t); }
+  for (const f of chapFrames()) if (f > v0 && f < v1) { const t = el("div"); t.style.left = tlPct(f); ticks.appendChild(t); }
   const [a, b] = S.episodes[S.current];
-  const sel = $("tlSel"); sel.style.left = tlPct(a); sel.style.width = tlPct(b - a);
+  const sel = $("tlSel"); sel.style.left = tlPct(a); sel.style.width = tlPct(b - a, true);
   $("tlHead").style.left = tlPct(headSrcFrame());
   renderLayerTrack();
 }
 function tlSnap(f, shift) {
   if (shift) return f;
-  const px = $("tl").getBoundingClientRect().width, lim = TL.snapPx / Math.max(1, px) * S.info.frames;
+  const [v0, v1] = tlView(), px = $("tl").getBoundingClientRect().width, lim = TL.snapPx / Math.max(1, px) * (v1 - v0);
   let best = f, d0 = lim;
   for (const c of [...chapFrames(), 0, S.info.frames]) if (Math.abs(c - f) < d0) { d0 = Math.abs(c - f); best = c; }
   return best;
@@ -990,11 +1800,7 @@ function initTimeline() {
       selectEpisode(parseInt(e.target.dataset.ep, 10)); setTimeout(() => tlSeek(f), 0); return;
     } else {
       const [a, b] = S.episodes[S.current];
-      if (f < a || f > b) {                      // outside the selected episode: open the one there
-        const k = S.episodes.findIndex(([x, y]) => f >= x && f < y);
-        if (k >= 0 && k !== S.current) { selectEpisode(k); setTimeout(() => tlSeek(f), 0); }
-        return;
-      }
+      if (f < a || f > b) return;                // the margin around the episode: only its handles are dragged there
       TL.drag = { kind: "seek" }; tlSeek(f);
     }
     try { tl.setPointerCapture(e.pointerId); } catch { /* synthetic events */ }
@@ -1084,8 +1890,23 @@ function stepFrame(d) {
 function setView(v) { const was = PLAY.on; togglePlay(false); S.view = v; setSegView(); if (S.img) schedulePreview(); if (was) setTimeout(() => togglePlay(true), 300); }
 function setSegView() { for (const b of $("segView").children) b.classList.toggle("on", b.dataset.v === S.view); }
 
+// Colour step: the viewer is as wide as the picture (no empty bars beside it), in the middle; the width left over
+// goes to the Auto correction (left) and Scopes (right) columns
+function fitStageRow() {
+  const stage = $("stage"), side = $("gradeSide");
+  if (!side) return;
+  if (!document.body.classList.contains("step-colour") || !S.img || S.zoom !== "Fit") {
+    stage.style.flex = ""; stage.style.width = ""; side.classList.remove("wide"); return;
+  }
+  const row = stage.parentNode, gap = 8, minSide = 250;    // Auto correction left and Scopes right of the picture
+  const want = Math.round((stage.clientHeight - 4) * S.img.w / S.img.h) + 6;
+  stage.style.flex = "none";
+  const cols = document.body.classList.contains("grade-collapsed") ? 1 : 2;   // panel hidden: one stacked column
+  stage.style.width = Math.max(240, Math.min(row.clientWidth - cols * (minSide + gap), want)) + "px";
+}
 function layoutImage() {
   if (!S.img) return;
+  fitStageRow();
   const stage = $("stage"), wrap = $("imgWrap"), before = $("imgBefore"), after = $("imgAfter");
   const { w, h } = S.img;
   const scale = S.zoom === "Fit" ? Math.min((stage.clientWidth - 4) / w, (stage.clientHeight - 4) / h)
@@ -1128,6 +1949,13 @@ function initViewer() {
     }
   });
   window.addEventListener("keydown", (e) => {
+    const typing = /TEXTAREA/.test(document.activeElement.tagName) || (document.activeElement.tagName === "INPUT" && !/checkbox|range/.test(document.activeElement.type));
+    if ((e.ctrlKey || e.metaKey) && !typing && !e.altKey) {          // the text boxes keep their own undo
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); histGo(-1); return; }
+      if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); histGo(1); return; }
+      if (k === "s") { e.preventDefault(); saveWorkflow(); return; }
+    }
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.type !== "checkbox") return;
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); stepFrame((e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 24 : 1)); }
     else if (e.key === "b" || e.key === "B") setView("before");
@@ -1189,9 +2017,10 @@ function onEvent(m) {
     onVfrAuto(m);
   } else if (m.event === "progress") {
     $("progBar").style.width = m.tot ? `${(100 * m.cur / m.tot).toFixed(1)}%` : "0";
+    progressText(m.cur, m.tot);
   } else if (m.event === "busy") {
     S.busy = m.busy; updateButtons();
-    if (!m.busy) $("progBar").style.width = "0";
+    if (!m.busy) { $("progBar").style.width = "0"; progressText(0, 0); }
   } else if (m.event === "stderr") {
     if (!/Warning|DeprecationWarning/.test(m.msg)) log(m.msg, "dim");
   } else if (m.event === "exit") {
@@ -1199,8 +2028,45 @@ function onEvent(m) {
   }
 }
 
+// percentage, speed and time left of the running job (export, VFR analysis ...), from its progress events
+const PROG = { tot: 0, t0: 0, c0: 0, rate: 0, last: 0 };
+function progressText(cur, tot) {
+  const box = $("progText");
+  if (!tot) { box.textContent = ""; PROG.tot = 0; return; }
+  const now = performance.now();
+  if (tot !== PROG.tot || cur < PROG.last) Object.assign(PROG, { tot, t0: now, c0: cur, rate: 0 });   // a new pass / job
+  PROG.last = cur;
+  const dt = (now - PROG.t0) / 1000;
+  if (dt > 1.5 && cur > PROG.c0) {
+    const r = (cur - PROG.c0) / dt;
+    PROG.rate = PROG.rate ? PROG.rate * 0.8 + r * 0.2 : r;            // smoothed: the ETA does not jump around
+    PROG.t0 = now; PROG.c0 = cur;
+  }
+  const pct = Math.min(100, 100 * cur / tot);
+  let txt = `${pct.toFixed(1)} %`;
+  if (PROG.rate > 0) {
+    const left = Math.max(0, (tot - cur) / PROG.rate);
+    const h = Math.floor(left / 3600), mn = Math.floor(left % 3600 / 60), sc = Math.floor(left % 60);
+    txt += ` · ${PROG.rate >= 10 ? Math.round(PROG.rate) : PROG.rate.toFixed(1)} fps · ETA ${h ? h + ":" + String(mn).padStart(2, "0") : mn}:${String(sc).padStart(2, "0")}`;
+  }
+  box.textContent = txt;
+}
+
 // ---------------------------------------------------------------- wiring
 function bind() {
+  $("vsfNewGroup").onclick = () => { vsfMigrate(); S.vs_groups.push(vsfNewGroup(5)); vsgChanged(); };
+  initEngineDialog();
+  initGradeTabs();
+  $("btnUndo").onclick = () => histGo(-1); $("btnRedo").onclick = () => histGo(1);
+  $("btnWfSave").onclick = saveWorkflow; $("btnWfLoad").onclick = loadWorkflow;
+  histButtons();
+  $("vsfDlgClose").onclick = vsfBrowserClose;
+  $("vsfDlg").onclick = (e) => { if (e.target === $("vsfDlg")) vsfBrowserClose(); };
+  $("vsfDlgSearch").oninput = () => { VSFB.sel = null; vsfBrowserRender(); };
+  $("vsfDlgSearch").onkeydown = (e) => {
+    if (e.key === "Escape") vsfBrowserClose();
+    if (e.key === "Enter" && VSFB.sel) { vsfAddTo(VSFB.g, VSFB.sel); vsfBrowserClose(); }
+  };
   for (const b of $$("#stepNav button")) b.onclick = () => goto(b.dataset.step);
   for (const b of $$("[data-goto]")) b.onclick = () => goto(b.dataset.goto);
   const pickFile = async () => openPath(await window.api.openVideo());
@@ -1263,7 +2129,8 @@ function bind() {
     if (ly) { ly.grade = structuredClone(GRADE0); sync(); schedulePreview(); scheduleScript(); return; }   // layer: no changes
     S.grade = structuredClone(GRADE0);
     for (const k of Object.keys(S.auto)) if (k.startsWith("grade.")) delete S.auto[k];
-    sync(); schedulePreview(); scheduleScript();
+    for (const id of Object.keys(S.autoUse)) S.autoUse[id] = false;          // measurement kept: tick a line to use it again
+    sync(); syncColourUi(); schedulePreview(); scheduleScript();
   };
   $("btnAutoColour").onclick = () => autoColour(false);
   $("btnAutoWB").onclick = () => autoColour(true);
@@ -1455,7 +2322,11 @@ function buildSliders() {
     r.oninput = () => { t.value = (+r.value).toFixed(dec); setv(key, clamp(+r.value)); sync(); schedulePreview(); };
     r.onchange = () => changed(key, clamp(+r.value));
     t.onchange = () => { const v = parseFloat(t.value.replace(",", ".")); changed(key, isNaN(v) ? getv(key) : clamp(v)); };
-    sl.ondblclick = () => changed(key, def);
+    sl.ondblclick = () => {                      // reset: the focused slider / box would otherwise keep its old number
+      if (document.activeElement && sl.contains(document.activeElement)) document.activeElement.blur();
+      r.value = def; t.value = (+def).toFixed(dec);
+      changed(key, def);
+    };
     sl.append(r, t);
     sl.dataset.dec = dec;
   }
@@ -1484,14 +2355,14 @@ function buildWheels() {
     let drag = false, fine = false, start = null;
     const at = (e) => {
       const r = cv.getBoundingClientRect(), R = size / 2 - 6;
-      let u = (e.clientX - r.left - size / 2) / R, v = -(e.clientY - r.top - size / 2) / R;
+      let u = ((e.clientX - r.left) * size / r.width - size / 2) / R, v = -((e.clientY - r.top) * size / r.height - size / 2) / R;
       if (fine && start) { u = start[1] + (u - start[3]) * 0.2; v = start[2] + (v - start[4]) * 0.2; }
       const m = Math.hypot(u, v); if (m > 1) { u /= m; v /= m; }
       return [wheelVal(name)[0], +u.toFixed(3), +v.toFixed(3)];
     };
     cv.onpointerdown = (e) => {
       drag = true; fine = e.shiftKey; cv.setPointerCapture(e.pointerId);
-      if (fine) { const r = cv.getBoundingClientRect(), R = size / 2 - 6; const cur = wheelVal(name); start = [0, cur[1], cur[2], (e.clientX - r.left - size / 2) / R, -(e.clientY - r.top - size / 2) / R]; }
+      if (fine) { const r = cv.getBoundingClientRect(), R = size / 2 - 6; const cur = wheelVal(name); start = [0, cur[1], cur[2], ((e.clientX - r.left) * size / r.width - size / 2) / R, -((e.clientY - r.top) * size / r.height - size / 2) / R]; }
       else { start = null; set(at(e), false); }
     };
     cv.onpointermove = (e) => { if (drag) set(at(e), false); };
@@ -1637,6 +2508,7 @@ function lutList() {
 let LUT_SIG = "";
 function lutUi() {
   const L = lutList(), sig = JSON.stringify(L);
+  $("lutCount").textContent = L.length ? `${L.filter((l) => l.on !== false).length} of ${L.length} on` : "";
   if (sig === LUT_SIG && $("lutList").childElementCount === L.length) return;
   LUT_SIG = sig;
   const box = $("lutList"); box.innerHTML = "";
@@ -1731,11 +2603,20 @@ function moveTrack(i, d) {
   if (!trackFree(t, l.start, l.end, l)) { status(`Track L${t} is not free there.`); return; }
   l.track = t; layersChanged();
 }
+function trimTracks() {                            // empty tracks at the top go (one stays); gaps in between stay
+  const used = Math.max(0, ...(S.layers || []).map((l) => l.track || 1));
+  const n = Math.max(1, used);
+  if (S.tracks > n) {
+    for (let t = n + 1; t <= S.tracks; t++) delete S.trackOff[t];
+    S.tracks = n;
+  }
+}
 function removeLayer(i, ask = true) {
   const l = S.layers[i];
   if (ask && !sameGrade(l.grade, GRADE0) && !confirm(`Delete "${l.name}" and its grade?`)) return;
   S.layers.splice(i, 1);
   if (S.layerSel === i) S.layerSel = -1; else if (S.layerSel > i) S.layerSel--;
+  trimTracks();
   layersChanged();
 }
 let LAYER_SIG = "";
@@ -1749,6 +2630,8 @@ function layerUi() {
     $("layerTarget").innerHTML = "Editing: <b>Base grade</b> (whole video)" + (list.length ? ` · ${list.length} adjustment layer${list.length === 1 ? "" : "s"} on top` : "");
   }
   $("btnGradeReset").textContent = sel ? "Reset layer" : "Reset all";
+  $("layerCount").textContent = list.length ? `${list.length} on this episode` : "";
+  $("layerTarget").classList.toggle("layer", !!sel);
   $("btnLayerAdd").disabled = !S.info;
   const sig = JSON.stringify([list.map(({ l, i }) => [i, l.name, l.track, l.start, l.end, l.on, l.opacity, l.col]), S.layerSel, S.current, S.layers.length, S.trackOff]);
   if (sig === LAYER_SIG) return;
@@ -1955,12 +2838,12 @@ function initLayerTrack() {
 }
 
 function initColourUi() {
-  buildSliders(); buildWheels(); initCurves(); initScopes();
+  buildSliders(); buildWheels(); initCurves(); initScopes(); buildFolds(); initRef();
   $("btnLutLoad").onclick = async () => loadLuts(await window.api.openLut());
   $("btnLayerAdd").onclick = () => addLayer();
   initLayerTrack();
 }
-function syncColourUi() { lutUi(); layerUi(); syncSliders(); for (const w of $$(".wheel[data-wheel]")) if (w._bg) drawWheel(w); drawCurves(); }
+function syncColourUi() { lutUi(); layerUi(); findingsUi(); refUi(); syncSliders(); for (const w of $$(".wheel[data-wheel]")) if (w._bg) drawWheel(w); drawCurves(); }
 
 async function init() {
   bind();

@@ -32,12 +32,28 @@ function findPython() {
   return "python";
 }
 
+// ---------------------------------------------------------------- diagnostics log (temp\dvdrestore.log)
+// Engine errors, failed requests, slow previews, engine exits, window errors / freezes - so a failure the user sees
+// can be traced afterwards. Rolls over at 5 MB (one old copy, .1).
+const LOG = path.join(APP_DIR, "temp", "dvdrestore.log");
+let logWrites = 0;
+function logf(...a) {
+  try {
+    if (logWrites++ % 200 === 0) {
+      fs.mkdirSync(path.dirname(LOG), { recursive: true });
+      if (fs.existsSync(LOG) && fs.statSync(LOG).size > 5e6) fs.renameSync(LOG, LOG + ".1");
+    }
+    fs.appendFileSync(LOG, `${new Date().toISOString()} ${a.join(" ")}\n`);
+  } catch { /* logging must never break the app */ }
+}
+
 let win = null;
 let py = null;
 let nextId = 1;
 const pending = new Map();
 
 function startBackend() {
+  logf(`--- start ${app.getVersion()} backend ${findPython()} portable=${PORTABLE}`);
   py = spawn(findPython(), ["-I", "-W", "ignore", SERVER], {
     cwd: APP_DIR,
     env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1" },
@@ -47,19 +63,24 @@ function startBackend() {
     let msg;
     try { msg = JSON.parse(line); } catch { return; }
     if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve } = pending.get(msg.id);
+      const { resolve, method, t0 } = pending.get(msg.id);
       pending.delete(msg.id);
+      const ms = Date.now() - t0;
+      if (msg.error && msg.error !== "superseded") logf(`RPC ${method} FAILED after ${ms} ms: ${String(msg.error).slice(0, 4000)}`);
+      else if (ms > 15000 && (method === "preview" || method === "probe")) logf(`RPC ${method} slow: ${ms} ms`);
       resolve(msg);
     } else if (msg.event && win) {
       win.webContents.send("backend-event", msg);
     }
   });
   readline.createInterface({ input: py.stderr }).on("line", (line) => {
-    if (win && line && !line.includes("API 3") && !line.includes("API3")) {
-      win.webContents.send("backend-event", { event: "stderr", msg: line });
+    if (line && !line.includes("API 3") && !line.includes("API3")) {
+      if (!/DeprecationWarning|UserWarning/.test(line)) logf("ENGINE", line.slice(0, 4000));
+      if (win) win.webContents.send("backend-event", { event: "stderr", msg: line });
     }
   });
-  py.on("exit", (code) => {
+  py.on("exit", (code, signal) => {
+    logf(`ENGINE EXITED code=${code} signal=${signal} (pending requests: ${[...pending.values()].map((p) => p.method).join(", ") || "none"})`);
     for (const { resolve } of pending.values()) resolve({ error: "backend stopped" });
     pending.clear();
     if (win) win.webContents.send("backend-event", { event: "exit", code });
@@ -69,7 +90,7 @@ function startBackend() {
 ipcMain.handle("rpc", (_e, method, params) => new Promise((resolve) => {
   if (!py || py.exitCode !== null) return resolve({ error: "backend not running" });
   const id = nextId++;
-  pending.set(id, { resolve });
+  pending.set(id, { resolve, method, t0: Date.now() });
   py.stdin.write(JSON.stringify({ id, method, params: params || {} }) + "\n");
 }));
 
@@ -77,16 +98,39 @@ ipcMain.handle("open-video", async () => {
   const r = await dialog.showOpenDialog(win, {
     title: "Open video or DVD image",
     properties: ["openFile"],
-    filters: [{ name: "Video, DVD or image", extensions: ["mkv", "iso", "m2v", "vob", "mpg", "ts", "mp4", "mov", "avi", "webm", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp"] },
+    filters: [{ name: "Video, DVD or image", extensions: ["mkv", "iso", "m2v", "vob", "mpg", "ts", "m2ts", "mts", "mpls", "mp4", "mov", "avi", "webm", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp"] },
               { name: "Images", extensions: ["png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp"] },
               { name: "All files", extensions: ["*"] }],
   });
   return r.canceled ? null : r.filePaths[0];
 });
+ipcMain.handle("open-refs", async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: "Colour reference: a better release, screenshots or a good episode of the same show",
+    properties: ["openFile", "multiSelections"],
+    filters: [{ name: "Images or video", extensions: ["png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp", "mkv", "mp4", "m2v", "vob", "mpg", "ts", "mov", "avi", "webm"] },
+              { name: "All files", extensions: ["*"] }],
+  });
+  return r.canceled ? null : r.filePaths;
+});
 ipcMain.handle("open-lut", async () => {
   const r = await dialog.showOpenDialog(win, {
     title: "Add LUTs (.cube)", properties: ["openFile", "multiSelections"],
     filters: [{ name: "LUT", extensions: ["cube"] }, { name: "All files", extensions: ["*"] }],
+  });
+  return r.canceled ? [] : r.filePaths;
+});
+ipcMain.handle("open-my-filter", async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: "Add your own filters", properties: ["openFile", "multiSelections"],
+    filters: [{ name: "Python filters or VapourSynth plugins", extensions: ["py", "dll"] }, { name: "All files", extensions: ["*"] }],
+  });
+  return r.canceled ? [] : r.filePaths;
+});
+ipcMain.handle("open-model", async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: "Add AI models", properties: ["openFile", "multiSelections"],
+    filters: [{ name: "AI model", extensions: ["onnx", "pth", "safetensors"] }, { name: "All files", extensions: ["*"] }],
   });
   return r.canceled ? [] : r.filePaths;
 });
@@ -100,6 +144,13 @@ ipcMain.handle("save-text", async (_e, name, text, filters) => {
   fs.writeFileSync(r.filePath, text, "utf-8");
   return r.filePath;
 });
+ipcMain.handle("open-text", async (_e, filters) => {
+  const r = await dialog.showOpenDialog(win, { title: "Open", properties: ["openFile"], filters: [...(filters || []), { name: "All files", extensions: ["*"] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const st = fs.statSync(r.filePaths[0]);
+  if (st.size > 20 * 1024 * 1024) return null;            // not a settings file
+  return { path: r.filePaths[0], text: fs.readFileSync(r.filePaths[0], "utf-8") };
+});
 ipcMain.handle("show-path", (_e, p) => shell.openPath(p));
 const GITHUB_URL = "https://github.com/EVA0111";                 // the GitHub button (fixed address, nothing else opens)
 ipcMain.handle("open-github", () => shell.openExternal(GITHUB_URL));
@@ -109,11 +160,19 @@ ipcMain.handle("is-dir", (_e, p) => { try { return fs.statSync(p).isDirectory();
 function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 960, minWidth: 1280, minHeight: 720,
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.1 alpha", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.2 alpha", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   win.on("closed", () => { win = null; });
+  // window-side problems: script errors, freezes, a crashed renderer
+  win.webContents.on("console-message", (e) => {
+    const lvl = e.level ?? e.params?.level;
+    if (lvl === "error" || lvl === 3) logf("WINDOW", String(e.message ?? e.params?.message).slice(0, 2000));
+  });
+  win.on("unresponsive", () => logf("WINDOW unresponsive (frozen)"));
+  win.on("responsive", () => logf("WINDOW responsive again"));
+  win.webContents.on("render-process-gone", (_e, d) => logf(`WINDOW renderer gone: ${d.reason} (exit ${d.exitCode})`));
 }
 
 // ---------------------------------------------------------------- dependencies window
@@ -125,7 +184,7 @@ function openDeps(firstRun) {
   if (depsWin) { depsWin.focus(); return; }
   depsWin = new BrowserWindow({
     width: 760, height: 640, minWidth: 620, minHeight: 520, parent: firstRun ? undefined : (win || undefined),
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.1 alpha - Dependencies", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.2 alpha - Dependencies", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   depsWin.loadFile(path.join(__dirname, "renderer", "deps.html"), { query: { first: firstRun ? "1" : "0" } });
@@ -162,11 +221,24 @@ ipcMain.handle("deps-start", () => {                           // "Start DVD Res
   if (depsWin) depsWin.close();
 });
 
-app.whenReady().then(() => {
-  deps.syncLayout(APP_DIR);                                    // engines/ temp/ runtime/ made again if deleted
-  if (PORTABLE && !deps.check(APP_DIR).ready) { openDeps(true); return; }
-  started = true; startBackend(); createWindow();
-});
+// One DVD Restore at a time: two instances share the profile folder (AppData\Roaming\DVD Restore) and the second
+// one crashed / froze the first (seen 2026-11-25: a renderer crash the second another copy started). Starting it
+// again brings the open window to the front. Test runs pass their own --user-data-dir, which has its own lock.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  logf("second copy started: the open DVD Restore window is brought to the front instead");
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const w = win || depsWin;
+    if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); }
+  });
+  app.whenReady().then(() => {
+    deps.syncLayout(APP_DIR);                                  // engines/ temp/ runtime/ made again if deleted
+    if (PORTABLE && !deps.check(APP_DIR).ready) { openDeps(true); return; }
+    started = true; startBackend(); createWindow();
+  });
+}
 let stdinClosed = false;
 function stopBackend() {
   // closing stdin lets the backend cancel playback / a running encode and exit; kill() is the fallback

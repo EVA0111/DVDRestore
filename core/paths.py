@@ -12,6 +12,7 @@ ENGINES = os.path.join(ROOT, "engines")
 TEMP = os.path.join(ROOT, "temp")
 RUNTIME = os.path.join(ROOT, "runtime")
 SETTINGS = os.path.join(ROOT, "settings.json")
+MY_FILTERS = os.path.join(ROOT, "my_filters")      # your own filters: *.py functions, plugins\*.dll
 
 
 def model(name):

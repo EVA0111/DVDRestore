@@ -59,7 +59,7 @@ def main():
         check(f"VapourSynth plugin {ns}", lambda ns=ns: hasattr(core, ns) or (_ for _ in ()).throw(ImportError(ns + " missing")))
     print("2. Model files")
     for m in ("dvdnet_precise.pt", "dvdnet_temporal.pt", "stablenet.pt", "uninet.pt", "fieldnet.pt", "halonet.pt", "blocknet.pt",
-              "chromanet.pt", "aanet.pt", "combnet.pt", "clipnet.pt", "dotnet.pt"):
+              "chromanet.pt", "aanet.pt", "combnet.pt", "clipnet.pt", "dotnet.pt", "repairnet.pt"):
         check(f"model {m}", lambda m=m: os.path.isfile(paths.model(m)) or (_ for _ in ()).throw(FileNotFoundError(m)))
 
     print("3. Test footage (made here)")
@@ -68,6 +68,7 @@ def main():
     ntsc = os.path.join(work, "ntsc_test.mkv")
     prog = os.path.join(work, "progressive_test.mp4")
     png = os.path.join(work, "still_test.png")
+    odd = os.path.join(work, "odd_size_test.png")          # an image whose size 4:2:0 cannot hold as it is
 
     def make(args, out):
         r = subprocess.run([ff, "-v", "error", "-y", *args, out], capture_output=True, text=True)
@@ -83,6 +84,7 @@ def main():
     check("progressive H.264 clip", lambda: make(["-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=24000/1001:duration=3",
                                                   "-c:v", "libx264", "-pix_fmt", "yuv420p"], prog))
     check("still image", lambda: make(["-f", "lavfi", "-i", "testsrc2=size=720x480", "-frames:v", "1"], png))
+    check("odd-sized image (708x531)", lambda: make(["-f", "lavfi", "-i", "testsrc2=size=708x531", "-frames:v", "1"], odd))
 
     print("4. Engine")
     import server
@@ -113,9 +115,15 @@ def main():
         check(f"cleanup model: {m}", build(ai_model=m, crawl="normal", rainbow="normal"))
     for s in (["ustab"] if QUICK else ["ustab", "chain", "plus", "gtfix", "ttemp", "mc"]):
         check(f"stabilizer: {s}", build(ai_model="precise", crawl="normal", rainbow="normal", stab=s, stab_level="normal"))
-    check("halo removal (HaloNet)", build(ghost="auto", halo_rx=2.0, halo_method="ai"))
+    check("halo removal (RepairNet)", build(ghost="auto", halo_rx=2.0, halo_method="ai"))
+    check("halo removal (HaloNet, RepairNet off)", build(ghost="auto", halo_rx=2.0, halo_method="ai", repairnet="off"))
     check("MPEG repair (BlockNet)", build(deblock="normal"))
-    check("colour alignment + ChromaNet", build(sx=-0.75, bleed="ai|normal"))
+    check("colour alignment + bleed (RepairNet)", build(sx=-0.75, bleed="ai|normal"))
+    vsf = lambda call, **a: {"type": "jet" if call.startswith("vs") and not call.startswith("vszip") else "vs", "on": True,
+                             "p": {"call": call, "args": a}}
+    check("VapourSynth filters: MVTools + clip settings", build(vs_filters_pos="repairs", vs_filters=[
+        vsf("mv.Degrain2"), vsf("mvu.Degrain3"), vsf("vsrgtools.contrasharpening", src="group"),
+        vsf("vszip.LimitFilter", src="@group"), vsf("std.MaskedMerge", clipb="@prev"), vsf("descale.Debicubic", width="@w", height="@h")]))
     check("resize to 1080 lines, EWA (GPU)", build(size="1080", kernel="ewa_lanczossharp"))
 
     print("5. Export")
@@ -134,7 +142,19 @@ def main():
     check("export NTSC -> MKV (cleanup + Universal)", lambda: export(ntsc, "ntsc_out.mkv", ai_model="precise", crawl="normal",
                                                                      rainbow="normal", stab="ustab"))
     check("export progressive (frame rate kept)", lambda: export(prog, "progressive_out.mkv", ai_model="off"))
+
+    def own_ivtc():                                    # Repair -> VapourSynth filters "instead of the app's IVTC"
+        r = export(ntsc, "own_ivtc_out.mkv", ai_model="off", mode="vfr", vs_filters_pos="ivtc",
+                   vs_filters=[{"type": "vs", "on": True, "p": {"call": "vivtc.VFM", "args": {"order": "1"}}},
+                               {"type": "vs", "on": True, "p": {"call": "vivtc.VDecimate", "args": {}}}])
+        fr = runner._run([runner.TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
+                          "-of", "csv=p=0", os.path.join(work, "out", "own_ivtc_out.mkv")]).stdout.strip()
+        if fr not in ("24000/1001", "2997/125"):
+            raise RuntimeError(f"frame rate {fr}, expected 23.976")
+        return f"{r}, {fr} fps"
+    check("export with your own IVTC (vivtc VFM + VDecimate)", own_ivtc)
     check("export image -> PNG", lambda: export(png, "still_out.png", ai_model="precise", crawl="normal", rainbow="normal"))
+    check("export odd-sized image -> PNG", lambda: export(odd, "odd_out.png", ai_model="precise", crawl="normal", rainbow="normal"))
 
     bad = [n for n, ok in RESULTS if not ok]
     opt = [n for n in bad if "optional" in n]

@@ -120,12 +120,19 @@ def is_image(path):
 
 
 def probe_image(path):
-    r = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", path])
+    r = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name,pix_fmt",
+              "-of", "json", path])
     v = (json.loads(r.stdout or "{}").get("streams") or [{}])[0]
     if not v.get("width"):
         raise RuntimeError("Cannot read this image")
     w, h = int(v["width"]), int(v["height"])
-    return {"path": path, "width": w, "height": h, "dar": w / h, "duration": IMAGE_FRAMES * 1001 / 30000,
+    pf = str(v.get("pix_fmt") or "")
+    bits = 16 if "16" in pf or "48" in pf or "64" in pf else (10 if "10" in pf else 8)
+    colour = "greyscale" if pf.startswith(("gray", "ya", "mono")) else ("palette" if pf == "pal8" else "colour")
+    fmt = {"mjpeg": "JPEG", "png": "PNG", "tiff": "TIFF", "bmp": "BMP", "webp": "WebP"}.get(str(v.get("codec_name")), str(v.get("codec_name") or "").upper())
+    img = {"format": fmt, "bits": bits, "colour": colour, "alpha": "a" in pf.replace("gray", "").replace("pal", "").replace("yuva", "a") and
+           any(x in pf for x in ("rgba", "bgra", "argb", "abgr", "ya", "yuva", "gbrap")), "pix_fmt": pf, "bytes": os.path.getsize(path)}
+    return {"path": path, "width": w, "height": h, "dar": w / h, "image_info": img, "duration": IMAGE_FRAMES * 1001 / 30000,
             "fps_num": 30000, "fps_den": 1001, "pal": False, "frames": IMAGE_FRAMES, "audio": [], "subs": [], "chapters": [],
             "progressive24": False, "progressive": True, "image": True, "order": "tff"}
 
@@ -166,14 +173,21 @@ def probe(path):
     # SD 29.97 / 25 stream (DVDs flag telecined frames as progressive; those keep the cadence analysis, which already
     # keeps real 30p and progressive PAL as they are). 23.976 with pulldown flags = soft telecine (engine sees 29.97i).
     r2 = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-read_intervals", "%+#300",
-               "-show_entries", "frame=interlaced_frame,repeat_pict", "-of", "csv=p=0", path])
+               "-show_entries", "frame=interlaced_frame,top_field_first,repeat_pict", "-of", "csv=p=0", path])
     rows = [[c for c in x.strip(", ").split(",") if c != ""] for x in (r2.stdout or "").split()]
     rows = [r for r in rows if r]
+    # csv order is ffprobe's own (interlaced_frame, top_field_first, repeat_pict)
     clean = bool(rows) and all(all(c == "0" for c in r) for r in rows)
+    il = [r for r in rows if len(r) >= 2 and r[0] == "1"]
     dvd_std = v["height"] <= 576 and (abs(num / den - 30000 / 1001) < 0.01 or pal)
     progressive = clean and not dvd_std
     progressive24 = progressive and abs(num / den - 24000 / 1001) < 0.01
     fo = v.get("field_order", "tt")
+    if len(il) >= 10 and len(il) >= 0.8 * len(rows):
+        # a hard-interlaced stream: the frames' own flags decide (what a player shows): ffmpeg's MPEG-2 encoder writes a stream field order "tb"
+        # (= bottom displayed first) for top-field-first frames, and that turned the whole IVTC into BFF. Soft-telecined
+        # discs (Courage: 10 % interlaced-flagged frames, their flags follow the pulldown) keep the stream's value
+        fo = "tt" if sum(r[1] == "1" for r in il) * 2 >= len(il) else "bb"
     if dur <= 0:
         # no container duration (raw .m2v / .vob stream): count the frames the engine will see (BestSource,
         # pulldown applied - the index is built now instead of at the first preview)
@@ -395,6 +409,99 @@ def import_dest(path, title):
     return disc.parent / f"{disc.name}_import" / f"title_{int(title):02d}.mkv"
 
 
+# ---------------------------------------------------------------- Blu-ray (BDMV folder)
+
+def bd_root(path):
+    """the BDMV folder of a disc folder, the BDMV folder itself, or the one a .mpls playlist sits in; None = not a Blu-ray"""
+    p = Path(path)
+    if p.suffix.lower() == ".mpls":
+        p = p.parent.parent
+    if p.is_dir() and p.name.upper() != "BDMV" and (p / "BDMV" / "PLAYLIST").is_dir():
+        p = p / "BDMV"
+    return str(p) if p.is_dir() and p.name.upper() == "BDMV" and (p / "PLAYLIST").is_dir() else None
+
+
+def is_bluray(path):
+    return bd_root(path) is not None
+
+
+def _mpls_items(mp):
+    """[(clip name, in, out seconds)] of a .mpls playlist, read directly (mkvmerge does not open every playlist:
+    Angel's Egg's main feature 00100.mpls joins nine clips and is "not recognized")"""
+    import struct
+    b = Path(mp).read_bytes()
+    if b[:4] != b"MPLS":
+        return []
+    pl = struct.unpack(">I", b[8:12])[0]
+    n = struct.unpack(">H", b[pl + 6:pl + 8])[0]
+    pos, out = pl + 10, []
+    for _ in range(n):
+        ln = struct.unpack(">H", b[pos:pos + 2])[0]
+        name = b[pos + 2:pos + 7].decode("ascii", "replace")
+        t_in, t_out = struct.unpack(">II", b[pos + 14:pos + 22])
+        out.append((name, t_in / 45000, t_out / 45000))
+        pos += 2 + ln
+    return out
+
+
+def bd_titles(path, min_seconds=30):
+    """the disc's playlists (main feature, episodes, extras) with length, chapters, languages - read by mkvmerge.
+    Playlists that play the same clips (the same title for other menus) and short ones (menus, logos) are left out."""
+    root = Path(bd_root(path))
+    titles, seen = [], set()
+    for mp in sorted((root / "PLAYLIST").glob("*.mpls")):
+        r = _run([TOOLS["mkvmerge"], "-J", str(mp)])
+        try:
+            j = json.loads(r.stdout or "{}")
+        except ValueError:
+            continue
+        c = j.get("container", {})
+        pr = c.get("properties", {})
+        dur = float(pr.get("playlist_duration", 0)) / 1e9
+        files = tuple(Path(f).name.lower() for f in pr.get("playlist_file", []))
+        joined = False
+        if not c.get("recognized"):                        # read the playlist ourselves; imported by joining its clips
+            try:
+                items = _mpls_items(mp)
+            except Exception:                              # noqa: BLE001
+                items = []
+            files = tuple(f"{nm.lower()}.m2ts" for nm, _, _ in items)
+            dur = sum(b - a for _, a, b in items)
+            if not items or not all((root / "STREAM" / f).is_file() for f in files):
+                continue
+            r = _run([TOOLS["mkvmerge"], "-J", str(root / "STREAM" / files[0])])
+            try:
+                j = json.loads(r.stdout or "{}")
+            except ValueError:
+                j = {}
+            pr, joined = {"playlist_chapters": len(files)}, True
+        if dur < min_seconds or (files, round(dur)) in seen:
+            continue
+        seen.add((files, round(dur)))
+        tr = j.get("tracks", [])
+        v = next((t for t in tr if t.get("type") == "video"), {})
+        lang = lambda t: t.get("properties", {}).get("language") or "und"
+        titles.append({"id": int(mp.stem) if mp.stem.isdigit() else mp.stem, "playlist": str(mp), "duration": dur,
+                       "chapters": int(pr.get("playlist_chapters", 0) or 0),
+                       "video": f'{v.get("properties", {}).get("pixel_dimensions", "?")} {v.get("codec", "")}',
+                       "audio": [f'{lang(t)} {t.get("codec", "")}' for t in tr if t.get("type") == "audio"],
+                       "subs": [lang(t) for t in tr if t.get("type") == "subtitles"], "clips": len(files),
+                       "joined": [str(root / "STREAM" / f) for f in files] if joined else None})
+    titles.sort(key=lambda t: -t["duration"])
+    return titles
+
+
+def bd_import_dest(path, title):
+    root = Path(bd_root(path))
+    disc = root.parent
+    return disc.parent / f"{disc.name}_import" / f"playlist_{title}.mkv"
+
+
+def disc_titles(path):
+    """DVD (ISO / VIDEO_TS) or Blu-ray (BDMV) titles"""
+    return bd_titles(path) if is_bluray(path) else dvd_titles(path)
+
+
 # ---------------------------------------------------------------- jobs
 
 def job_is_pal(job):
@@ -527,9 +634,54 @@ class JobRunner:
         self.log(f"Report saved: {zpath}  ({mb:.1f} MB) - send this file.")
         return {"path": str(zpath), "mb": round(mb, 1)}
 
+    def import_bd(self, path, title, duration=0.0):
+        """Remux one Blu-ray playlist to MKV by stream copy (mkvmerge joins its clips, keeps every track, language and
+        the chapters). Reuses an existing complete import."""
+        out = bd_import_dest(path, title)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        done = out.with_suffix(".done")
+        if out.exists() and done.exists():
+            self.log(f"Using existing import {out}")
+            return str(out)
+        mp = Path(bd_root(path)) / "PLAYLIST" / f"{int(title):05d}.mpls" if str(title).isdigit() else Path(str(title))
+        tmp = out.with_suffix(".part.mkv")
+        src = [str(mp)]
+        try:
+            items = _mpls_items(mp)
+            r = _run([TOOLS["mkvmerge"], "-J", str(mp)])
+            if items and not json.loads(r.stdout or "{}").get("container", {}).get("recognized"):
+                clips = [str(Path(bd_root(path)) / "STREAM" / f"{nm}.m2ts") for nm, _, _ in items]
+                src = [x for c in clips for x in ("+", c)][1:]   # a + b + c: the clips one after the other
+                self.log(f"Playlist {mp.name} joins {len(clips)} clips: they are appended in its order")
+        except Exception:                                  # noqa: BLE001
+            pass
+        self.log(f"Importing Blu-ray playlist {mp.name} (stream copy, nothing is re-encoded)...")
+        p = subprocess.Popen([TOOLS["mkvmerge"], "--gui-mode", "-o", str(tmp), *src], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                             creationflags=NO_WINDOW)
+        self.proc.append(p)
+        last = []
+        for line in p.stdout:
+            m = re.match(r"#GUI#progress (\d+)%", line.strip())
+            if m:
+                self.log(None, int(m.group(1)), 100)
+            elif line.strip():
+                last.append(line.strip())
+        if p.wait() not in (0, 1):                        # 1 = warnings only
+            self._check()
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError("Blu-ray import failed: " + (last[-1] if last else "?"))
+        self._check()
+        tmp.replace(out)
+        done.write_text("ok", encoding="utf-8")
+        self.log(f"Imported: {out}")
+        return str(out)
+
     def import_title(self, path, title, duration=0.0):
         """Remux one DVD title to MKV, bit-exact (stream copy): video with its pulldown flags, all audio and
         subtitle tracks with languages, accurate chapters (-preindex). Reuses an existing complete import."""
+        if is_bluray(path):
+            return self.import_bd(path, title, duration)
         out = import_dest(path, title)
         out.parent.mkdir(parents=True, exist_ok=True)
         done = out.with_suffix(".done")
@@ -591,7 +743,7 @@ class JobRunner:
             self.log("Pass 1/2: reusing existing VFR analysis")
             return
         self.log("Pass 1/2: analysing cadence (VFR)...")
-        for f in ("tfm.txt", "tdec.txt", "timecodes.txt", "pass1.sig", "diff.txt", "tdec_ovr.txt"):
+        for f in ("tfm.txt", "tdec.txt", "timecodes.txt", "pass1.sig", "diff.txt", "blk.txt", "loc.txt", "tdec_ovr.txt"):
             (work / f).unlink(missing_ok=True)
         jp = work / "pass1.json"
         jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
@@ -656,6 +808,12 @@ class JobRunner:
         if (job.get("progressive24") or job.get("progressive")) and job["mode"] == "vfr":
             job["mode"] = "cfr"                         # progressive source: nothing to inverse-telecine
             self.log(f"Progressive source ({job['fps_num'] / job['fps_den']:.3f} fps): no inverse telecine, frame rate kept")
+            jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
+        import vsgraph as _vg
+        own_ivtc = bool(_vg.vsf_at(job, "ivtc"))     # a filter group set to do the IVTC itself
+        if own_ivtc and job["mode"] == "vfr":
+            job["mode"] = "cfr"                         # the app's VFR analysis needs its own IVTC
+            self.log("Your VapourSynth filters do the IVTC: exported with a constant frame rate (theirs)")
             jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
         # 1. VFR analysis
         if job["mode"] == "vfr":
@@ -734,6 +892,19 @@ class JobRunner:
                         f"The video has {n_video} frames but the VFR timing has {n_tc}: the audio would drift. "
                         "Something in the script adds or removes frames (frame-rate change, interpolation, trim) - "
                         "remove it, or export in CFR mode.")
+            elif own_ivtc:
+                # your own IVTC sets the rate: measured from the frames it gave for the episode's length, snapped to the
+                # standard rate it is (23.976 / 29.97 / 25 / 24 / 30 / 50 / 59.94 / 48 / 47.952 / 15 ...)
+                exact = n_video / max(dur_s, 1e-6)
+                std = [(24000, 1001), (30000, 1001), (25, 1), (24, 1), (30, 1), (50, 1), (60000, 1001), (60, 1), (48, 1),
+                       (48000, 1001), (12000, 1001), (15000, 1001), (12, 1), (15, 1)]
+                num, den = min(std, key=lambda r: abs(r[0] / r[1] - exact))
+                if abs(num / den - exact) / exact > 0.006:
+                    from fractions import Fraction
+                    fr = Fraction(exact).limit_denominator(1001)
+                    num, den = fr.numerator, fr.denominator
+                job["out_rate"] = [num, den]
+                self.log(f"Your IVTC gives {n_video} frames for {dur_s:.2f} s: {num / den:.3f} fps")
             else:
                 rate = (job["fps_num"] / job["fps_den"] if job.get("progressive") else
                         50.0 if pal and job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50" else (25.0 if pal else 24000 / 1001))
@@ -749,6 +920,8 @@ class JobRunner:
         m = [TOOLS["mkvmerge"], "-q", "-o", str(out)]
         if job["mode"] == "vfr":
             m += ["--timestamps", f"0:{work / 'timecodes.txt'}"]
+        elif job.get("out_rate"):
+            m += ["--default-duration", f"0:{job['out_rate'][0]}/{job['out_rate'][1]}p"]   # your own IVTC's rate
         elif job.get("progressive"):
             m += ["--default-duration", f"0:{job['fps_num']}/{job['fps_den']}p"]        # the source's own rate
         elif pal:
