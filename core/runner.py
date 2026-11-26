@@ -157,7 +157,9 @@ def probe(path):
               "channels": s.get("channels")} for s in j.get("streams", []) if s["codec_type"] == "audio"]
     subs = [{"index": s["index"], "codec": s.get("codec_name"), "lang": s.get("tags", {}).get("language", "und")}
             for s in j.get("streams", []) if s["codec_type"] == "subtitle"]
-    chapters = [float(c["start_time"]) for c in j.get("chapters", [])]
+    dur0 = float(j.get("format", {}).get("duration", 0) or 0)
+    # a chapter mark at the very end (DVDs often have one: "chapter 4 - 0:07:38, length 0:00") starts nothing
+    chapters = [float(c["start_time"]) for c in j.get("chapters", []) if not (dur0 and float(c["start_time"]) > dur0 - 0.5)]
     num, den = (int(x) for x in v.get("r_frame_rate", "30000/1001").split("/"))
     if v["height"] <= 576 and den and num / den > 45:
         # raw MPEG-2 streams (.m2v): ffprobe gives the FIELD rate (60000/1001, 50) - a DVD has at most 30 frames/s
@@ -172,16 +174,29 @@ def probe(path):
     # telecined or PAL-processed: the first 300 frames carry no interlace or pulldown flags, and it is not a DVD-standard
     # SD 29.97 / 25 stream (DVDs flag telecined frames as progressive; those keep the cadence analysis, which already
     # keeps real 30p and progressive PAL as they are). 23.976 with pulldown flags = soft telecine (engine sees 29.97i).
-    r2 = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-read_intervals", "%+#300",
+    # all cores: lossless captures (FFV1) decode ~6x faster (2.1 s -> 0.35 s on open); the flags are the same
+    r2 = _run([TOOLS["ffprobe"], "-v", "error", "-threads", str(min(16, os.cpu_count() or 4)), "-select_streams", "v:0", "-read_intervals", "%+#300",
                "-show_entries", "frame=interlaced_frame,top_field_first,repeat_pict", "-of", "csv=p=0", path])
     rows = [[c for c in x.strip(", ").split(",") if c != ""] for x in (r2.stdout or "").split()]
     rows = [r for r in rows if r]
     # csv order is ffprobe's own (interlaced_frame, top_field_first, repeat_pict)
     clean = bool(rows) and all(all(c == "0" for c in r) for r in rows)
     il = [r for r in rows if len(r) >= 2 and r[0] == "1"]
+    pulldown = any(len(r) >= 3 and r[2] != "0" for r in rows)   # repeat_pict: soft telecine (the engine applies it)
     dvd_std = v["height"] <= 576 and (abs(num / den - 30000 / 1001) < 0.01 or pal)
     progressive = clean and not dvd_std
+    scan = None
+    if not progressive and not pulldown and dvd_std and dur0 > 0:
+        # an SD 29.97 / 25 file is not progressive by its flags alone (DVD streams flag telecined frames as progressive,
+        # and progressive rips are often flagged interlaced): the picture decides. ffmpeg's idet over 3 x 200 frames:
+        # real progressive files read 0-1.6 % combed (Desert Punk ep01, rips), telecined / interlaced 33-100 %
+        # (Blue Dragon, clip.mkv, Dominion, PAL Sample.mpg). Soft telecine never gets here (pulldown flags): ffmpeg
+        # ignores the flags and its frames read 0 % combed, but the engine applies the pulldown
+        scan = picture_scan(path, dur0)
+        if scan["frames"] >= 150 and scan["combed"] <= 0.05:          # progressive anime reads 1.4-1.6 % (fine lines)
+            progressive = True
     progressive24 = progressive and abs(num / den - 24000 / 1001) < 0.01
+    std_rates = (24000 / 1001, 24, 25, 30000 / 1001, 30, 50, 60000 / 1001, 60)
     fo = v.get("field_order", "tt")
     if len(il) >= 10 and len(il) >= 0.8 * len(rows):
         # a hard-interlaced stream: the frames' own flags decide (what a player shows): ffmpeg's MPEG-2 encoder writes a stream field order "tb"
@@ -197,11 +212,104 @@ def probe(path):
             dur = n * den / num
         except Exception as e:                           # noqa: BLE001
             print(f"frame count failed: {e}", file=sys.stderr)
+    frame_ms = None
+    if progressive and not any(abs(num / den - r) < 0.01 for r in std_rates):
+        # an average rate (17732/665): 24p and 30p parts. The frames' own times, as ms steps (~120 KB for a 24-min
+        # episode), so chapters, episodes and every time shown are where they really are (the average rate put a
+        # chapter 30 s into a 24p part ~4 s away)
+        try:
+            times = source_frame_times(path)
+            if variable_rate(times):
+                ms = [round(t * 1000) for t in times]
+                frame_ms = [ms[0]] + [b - a for a, b in zip(ms, ms[1:])]
+        except Exception as e:                           # noqa: BLE001
+            print(f"frame times not read: {e}", file=sys.stderr)
     return {"path": path, "width": v["width"], "height": v["height"], "dar": dar, "duration": dur,
-            "fps_num": num, "fps_den": den, "pal": pal, "frames": int(round(dur * num / den)),
+            "fps_num": num, "fps_den": den, "pal": pal, "frames": len(frame_ms) if frame_ms else int(round(dur * num / den)),
+            "frame_ms": frame_ms,
             "audio": audio, "subs": subs, "chapters": chapters, "progressive24": progressive24, "progressive": progressive,
+            # how it was decided ("flags" / "picture" + the combed share) and a hint that frame times vary (an
+            # average rate such as 17732/665: 24p and 30p parts in one file - the export keeps each frame's time)
+            "scan": ({"by": "picture", **scan} if scan else {"by": "flags"}),
+            "vfr_hint": bool(progressive and not any(abs(num / den - r) < 0.01 for r in std_rates)),
             # ffprobe: tt/bb = top/bottom first; tb = top coded, BOTTOM displayed first; bt = the reverse
             "order": "bff" if fo in ("bb", "tb") else "tff"}
+
+
+def picture_scan(path, dur, windows=(0.15, 0.45, 0.75), frames=200):
+    """ffmpeg idet on a few windows of the file (in parallel): {"frames": frames it could judge, "combed": share of
+    them that look interlaced}"""
+    import concurrent.futures as cf
+    ts = [dur * f for f in windows] if dur > 30 else [0.0]
+
+    def one(t):
+        r = subprocess.run([TOOLS["ffmpeg"], "-hide_banner", "-nostats", "-threads", "8", "-ss", f"{t:.3f}", "-i", path,
+                            "-map", "0:v:0", "-vf", "idet", "-frames:v", str(frames), "-an", "-sn", "-f", "null", "-"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL,
+                           creationflags=NO_WINDOW)
+        m = re.findall(r"Multi frame detection: TFF: *(\d+) BFF: *(\d+) Progressive: *(\d+)", r.stderr or "")
+        return tuple(map(int, m[-1])) if m else (0, 0, 0)
+    try:
+        with cf.ThreadPoolExecutor(len(ts)) as ex:
+            res = list(ex.map(one, ts))
+    except Exception:                                    # noqa: BLE001
+        return {"frames": 0, "combed": 1.0}
+    il, pr = sum(r[0] + r[1] for r in res), sum(r[2] for r in res)
+    return {"frames": il + pr, "combed": round(il / max(1, il + pr), 4)}
+
+
+def _frame_secs(info):
+    """frame start times (s, from the first frame) of a variable-rate source, or None (constant rate)"""
+    ms = info.get("frame_ms")
+    if not ms:
+        return None
+    out, c = [], 0
+    for d in ms:
+        c += d
+        out.append(c)
+    return [(x - out[0]) / 1000 for x in out]
+
+
+def time_to_frame(info, t):
+    """the frame shown at time t (s): the first frame that starts at or after t (half a ms of rounding allowed)"""
+    secs = _frame_secs(info)
+    if not secs:
+        return int(round(t * info.get("fps_num", 30000) / info.get("fps_den", 1001)))
+    import bisect
+    return min(len(secs), bisect.bisect_left(secs, t - 0.0005))
+
+
+def frame_to_time(info, f):
+    secs = _frame_secs(info)
+    if not secs:
+        return f * info.get("fps_den", 1001) / info.get("fps_num", 30000)
+    if f < len(secs):
+        return secs[max(0, int(f))]
+    step = secs[-1] - secs[-2] if len(secs) > 1 else 0.04
+    return secs[-1] + (f - len(secs) + 1) * step
+
+
+def source_frame_times(path):
+    """Presentation times (s) of every video frame, in order, from the container (no decoding; ~1 s per episode)."""
+    r = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time",
+              "-of", "csv=p=0", path])
+    t = []
+    for x in (r.stdout or "").split():
+        try:
+            t.append(float(x.strip(",")))
+        except ValueError:
+            pass
+    return sorted(t)
+
+
+def variable_rate(times):
+    """True when the frame spacing really varies (24p and 30p parts), not just timestamp rounding"""
+    if len(times) < 50:
+        return False
+    d = sorted(b - a for a, b in zip(times, times[1:]))
+    med = d[len(d) // 2]
+    off = sum(1 for x in d if abs(x - med) > 0.1 * med)
+    return off > 0.02 * len(d)
 
 
 def detect_episodes(info):
@@ -243,8 +351,7 @@ def detect_episodes(info):
         elif 0 < t - starts[-1] < 4 * 60 and len(starts) > 1:     # same boundary seen by both rules
             if pr < prio[-1] or (pr == prio[-1] and t < starts[-1]):
                 starts[-1], prio[-1] = t, pr                      # the opening match wins, else the earliest
-    fps = info.get("fps_num", 30000) / info.get("fps_den", 1001)
-    frames = [int(round(t * fps)) for t in starts] + [info["frames"]]
+    frames = [time_to_frame(info, t) for t in starts] + [info["frames"]]
     return [(a, b) for a, b in zip(frames, frames[1:]) if b - a > 0]
 
 
@@ -259,8 +366,12 @@ def _pcm(path, t, dur, sr=48000):
         cmd = [TOOLS["ffmpeg"], "-v", "error", "-i", path, "-map", "0:a:0", "-af", "aresample=first_pts=0",
                "-ss", f"{max(t, 0):.6f}", "-t", f"{dur:.6f}", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
     else:
-        cmd = [TOOLS["ffmpeg"], "-v", "error", "-ss", f"{t:.6f}", "-i", path, "-t", f"{dur:.6f}",
-               "-map", "0:a:0", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
+        # a fast seek to 2 s before, then cut on the real audio timestamps (-copyts + atrim): seeking straight to t
+        # landed on the 32 ms AC3 frame grid in one of the two files, and the sync check read up to -28 ms on an
+        # export that was exactly in sync (0.0 ms at every point when measured sample-exactly)
+        cmd = [TOOLS["ffmpeg"], "-v", "error", "-ss", f"{max(0.0, t - 2):.6f}", "-copyts", "-i", path, "-map", "0:a:0",
+               "-af", f"atrim=start={t:.6f}:duration={dur:.6f},asetpts=PTS-STARTPTS",
+               "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
     r = subprocess.run(cmd,
                        capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
     return np.frombuffer(r.stdout, dtype=np.float32)
@@ -614,9 +725,12 @@ class JobRunner:
         for f in Path(job["work"]).parent.glob(".work_*/ffmpeg.log"):
             shutil.copy(f, tmp / f"ffmpeg_{f.parent.name.lstrip('.')}.log")
         dur = float(state.get("info", {}).get("duration") or 0)
-        fps = job["fps_num"] / job["fps_den"]
-        start_s = job["start"] / fps
-        end_s = (job["end"] / fps) if job.get("end") else dur
+        info = state.get("info") or {}
+        if not info.get("frame_ms") and info.get("vfr_hint"):
+            info = probe(job["source"])                   # the app does not send the frame-time table along
+        info = {**info, "fps_num": job["fps_num"], "fps_den": job["fps_den"]}
+        start_s = frame_to_time(info, job["start"])
+        end_s = frame_to_time(info, job["end"]) if job.get("end") else dur
         for i, frac in enumerate((0.3, 0.7), 1):        # untouched video, stream copy (no re-encode)
             self._check()
             t = start_s + (end_s - start_s) * frac
@@ -858,6 +972,28 @@ class JobRunner:
         fps = job.get("fps_num", 30000) / job.get("fps_den", 1001)
         start_s = job["start"] / fps
         dur_s = (job["end"] - job["start"]) / fps
+        src_tc = None
+        if job.get("progressive") and not job.get("image") and job["mode"] != "vfr":
+            # progressive with 24p and 30p parts (a VFR rip): a constant average rate (26.66 fps) put the picture
+            # seconds ahead of / behind the audio inside the episode - every frame keeps its own time instead, and the
+            # audio is cut at the real times of the first and last frame
+            try:
+                times = source_frame_times(job["source"])
+                n_src = _vg.source({"source": job["source"]}, clean=False).num_frames   # the whole file (not the episode)
+                if variable_rate(times) and len(times) != n_src:
+                    self.log(f"Variable frame rate source, but its {len(times)} frame times do not match the {n_src} decoded "
+                             "frames: exported at a constant rate")
+                elif variable_rate(times) and 0 <= job["start"] < job["end"] <= n_src:
+                    a, b = job["start"], job["end"]
+                    t0 = times[0]
+                    end_t = times[b] if b < len(times) else times[-1] + (times[-1] - times[-2])
+                    start_s, dur_s = times[a] - t0, end_t - times[a]
+                    src_tc = work / "timecodes_src.txt"
+                    src_tc.write_text("# timecode format v2\n" + "".join(f"{(times[i] - times[a]) * 1000:.3f}\n" for i in range(a, b)),
+                                      encoding="utf-8")
+                    self.log(f"Variable frame rate source: each frame keeps its own time ({b - a} frames, {dur_s:.2f} s)")
+            except Exception as e:                       # noqa: BLE001
+                self.log(f"Frame times not read ({e}): constant rate")
         has_audio = cut_audio(job["source"], start_s, dur_s, audio)
         import encoding
         aa = encoding.audio_args(job)
@@ -892,10 +1028,19 @@ class JobRunner:
                         f"The video has {n_video} frames but the VFR timing has {n_tc}: the audio would drift. "
                         "Something in the script adds or removes frames (frame-rate change, interpolation, trim) - "
                         "remove it, or export in CFR mode.")
+            elif src_tc is not None:
+                if n_video != job["end"] - job["start"]:
+                    raise RuntimeError(f"The video has {n_video} frames but the source part has {job['end'] - job['start']}: "
+                                       "something in the script adds or removes frames, so the frame times cannot be kept.")
             elif own_ivtc:
                 # your own IVTC sets the rate: measured from the frames it gave for the episode's length, snapped to the
                 # standard rate it is (23.976 / 29.97 / 25 / 24 / 30 / 50 / 59.94 / 48 / 47.952 / 15 ...)
-                exact = n_video / max(dur_s, 1e-6)
+                # the probe's frame count is estimated from the duration (can be 1 too many): the frames that exist
+                try:
+                    n_src = min(job["end"], _vg.source(job, clean=False).num_frames) - job["start"]
+                except Exception:                     # noqa: BLE001
+                    n_src = job["end"] - job["start"]
+                exact = n_video / max(n_src / fps, 1e-6)
                 std = [(24000, 1001), (30000, 1001), (25, 1), (24, 1), (30, 1), (50, 1), (60000, 1001), (60, 1), (48, 1),
                        (48000, 1001), (12000, 1001), (15000, 1001), (12, 1), (15, 1)]
                 num, den = min(std, key=lambda r: abs(r[0] / r[1] - exact))
@@ -920,6 +1065,8 @@ class JobRunner:
         m = [TOOLS["mkvmerge"], "-q", "-o", str(out)]
         if job["mode"] == "vfr":
             m += ["--timestamps", f"0:{work / 'timecodes.txt'}"]
+        elif src_tc is not None:
+            m += ["--timestamps", f"0:{src_tc}"]                                     # the source's own frame times
         elif job.get("out_rate"):
             m += ["--default-duration", f"0:{job['out_rate'][0]}/{job['out_rate'][1]}p"]   # your own IVTC's rate
         elif job.get("progressive"):

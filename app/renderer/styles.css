@@ -230,7 +230,7 @@ body.busy .busy-dot { background: var(--accent); animation: pulse 1s ease-in-out
 #progBar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width .2s; }
 .log { height: 170px; margin: 0; overflow-y: auto; background: #08090b; border: 1px solid var(--line); border-radius: var(--radius);
        padding: 8px 10px; font: 11.5px/1.45 Consolas, monospace; color: #c9cfdb; white-space: pre-wrap; }
-.log .err { color: var(--danger); } .log .ok { color: var(--go); } .log .dim { color: var(--muted); }
+.log .err { color: var(--danger); } .log .ok { color: var(--go); } .log .dim { color: var(--muted); } .log .warn { color: var(--warn); }
 
 /* ---------------- settings dialog ---------------- */
 .modal { position: fixed; inset: 0; background: #0009; display: flex; align-items: center; justify-content: center; z-index: 10; }
@@ -704,3 +704,51 @@ body.step-colour .grade-dock.collapsed { height: auto; }
 body.step-colour.grade-collapsed .grade-side { display: flex; flex-direction: column; gap: 8px; order: 0; flex: 0 1 380px; min-width: 250px; min-height: 0; }
 body.step-colour.grade-collapsed .grade-side > #autoGroup { order: 0; flex: 1 1 0; max-width: none; min-height: 120px; }
 body.step-colour.grade-collapsed .grade-side > [data-fold="scopes"] { order: 1; flex: 1 1 0; max-width: none; min-height: 0; }
+/* TensorRT engine dialog: VapourKit's layout in the app's own look (panels, indigo accent, its buttons) */
+.dialog.eng-dlg { width: 900px; gap: 12px; }
+.eng-model { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.eng-model .src-name { font-weight: 600; }
+.eng-sec { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+.eng-sec-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-left: 3px solid var(--accent2);
+                border-bottom: 1px solid var(--line); background: var(--panel2); font-weight: 600; font-size: 12px;
+                letter-spacing: .06em; text-transform: uppercase; color: var(--text); }
+.eng-i { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: 1.5px solid var(--muted);
+         border-radius: 50%; font: italic 700 10px Georgia, serif; color: var(--muted); letter-spacing: 0; text-transform: none; }
+.eng-sec-body { padding: 12px 14px 14px; }
+.eng-desc { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.eng-dlg .eng-grid { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 16px; margin: 0; }
+.eng-dlg .eng-cap { font-size: 11px; font-weight: 600; letter-spacing: .05em; color: var(--muted); }
+.eng-dlg .eng-val { font-size: 12px; color: var(--text); margin: 4px 0 10px; min-height: 17px; }
+.eng-btns { display: flex; gap: 2px; padding: 3px; background: var(--field); border: 1px solid var(--line); border-radius: var(--r); }
+.eng-btns button { flex: 1; height: 30px; font-size: 13px; background: transparent; border: 1px solid transparent; color: var(--muted); }
+.eng-btns button:hover:not(:disabled) { color: var(--text); background: var(--panel2); }
+.eng-btns button.on { background: var(--accent-bg); border-color: #34407a; color: var(--text); font-weight: 600; }
+.eng-btns button:disabled { opacity: .4; }
+.eng-dlg .eng-args { width: 100%; min-height: 70px; margin-top: 6px; padding: 9px 11px; resize: vertical; background: var(--field);
+                     border: 1px solid var(--line2); border-radius: var(--r); color: var(--text); font: 13px/1.5 Consolas, ui-monospace, monospace;
+                     white-space: pre-wrap; word-break: break-all; }
+.eng-dlg .eng-args:focus { border-color: var(--accent2); outline: none; }
+.eng-tip { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+.eng-dlg .eng-note { margin-top: 6px; font-size: 11.5px; }
+/* Colour step: Side by side */
+body:not(.step-colour) #segView .sbs-only { display: none; }
+.img-wrap.sbs { display: flex; align-items: flex-start; }
+.sbs-tag { position: absolute; bottom: 8px; left: 8px; z-index: 2; pointer-events: none; font-size: 11px; background: #000a; color: #fff;
+           padding: 1px 6px; border-radius: 4px; }
+/* audit 2026-11-27 */
+/* toolbar: the zoom menu and frame box keep their width; the VFR button gives way (ellipsis) on narrow windows */
+.toolbar > select, .toolbar > .seg, .toolbar > .frame-nav, .toolbar > .undo-redo, .toolbar > #btnVsview { flex: none; }
+.toolbar > #btnVfrPrev { flex: 0 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Colour panel: the auto / edited chip is a dot there (the label column is narrow; the text is in its tooltip) */
+.gd-page .field > label .chip { font-size: 0; width: 8px; height: 8px; padding: 0; line-height: 0; border-radius: 50%; flex: none; }
+.gd-page .field > label { min-width: 0; }
+.gd-page[data-page="primaries"] > [data-fold="light"] .field,
+.gd-page[data-page="primaries"] > [data-fold="colour"] .field { grid-template-columns: 86px minmax(0, 1fr); }
+/* a still image: no field matching, no stabilizer over time, no video encoder or audio */
+body.image-mode [data-panel="adjust"] > [data-gid="telecine"], body.image-mode [data-panel="adjust"] > [data-gid="stab"],
+body.image-mode .vid-only { display: none !important; }
+body:not(.image-mode) .img-only { display: none !important; }
+/* progressive source: the telecine controls do not apply */
+body.scan-prog [data-gid="telecine"] .field:not(.scan-field), body.scan-prog [data-gid="telecine"] #btnAdvanced,
+body.scan-prog [data-gid="telecine"] .auto-btn, body.scan-prog #advBox, body.scan-prog #btnVfrPrev { display: none !important; }
+body:not(.scan-prog) .scan-note { display: none; }

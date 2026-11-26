@@ -2387,7 +2387,7 @@ def auto_group(kind, job, progress=None):
         # with the AI cleaner on: Temporal fix (guided). Real still shots (Courage x4, Lodoss x2, One Piece,
         # bench_still.py): steady-reference 45.5 -> 51.9 dB, luma wobble 1.86 -> 0.55, line detail kept;
         # TTempSmooth 49.8 dB / 0.83, TemporalFix AI 49.1 dB / 0.64 but detail 0.85 (Lodoss 0.37)
-        ai = opt(job, "ai_model") != "off"
+        ai = _ai_cleaner(job)                          # the AI cleanup really runs (not only selected)
         if opt(job, "ai_model") == "field":            # FieldNet runs its own steadiness stages
             return {"stab": "off", "stab_level": "normal", "crawl_level": m.get("Y_p90"), "ai_cleaner": ai, "stable_net": True}
         # Universal (ustab.py) for everything else: better than no stabilizer on every kind of shot (bench_cases),
@@ -2406,10 +2406,10 @@ def auto_stab(job, crawl):
         return "off", "normal"
     if m == "field":
         return "off", "normal"
-    if m == "precise":
-        return "ustab", "strong"
-    if m in ("temporal", "stable", "uni"):
-        return "ustab", "normal"
+    # the AI cleanup's own boil / shimmer only counts when it runs (dot crawl or rainbows on, or an all-in-one
+    # model): with both off the Precise model is idle and a clean film source got Universal strong for nothing
+    if m in ("precise", "temporal", "stable", "uni") and _ai_cleaner(job):
+        return "ustab", "strong" if m == "precise" else "normal"
     if crawl in ("normal", "strong", "light"):                # classic filters only: leftover crawl / flicker
         return "ustab", "strong" if crawl == "strong" else "normal"
     return "off", "normal"
@@ -2965,7 +2965,42 @@ def output_format(clip, job):
     return resize_output(clip, dict(job, out_w=clip.width, out_h=clip.height))
 
 
-VSF_POINTS = ("source", "ivtc", "after_ivtc", "after_cleanup", "after_halos", "repairs", "after_stab", "after_size", "end")
+VSF_POINTS = ("source", "ivtc", "after_ivtc", "after_composite", "after_cleanup", "after_halos", "repairs", "after_stab",
+              "after_crop", "after_size", "after_sharpen", "end")
+STAB_POINTS = ("after_ivtc", "after_cleanup", "after_halos", "default", "after_size", "end")   # job "stab_pos" (older jobs)
+
+# Repair steps after Telecine and Composite artifacts, in the order they run (job "repair_order", dragged in the app)
+REPAIR_STEPS = ("compression", "halos", "colour", "crop", "stab", "size", "sharpen")
+STEP_POINT = {"compression": "after_cleanup", "halos": "after_halos", "colour": "repairs", "crop": "after_crop",
+              "stab": "after_stab", "size": "after_size", "sharpen": "after_sharpen"}   # the filter groups placed after it
+_STAB_AFTER = {"after_ivtc": None, "after_cleanup": "compression", "after_halos": "halos", "default": "crop",
+               "after_size": "size", "end": "sharpen"}
+
+
+def repair_order(job):
+    """the movable Repair steps in their order; a missing step goes back to its usual place. Older jobs: the
+    default order with the stabilizer where "stab_pos" put it."""
+    o = job.get("repair_order")
+    if isinstance(o, (list, tuple)) and o:
+        out = [x for x in dict.fromkeys(o) if x in REPAIR_STEPS]
+        for i, x in enumerate(REPAIR_STEPS):
+            if x not in out:
+                out.insert(min(i, len(out)), x)
+        return out
+    out = [x for x in REPAIR_STEPS if x != "stab"]
+    a = _STAB_AFTER[stab_pos(job)]
+    out.insert(0 if a is None else out.index(a) + 1, "stab")
+    return out
+
+
+def stab_pos(job):
+    p = str(job.get("stab_pos") or "default")
+    return p if p in STAB_POINTS else "default"
+
+
+def _stab_ok(job):
+    """FieldNet has its own steadiness stages (mc + gtfix + ttemp + still lock, or v5's TStab): no second stabilizer"""
+    return not (opt(job, "ai_model") == "field" and str(job.get("field_stab", "filters")) != "off")
 
 
 def vsf_groups(job):
@@ -3015,25 +3050,6 @@ def vs_filters(clip, job, point="repairs"):
         kw = {"matrix_s": "170m"} if clip.format.color_family != vs.YUV and fmt.color_family == vs.YUV else {}
         clip = core.resize.Bicubic(clip, format=fmt.id, dither_type="error_diffusion", **kw)
     return clip
-
-
-def finalize(clip, job, clean=True):
-    clip = crop(clip, job)
-    # FieldNet has its own steadiness stages (mc + gtfix + ttemp + still lock, or v5's TStab): no second stabilizer
-    if not (opt(job, "ai_model") == "field" and str(job.get("field_stab", "filters")) != "off"):
-        clip = stabilize(clip, job)
-    if clean:
-        clip = vs_filters(clip, job, "after_stab")     # a filter group dragged below the stabilizer
-    order = stage_order(job)
-    for s in order:
-        if s == "colour":
-            clip = grade(clip, job)
-        else:                                    # size last (default): resize straight to the output format
-            clip = resize_output(clip, job) if s == order[-1] else resize_size(clip, job)
-            if clean:
-                clip = vs_filters(clip, job, "after_size")   # a filter group dragged below Shape and size
-            clip = sharpen(line_darken(clip, job), job)
-    return clip if order[-1] == "size" else output_format(clip, job)
 
 
 # Output sharpening and line darkening (Crop & size step), at the output size, after resizing.
@@ -3278,6 +3294,7 @@ def script_text(job, title=""):
     def vline(pt, what="your VapourSynth filters"):
         if vsf_at(job, pt):
             L.append(f'clip = dr.vs_filters(clip, job, "{pt}")'.ljust(47) + f"  # {what}: {vn(pt)}")
+
     if vsf_at(job, "source"):
         L[-1] += f"   (+ your VapourSynth filters on the source: {vn('source')})"
     own_ivtc = bool(vsf_at(job, "ivtc"))
@@ -3294,41 +3311,54 @@ def script_text(job, title=""):
     vline("after_ivtc")
     if opt(job, "aa") == "all":
         L.append("clip = dr.anti_alias(clip, job)                # AANet on every frame")
-    if clean("deblock"):
-        L.append(f"clip = dr.deblock(clip, job)                   # MPEG repair: {opt(job, 'deblock')}")
+    order = repair_order(job)
+    if order != [x for x in REPAIR_STEPS]:
+        L.append(f"# Repair order: {' -> '.join(order)} (job['repair_order'])")
+    grading = bool(grade_active(grade_settings(job)) or grade_layers(job))
+    gline = ("clip = dr.grade(clip, job)                     # colour correction" +
+             (f" + {len(grade_layers(job))} adjustment layers (job['grade_layers'])" if grade_layers(job) else ""))
+
+    def compression():
+        if clean("deblock"):
+            L.append(f"clip = dr.deblock(clip, job)                   # MPEG repair: {opt(job, 'deblock')}")
+    early = order[0] == "compression"
+    if early:
+        compression()
     if ntsc and (clean("crawl") or clean("rainbow")):
         L.append(f"clip = dr.xtalk_stage_b(clip, job)             # dots + rainbows after IVTC: {opt(job, 'crawl')} / {opt(job, 'rainbow')}")
-    vline("after_cleanup")
-    if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")):
-        L.append(f"clip = dr.halos(clip, job)                     # halo removal: {opt(job, 'halo_method')}")
-    vline("after_halos")
-    L.append("clip = dr.colour_fix(clip, job)                # colour shift, bleed, clean white / black")
-    vline("repairs")
-    if any(crop_values(job)):
-        L.append("clip = dr.crop(clip, job)")
-    if clean("stab"):
-        L.append(f"clip = dr.stabilize(clip, job)                 # temporal stabilizer: {opt(job, 'stab')}")
-    vline("after_stab")
-    order = stage_order(job)
-    if order != list(STAGES):
-        L.append(f"# step order: {' -> '.join(order)} (job['stage_order'])")
-    for s in order:
-        if s == "colour":
-            if grade_active(grade_settings(job)) or grade_layers(job):
-                L.append("clip = dr.grade(clip, job)                     # colour correction" +
-                         (f" + {len(grade_layers(job))} adjustment layers (job['grade_layers'])" if grade_layers(job) else ""))
-        else:
-            if s == order[-1]:
+    vline("after_composite")
+    out_done = False
+    for i, step in enumerate(order):
+        rest = order[i + 1:]
+        if step == "compression" and not early:
+            compression()
+        elif step == "halos":
+            if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")):
+                L.append(f"clip = dr.halos(clip, job)                     # halo removal: {opt(job, 'halo_method')}")
+        elif step == "colour":
+            L.append("clip = dr.colour_fix(clip, job)                # colour shift, bleed, clean white / black")
+        elif step == "crop":
+            if any(crop_values(job)):
+                L.append("clip = dr.crop(clip, job)")
+        elif step == "stab":
+            if clean("stab") and _stab_ok(job):
+                L.append(f"clip = dr.stabilize(clip, job)                 # temporal stabilizer: {opt(job, 'stab')}")
+        elif step == "size":
+            if not grading and all(r == "sharpen" for r in rest):
                 L.append("clip = dr.resize_output(clip, job)             # output size, 10-bit, colour tags")
+                out_done = True
             else:
                 L.append("clip = dr.resize_size(clip, job)               # output size (format and tags at the end)")
-            vline("after_size")
+        elif step == "sharpen":
             sg = sharp_settings(job)
             if float(sg["lines"]) > 0:
                 L.append(f"clip = dr.line_darken(clip, job)               # line darkening {sg['lines']}")
             if float(sg["luma"]) > 0 or float(sg["chroma"]) > 0:
                 L.append(f"clip = dr.sharpen(clip, job)                   # sharpening ({sg['mode']}): luma {sg['luma']}, colour {sg['chroma']}")
-    if order[-1] != "size":
+        vline(STEP_POINT[step])
+    if grading:
+        L.append(gline)
+    if not out_done:
         L.append("clip = dr.output_format(clip, job)             # 10-bit, colour tags (size as it is now)")
     vline("end", "your VapourSynth filters at the end")
     L += ["", "clip.set_output()", ""]
@@ -3410,30 +3440,63 @@ def build(job, ivtc=True, chroma=True, clean=True):
     # FieldNet v3 also knows PAL (its own composite patterns, 2:2 film, bobbed 50i): it runs on PAL discs too
     uni = opt(job, "ai_model") in ("uni", "field") and _ai_cleaner(job) and (not is_pal(job) or opt(job, "ai_model") == "field")
     ud = uni_dials(job) if uni else {}
+    order = repair_order(job)
+    # the Colour step's grade runs after every Repair step (the app's order: Repair, then Colour). The older
+    # "stage_order" (Colour before / after a separate Crop & size step) is no longer read: that step is part of
+    # Repair now and the setting could not be seen or changed any more
+    grading = bool(grade_active(grade_settings(job)) or grade_layers(job))
+
+    def compression(c):
+        return c if (uni and ud["mpeg"] > 0) else deblock(c, job)
+    early = clean and order[0] == "compression"        # its usual place: MPEG repair before the dot crawl clean-up
+    if early:
+        clip = compression(clip)
     if clean:
-        if not (uni and ud["mpeg"] > 0):
-            clip = deblock(clip, job)
         if not is_pal(job) or uni:
             clip = xtalk_stage_b(clip, job)
-        clip = vs_filters(clip, job, "after_cleanup")
-        rn = repair_dials(job) if not uni else None
-        if opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")) and not (uni and ud["halo"] > 0)                 and not (rn and opt(job, "halo_method") == "ai"):
-            clip = ghost_halo(clip, job)
-        clip = vs_filters(clip, job, "after_halos")
-    ch = job.get("chroma", {}) if chroma else {}
-    if uni and ud["chroma"] > 0:
-        ch = dict(ch, method="off", shift_x=0.0, shift_y=0.0)
-    dials = repair_dials(job, ch) if clean and not uni else None
-    if dials:                                          # RepairNet: halos + bleed in one pass (after the colour shift)
-        clip = repair_colour(clip, job, ch, dials)
-    else:
-        clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
-                          ch.get("method", "off"), ch.get("strength", "normal"))
-    if chroma and ch.get("neutral", False):
-        clip = neutralize(clip)
-    if clean:
-        clip = vs_filters(clip, job, "repairs")
-    clip = finalize(clip, job, clean=clean)
+        clip = vs_filters(clip, job, "after_composite")
+    out_done = False
+    for i, step in enumerate(order):
+        rest = order[i + 1:]
+        if step == "compression":
+            if clean and not early:
+                clip = compression(clip)
+        elif step == "halos":
+            rn = repair_dials(job) if not uni else None
+            if clean and opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")) \
+                    and not (uni and ud["halo"] > 0) and not (rn and opt(job, "halo_method") == "ai"):
+                clip = ghost_halo(clip, job)
+        elif step == "colour":
+            ch = job.get("chroma", {}) if chroma else {}
+            if uni and ud["chroma"] > 0:
+                ch = dict(ch, method="off", shift_x=0.0, shift_y=0.0)
+            dials = repair_dials(job, ch) if clean and not uni else None
+            if dials:                                  # RepairNet: halos + bleed in one pass (after the colour shift)
+                clip = repair_colour(clip, job, ch, dials)
+            else:
+                clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
+                                  ch.get("method", "off"), ch.get("strength", "normal"))
+            if chroma and ch.get("neutral", False):
+                clip = neutralize(clip)
+        elif step == "crop":
+            clip = crop(clip, job)
+        elif step == "stab":
+            if _stab_ok(job):
+                clip = stabilize(clip, job)
+        elif step == "size":
+            if not grading and all(r == "sharpen" for r in rest):
+                clip = resize_output(clip, job)        # nothing but sharpening after it: straight to the output format
+                out_done = True
+            else:
+                clip = resize_size(clip, job)
+        elif step == "sharpen":
+            clip = sharpen(line_darken(clip, job), job)
+        if clean:
+            clip = vs_filters(clip, job, STEP_POINT[step])
+    if grading:
+        clip = grade(clip, job)
+    if not out_done:
+        clip = output_format(clip, job)
     if clean:
         clip = vs_filters(clip, job, "end")
     return clip

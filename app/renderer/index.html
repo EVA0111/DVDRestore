@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
-<title>DVD Restore v0.2 alpha</title>
+<title>DVD Restore v0.25 alpha</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <!-- Layout: step rail | current step | live preview.
-     Steps: Source -> Repair -> Colour -> Crop & size -> Script -> Export. Settings = dialog. -->
+     Steps: Source -> Repair (incl. crop & size) -> Colour -> Script -> Export. Settings = dialog. -->
 <div class="app">
 
 <!-- ============ step rail ============ -->
 <nav class="rail">
-  <div class="brand"><span class="logo"></span><div><b>DVD Restore</b><i class="ver">v0.2 alpha</i><small id="srcShort">no source</small></div></div>
+  <div class="brand"><span class="logo"></span><div><b>DVD Restore</b><i class="ver">v0.25 alpha</i><small id="srcShort">no source</small></div></div>
   <div class="steps" id="stepNav">
     <button data-step="source"><span class="dot">1</span><span class="lbl">Source<small>disc, file, episodes</small></span></button>
     <button data-step="adjust"><span class="dot">2</span><span class="lbl">Repair<small>fix the source, crop &amp; size</small></span></button>
@@ -23,7 +23,7 @@
   </div>
   <div class="rail-foot">
     <div id="backendBadge" class="backend-badge" title="Where the neural models run - change in Settings">PyTorch</div>
-    <div class="wf-row"><button id="btnWfSave" class="ghost" title="Save the settings of the episode shown (Repair, Crop &amp; size, Colour, your filter groups) as a file to keep or share (Ctrl+S)">Save workflow</button><button id="btnWfLoad" class="ghost" title="Apply a saved or shared workflow file to this episode or all episodes">Load workflow</button></div>
+    <div class="wf-row"><button id="btnWfSave" class="ghost" title="Save the settings of the episode shown (Repair, Colour, your filter groups) as a file to keep or share (Ctrl+S)">Save workflow</button><button id="btnWfLoad" class="ghost" title="Apply a saved or shared workflow file to this episode or all episodes">Load workflow</button></div>
     <button id="btnReport" class="ghost wide" title="Measure this source and save a zip (measurements, sample frames, short clips, settings, log) to send for tuning">Collect report</button>
     <button id="btnSettings" class="ghost wide">⚙ Settings</button>
     <button id="btnDeps" class="ghost wide" title="Python, PyTorch, TensorRT, VapourSynth, ffmpeg, MKVToolNix: check, repair or add vsview">Dependencies</button>
@@ -39,8 +39,8 @@
       <header class="panel-head"><h2>Source</h2><p>Open a DVD (ISO or VIDEO_TS), a Blu-ray (BDMV folder), a video file or an image. Each episode is cut from it.</p></header>
       <div id="dropZone" class="drop">
         <div class="drop-icon">⤓</div>
-        <div class="drop-title">Drop a DVD or video here</div>
-        <div class="muted">ISO image, VIDEO_TS folder, or MKV / VOB / MPG / TS / AVI</div>
+        <div class="drop-title">Drop a disc, video or image here</div>
+        <div class="muted">DVD (ISO, VIDEO_TS), Blu-ray (BDMV, .mpls), MKV / VOB / MPG / TS / AVI / MP4, or a PNG / JPG / TIFF image</div>
         <div class="actions center">
           <button id="btnOpenFile" class="primary">Open file…</button>
           <button id="btnOpenFolder" title="A DVD (VIDEO_TS folder) or Blu-ray (BDMV folder): its titles / playlists are listed to import">Open DVD / Blu-ray folder…</button>
@@ -78,10 +78,10 @@
           <button id="btnWhole">One episode</button>
           <button id="btnAddEp">Duplicate</button>
           <button id="btnDelEp">Remove</button>
-          <button id="btnCopyAll" title="Every episode gets the Repair, Colour and Crop &amp; size settings of the episode shown (each can still be changed on its own afterwards)">Copy settings to all</button>
+          <button id="btnCopyAll" title="Every episode gets the Repair and Colour settings of the episode shown (each can still be changed on its own afterwards)">Copy settings to all</button>
         </div>
         <div class="note">Click a row to preview it · tick the episodes to export · type a time (h:mm:ss.sss) or a chapter number in the Ch. boxes (↑ / ↓ step through chapters).
-          Every episode has its own Repair, Colour and Crop &amp; size settings (a new one starts from the defaults) - <b>Copy settings to all</b> gives all episodes the ones of the episode shown.</div>
+          Every episode has its own Repair and Colour settings (a new one starts from the defaults, a duplicate from the one it copies) - <b>Copy settings to all</b> gives all episodes the ones of the episode shown.</div>
       </div>
 
       <div id="chapBox" class="group hidden">
@@ -115,13 +115,16 @@
 
     <!-- ============ 3 ADJUST (pipeline order) ============ -->
     <section class="panel hidden" data-panel="adjust">
-      <header class="panel-head"><h2>Repair</h2><p>In processing order. Each group has its own <b>Auto</b> button that measures this source for that group only.
+      <header class="panel-head"><h2>Repair</h2><p>In processing order; drag a group by ⠿ to change it (Telecine and Composite artifacts always run first). Each group has its own <b>Auto</b> button that measures this source for that group only.
         <span class="chip auto">auto</span> = set by Auto, <span class="chip edited">edited ↺</span> = changed by you (click to undo).</p></header>
       <div class="note warn-note">Auto values are <b>suggestions</b>, measured on a sample of the episode - they can be wrong.
         Always check the result in the preview (Split, Play) and change what does not look right.</div>
 
-      <div class="group">
+      <div class="group" data-gid="telecine">
         <div class="group-head"><h3>Telecine &amp; interlacing</h3><span><button id="btnAdvanced" class="link">Fine-tune IVTC ▾</button> <button class="auto-btn" data-auto="frames" title="PAL: progressive / field-shifted / interlaced and field order. NTSC: film or hybrid (VFR / CFR) and whether the ICP fix is needed.">Auto</button></span></div>
+        <div class="field scan-field"><label title="Progressive = whole frames (a rip, a web or Blu-ray file, a progressive DVD): nothing to field-match or deinterlace, the frame rate and every frame's time are kept. Interlaced / telecined = fields (most DVDs): the controls below apply. Set when the file is opened (its flags and a check of the picture for combing); change it if the detection was wrong.">Picture</label>
+          <div class="seg" data-bind="scan"><button data-v="progressive">Progressive</button><button data-v="interlaced">Interlaced / telecined</button></div></div>
+        <div id="scanNote" class="note scan-note"></div>
         <div class="field ntsc" data-key="mode"><label title="CFR 23.976 = everything becomes 24p film. VFR = film parts 24p, parts made at video rate (scrolling captions, video titles) stay 30p so they move smoothly. Frames Auto measures which this source needs.">Frame rate</label>
           <div class="seg" data-bind="mode"><button data-v="vfr">VFR (24p + 30p)</button><button data-v="cfr">CFR 23.976</button></div></div>
         <div class="field pal" data-key="pal_mode"><label>PAL type</label><select data-bind="pal_mode" data-opts="pal_modes"></select></div>
@@ -138,7 +141,7 @@
         <div id="advBox" class="hidden"></div>
       </div>
 
-      <div class="group ntsc">
+      <div class="group ntsc" data-gid="composite">
         <div class="group-head"><h3>Composite artifacts</h3><button class="auto-btn" data-auto="composite" title="Measures dot crawl and rainbows (10-30 s); with FieldNet: measures MPEG blocking and halos and sets its MPEG / Halos dials">Auto</button></div>
         <div class="field" data-key="crawl" data-show="ai_model!field&ai_model!uni"><label>Dot crawl</label><select data-bind="crawl" data-opts="levels"></select></div>
         <div class="field" data-key="rainbow" data-show="ai_model!field&ai_model!uni"><label>Rainbows</label><select data-bind="rainbow" data-opts="levels"></select></div>
@@ -163,15 +166,15 @@
         <div id="aiNote" class="note"></div>
       </div>
 
-      <div class="group" data-show="ai_model!field&ai_model!uni|uni_mpeg=0">
-        <div class="group-head"><h3>Compression</h3><button class="auto-btn" data-auto="block" title="Measures the MPEG block grid">Auto</button></div>
+      <div class="group" data-show="ai_model!field&ai_model!uni|uni_mpeg=0" data-gid="compression">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="compression" title="Drag to run this step at another point">⠿</span><h3>Compression</h3><button class="auto-btn" data-auto="block" title="Measures the MPEG block grid">Auto</button></div>
         <div class="field" data-key="deblock" data-show="ai_model!field&ai_model!uni|uni_mpeg=0"><label>MPEG repair</label>
           <div class="seg" data-bind="deblock"><button data-v="off">Off</button><button data-v="light" title="60 % of the repair">Light</button><button data-v="normal" title="Neural model: blocking, mosquito noise around lines, blocky colour">Normal</button></div></div>
         <div class="note" data-show="ai_model!field&ai_model!uni|uni_mpeg=0">Only worth it where the block grid is plainly visible (Auto measures it). The repair also softens film grain.</div>
       </div>
 
-      <div class="group" data-show="ai_model!field&ai_model!uni|uni_halo=0">
-        <div class="group-head"><h3>Halos</h3><button class="auto-btn" data-auto="ghost" title="Looks for halos and echoes around edges">Auto</button></div>
+      <div class="group" data-show="ai_model!field&ai_model!uni|uni_halo=0" data-gid="halos">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="halos" title="Drag to run this step at another point">⠿</span><h3>Halos</h3><button class="auto-btn" data-auto="ghost" title="Looks for halos and echoes around edges">Auto</button></div>
         <div class="field" data-key="ghost" data-show="ai_model!field&ai_model!uni|uni_halo=0"><label>Halo removal</label>
           <div class="seg" data-bind="ghost"><button data-v="off">Off</button><button data-v="auto">On</button></div></div>
         <div class="field" data-show="ghost=auto&ai_model!field&ai_model!uni|ghost=auto&uni_halo=0"><label>Method</label>
@@ -181,8 +184,8 @@
         <div class="note rn-note hidden" id="rnNoteHalo"></div>
       </div>
 
-      <div class="group">
-        <div class="group-head"><h3>Colour alignment</h3><button class="auto-btn" data-auto="chroma" data-show="ai_model!field&ai_model!uni|uni_chroma=0" title="Measures how far the colour sits from the outlines and how much it bleeds">Auto</button></div>
+      <div class="group" data-gid="colour">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="colour" title="Drag to run this step at another point">⠿</span><h3>Colour alignment</h3><button class="auto-btn" data-auto="chroma" data-show="ai_model!field&ai_model!uni|uni_chroma=0" title="Measures how far the colour sits from the outlines and how much it bleeds">Auto</button></div>
         <div class="field" data-key="sx" data-show="ai_model!field&ai_model!uni|uni_chroma=0"><label>Shift → right</label>
           <div class="stepper" data-bind="sx" data-step="0.25" data-min="-4" data-max="4" data-unit="px"></div></div>
         <div class="field" data-key="sy" data-show="ai_model!field&ai_model!uni|uni_chroma=0"><label>Shift ↓ down</label>
@@ -195,8 +198,16 @@
           <label class="switch"><input type="checkbox" data-bind="neutral"><span></span><em>text, eyes, outlines</em></label></div>
       </div>
 
-      <div class="group">
-        <div class="group-head"><h3>Temporal stabilizer</h3><button class="auto-btn" data-auto="stab" data-show="ai_model!field" title="Suggests a stabilizer when dot crawl / flicker is left over time">Auto</button></div>
+      <div class="group cs-group" data-gid="crop">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="crop" title="Drag to run this step at another point">⠿</span><h3>Crop</h3><span><span id="cropSize" class="hint"></span> <button id="btnAutoCrop" title="Find the black borders of this source and set the crop">Auto</button></span></div>
+        <div class="field" data-key="crop.l"><label>Left</label><div class="stepper" data-bind="crop.l" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
+        <div class="field" data-key="crop.r"><label>Right</label><div class="stepper" data-bind="crop.r" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
+        <div class="field" data-key="crop.t"><label>Top</label><div class="stepper" data-bind="crop.t" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
+        <div class="field" data-key="crop.b"><label>Bottom</label><div class="stepper" data-bind="crop.b" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
+      </div>
+
+      <div class="group" data-gid="stab">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="stab" title="Drag to run this step at another point">⠿</span><h3>Temporal stabilizer</h3><button class="auto-btn" data-auto="stab" data-show="ai_model!field" title="Suggests a stabilizer when dot crawl / flicker is left over time">Auto</button></div>
         <div class="field" data-key="stab" data-show="ai_model!field"><label>Method</label><select data-bind="stab" data-opts="stab"></select></div>
         <div class="field" data-show="stab=tfix_ai&ai_model!field"><label title="0.0-3.0. Higher = more aggressive; fractions blend the two neighbouring trained models (0 = off). Too high can smooth small movements.">Strength</label>
           <div class="slider" data-bind="tfix_strength" data-min="0" data-max="3" data-step="0.05" data-def="2"></div></div>
@@ -207,16 +218,8 @@
       </div>
 
       <div id="autoResult" class="note"></div>
-      <div class="group cs-group">
-        <div class="group-head"><h3>Crop</h3><span><span id="cropSize" class="hint"></span> <button id="btnAutoCrop" title="Find the black borders of this source and set the crop">Auto</button></span></div>
-        <div class="field" data-key="crop.l"><label>Left</label><div class="stepper" data-bind="crop.l" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
-        <div class="field" data-key="crop.r"><label>Right</label><div class="stepper" data-bind="crop.r" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
-        <div class="field" data-key="crop.t"><label>Top</label><div class="stepper" data-bind="crop.t" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
-        <div class="field" data-key="crop.b"><label>Bottom</label><div class="stepper" data-bind="crop.b" data-step="2" data-min="0" data-max="160" data-unit="px"></div></div>
-      </div>
-
-      <div class="group cs-group">
-        <div class="group-head"><h3>Shape and size</h3><span id="outRes" class="hint"></span></div>
+      <div class="group cs-group" data-gid="size">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="size" title="Drag to run this step at another point">⠿</span><h3>Shape and size</h3><span id="outRes" class="hint"></span></div>
         <div class="field"><label title="Shape of the whole (uncropped) picture when it is shown. A DVD stores 4:3 and 16:9 in the same 720 pixels.">Aspect ratio</label><select data-bind="aspect" data-opts="aspects"></select></div>
         <div class="field" data-show="aspect=custom"><label>Ratio</label><input type="text" data-bind="aspect_custom" placeholder="1.85 or 16:9"></div>
         <div class="field"><label>Size</label><select data-bind="size" data-opts="sizes"></select></div>
@@ -235,8 +238,8 @@
         <div id="sizeNote" class="note"></div>
       </div>
 
-      <div class="group cs-group">
-        <div class="group-head"><h3>Sharpen &amp; lines</h3><span class="hint">at the output size</span></div>
+      <div class="group cs-group" data-gid="sharpen">
+        <div class="group-head"><span class="vsf-grip rep-grip" draggable="true" data-step="sharpen" title="Drag to run this step at another point">⠿</span><h3>Sharpen &amp; lines</h3><span class="hint" id="sharpWhere">at the output size</span></div>
         <div class="field"><label title="Sharpening of brightness detail">Luma sharpening</label>
           <div class="stepper" data-bind="sharp.luma" data-step="0.1" data-min="0" data-max="2"></div></div>
         <div class="field"><label title="Sharpening of colour edges (soft colour after a DVD's half-resolution colour or a soft upscale)">Chroma sharpening</label>
@@ -258,7 +261,7 @@
     <section class="panel hidden" data-panel="colour">
       <header class="panel-head"><h2>Colour</h2><p>Runs after all repairs. Everything at its default = picture untouched; <i>Before</i> is never corrected, so Split shows exactly this step. Double-click any slider, wheel or curve point to reset it. Click a section title to fold it.</p></header>
 
-      <div class="panel-foot"><button data-goto="adjust">← Repair</button><button class="primary" data-goto="frame">Next: Crop &amp; size →</button></div>
+      <div class="panel-foot"><button data-goto="adjust">← Repair</button><button class="primary" data-goto="script">Next: Script →</button></div>
     </section>
 
     <!-- ============ 5 CROP & SIZE ============ -->
@@ -279,13 +282,13 @@
       <div class="note">While the script is <b>from settings</b> it follows every change in the other steps. Once you type in it, it is <b>edited</b>:
         settings changes no longer reach it, until you press <i>Rebuild from settings</i>. The <code>EPISODE</code> block is filled in for each episode on export;
         the preview shows VFR as CFR (VFR needs the analysis pass that runs on export).</div>
-      <div class="panel-foot"><button data-goto="frame">← Crop &amp; size</button><button class="primary" data-goto="export">Next: Export →</button></div>
+      <div class="panel-foot"><button data-goto="colour">← Colour</button><button class="primary" data-goto="export">Next: Export →</button></div>
     </section>
 
     <!-- ============ 7 EXPORT ============ -->
     <section class="panel hidden" data-panel="export">
-      <header class="panel-head"><h2>Export</h2><p>Encode the ticked episodes. Audio, subtitles and fonts are copied untouched and checked for sync.</p></header>
-      <div class="group">
+      <header class="panel-head"><h2>Export</h2><p class="vid-only">Encode the ticked episodes. Audio, subtitles and fonts are copied untouched and checked for sync.</p><p class="img-only">Saves the restored picture as a lossless PNG in the folder below.</p></header>
+      <div class="group vid-only">
         <div class="group-head"><h3>File</h3></div>
         <div class="field"><label>Encoder</label><select data-bind="encoder" data-opts="encoders"></select></div>
         <div class="field" id="encPresetRow"><label id="encPresetLbl">Preset</label><select id="encPreset"></select></div>
@@ -304,8 +307,8 @@
         <div id="encNote" class="note"></div>
       </div>
       <div class="group">
-        <div class="group-head"><h3>Audio &amp; file</h3></div>
-        <div class="field"><label>Audio</label><select data-bind="audio_codec" data-opts="audio_codecs"></select></div>
+        <div class="group-head"><h3><span class="vid-only">Audio &amp; file</span><span class="img-only">File</span></h3></div>
+        <div class="field vid-only"><label>Audio</label><select data-bind="audio_codec" data-opts="audio_codecs"></select></div>
         <div class="field" data-show="audio_codec=aac|audio_codec=opus"><label>Audio bitrate</label>
           <div class="stepper" data-bind="audio_bitrate" data-step="16" data-min="64" data-max="512" data-unit="kbit/s"></div></div>
         <div class="field"><label>Folder</label><div class="with-btn"><input type="text" data-bind="out_dir"><button id="btnOutDir">Browse…</button></div></div>
@@ -325,8 +328,8 @@
 <section class="viewer">
   <div class="toolbar">
     <div class="undo-redo"><button id="btnUndo" disabled>↶</button><button id="btnRedo" disabled>↷</button></div>
-    <div class="seg" id="segView" title="B / A / S">
-      <button data-v="before">Before</button><button data-v="after">After</button><button data-v="split">Split</button>
+    <div class="seg" id="segView" title="B / A / S (D = side by side in Colour)">
+      <button data-v="before">Before</button><button data-v="after">After</button><button data-v="split">Split</button><button data-v="sbs" class="sbs-only" title="Before and After next to each other (D)">Side by side</button>
     </div>
     <select id="selZoom" title="Zoom (click the picture to toggle 2x)"><option>Fit</option><option>1:1</option><option>2x</option><option>3x</option><option>4x</option></select>
     <div class="frame-nav">
@@ -372,6 +375,7 @@
       <img id="imgBefore" alt="">
       <img id="imgAfter" alt="">
       <div id="splitBar" class="split-bar hidden"><span>Before | After</span></div>
+      <span class="sbs-tag sbs-b hidden">Before</span><span class="sbs-tag sbs-a hidden">After</span>
     </div>
     <div id="spinner" class="spinner hidden"><div class="spin"></div><span id="spinnerText">Rendering preview…</span></div>
   </div>
@@ -545,41 +549,34 @@
 </div>
 
 <div id="engineDlg" class="modal hidden">
-  <div class="dialog wide">
+  <div class="dialog wide eng-dlg">
     <header><h2>Engine settings</h2><button id="btnEngineClose" class="link close" title="Cancel (Esc)">✕</button></header>
-    <div class="group">
-      <div class="group-head"><h3>Model</h3></div>
-      <div id="engModel" class="src-name"></div>
-      <div id="engInfo" class="badges"></div>
-    </div>
-    <div class="group eng-switches">
-      <div class="group-head"><h3>Configuration switches</h3></div>
-      <div class="note">These switches update the TensorRT command below with good defaults. You can edit the command by hand.</div>
-      <div class="eng-grid">
-        <div><div class="eng-cap">MODEL TYPE</div><div id="engTypeTxt" class="eng-val"></div>
-          <div class="seg" id="engType"><button data-v="image">Image</button><button data-v="vsr">VSR</button></div></div>
-        <div><div class="eng-cap">SHAPE MODE</div><div id="engShapeTxt" class="eng-val"></div>
-          <div class="seg" id="engShape"><button data-v="dynamic">Dynamic</button><button data-v="static">Static</button></div></div>
-        <div><div class="eng-cap">PRECISION</div><div id="engPrecTxt" class="eng-val"></div>
-          <div class="seg" id="engPrecision"><button data-v="fp16">FP16</button><button data-v="bf16">BF16</button><button data-v="fp32">FP32</button></div></div>
+    <div class="eng-model"><div id="engModel" class="src-name"></div><div id="engInfo" class="badges"></div></div>
+    <section class="eng-sec">
+      <div class="eng-sec-head">Configuration switches</div>
+      <div class="eng-sec-body">
+        <p class="eng-desc">These switches automatically update the TensorRT command below with good defaults. You can manually edit the command if needed.</p>
+        <div class="eng-grid">
+          <div><div class="eng-cap">MODEL TYPE</div><div id="engTypeTxt" class="eng-val"></div>
+            <div class="eng-btns" id="engType"><button data-v="image">Image</button><button data-v="vsr">VSR</button></div></div>
+          <div><div class="eng-cap">SHAPE MODE</div><div id="engShapeTxt" class="eng-val"></div>
+            <div class="eng-btns" id="engShape"><button data-v="dynamic">Dynamic</button><button data-v="static">Static</button></div></div>
+          <div><div class="eng-cap">PRECISION</div><div id="engPrecTxt" class="eng-val"></div>
+            <div class="eng-btns" id="engPrecision"><button data-v="fp16">FP16</button><button data-v="bf16">BF16</button><button data-v="fp32">FP32</button></div></div>
+        </div>
       </div>
-      <div class="eng-grid" style="margin-top:4px">
-        <div><div class="eng-cap">OPTIMIZATION LEVEL</div><div class="eng-val">0-5: higher = longer build, sometimes faster</div>
-          <div class="seg" id="engOpt"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
-        <div><div class="eng-cap">WORKSPACE</div><div class="eng-val">GPU memory TensorRT may use while building</div>
-          <div class="seg" id="engWs"><button data-v="2048">2 GB</button><button data-v="4096">4 GB</button><button data-v="8192">8 GB</button></div></div>
-        <div><div class="eng-cap">STRENGTH</div><div class="eng-val">0-1: less = blended with a plain resize</div>
-          <input type="text" id="engStrength" class="eng-num" spellcheck="false"></div>
+    </section>
+    <section class="eng-sec">
+      <div class="eng-sec-head"><span class="eng-i">i</span>TensorRT build command</div>
+      <div class="eng-sec-body">
+        <p class="eng-desc">This command is automatically generated based on the switches above. You can manually edit it if needed.</p>
+        <div class="eng-cap">ENGINE BUILD PARAMETERS (TRTEXEC SYNTAX)</div>
+        <textarea id="engArgs" class="eng-args" spellcheck="false" rows="3"></textarea>
+        <p class="eng-tip">Tip: Use OUTPUT_PATH as the placeholder for --saveEngine. The switches above will automatically update this command.</p>
+        <div id="engArgsNote" class="note"></div>
+        <div id="engNote" class="note eng-note"></div>
       </div>
-    </div>
-    <div class="group">
-      <div class="group-head"><h3>TensorRT build command</h3></div>
-      <div class="note">Made from the switches above; edit it if needed. Understood: --minShapes / --optShapes / --maxShapes, --shapes (static; H / W as letters = the picture size), --builderOptimizationLevel, --fp16 / --bf16, --memPoolSize=workspace:…M, --noTF32. --saveEngine is ignored: engines are kept in engines\.</div>
-      <div class="eng-cap" style="margin-top:8px">ENGINE BUILD PARAMETERS (TRTEXEC SYNTAX)</div>
-      <textarea id="engArgs" class="code eng-args" spellcheck="false" rows="3"></textarea>
-      <div id="engArgsNote" class="note"></div>
-      <div id="engNote" class="note"></div>
-    </div>
+    </section>
     <div class="actions" style="justify-content:flex-end">
       <button id="btnEngineCancel">Cancel</button>
       <button id="btnEngineSave">Save</button>

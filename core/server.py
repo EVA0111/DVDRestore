@@ -206,7 +206,7 @@ def make_job(st, k):
         "grade_layers": [{"start": int(l["start"]), "end": int(l["end"]), "opacity": float(l.get("opacity", 1)), "grade": l.get("grade") or {}}
                          for l in st.get("layers") or [] if l.get("on", True) and int(l["end"]) > a and int(l["start"]) < b],
         "pal_mode": st.get("pal_mode", "auto"), "comb": st.get("comb", "nnedi3"), "ai_model": st.get("ai_model", "temporal"),
-        "stab": st.get("stab", "off"), "stab_level": st.get("stab_level", "normal"),
+        "stab": st.get("stab", "off"), "stab_level": st.get("stab_level", "normal"), "stab_pos": st.get("stab_pos") or "default", "repair_order": [str(x) for x in st.get("repair_order") or []],
         **{k: float(st.get(k, d)) for k, d in (("uni_crawl", 1), ("uni_rainbow", 1), ("uni_mpeg", 1), ("uni_halo", 1),
                                                ("uni_chroma", 1), ("uni_grain", 0), ("uni_detail", 1))},
         "tfix_strength": float(st.get("tfix_strength", 2.0)),
@@ -227,9 +227,17 @@ def make_job(st, k):
         "stage_order": [s for s in (st.get("stage_order") or ["colour", "size"]) if s != "upscale"],
         "work": str(work_root(st, src) / f".work_{name}"), "output": str(out_dir / (f"{name}.png" if info.get("image") else f"{name}.mkv")),
         "image": bool(info.get("image")),
-        "src_w": info.get("width"), "src_h": info.get("height"), "progressive24": bool(info.get("progressive24")),
-        "progressive": bool(info.get("progressive")),
-    } | chain_job(st)
+        "src_w": info.get("width"), "src_h": info.get("height"), "progressive24": bool(info.get("progressive24")) and progressive_choice(st, info),
+        "progressive": progressive_choice(st, info),
+    } | chain_job(st) | ({"mode": "cfr"} if progressive_choice(st, info) else {})   # progressive: nothing to inverse-telecine
+
+
+def progressive_choice(st, info):
+    """the Repair step's Picture switch (scan: progressive / interlaced), else what the probe found"""
+    sc = st.get("scan")
+    if sc in ("progressive", "interlaced"):
+        return sc == "progressive" or bool(info.get("image"))
+    return bool(info.get("progressive"))
 
 
 def chain_job(st):
@@ -324,7 +332,9 @@ def frame_image(f, fmt="PNG"):
     from PIL import Image
     img = Image.fromarray(np.dstack([np.asarray(f[p]) for p in range(3)]))
     buf = io.BytesIO()
-    if fmt == "PNG":
+    if fmt == "BMP":                                   # lossless, ~5x faster than PNG (the still preview)
+        img.save(buf, "BMP")
+    elif fmt == "PNG":
         img.save(buf, "PNG", compress_level=1)
     else:
         img.save(buf, "JPEG", quality=92)
@@ -422,16 +432,24 @@ class Preview:
             rid, st, k, frac, views, frame = req
             try:
                 out = {}
-                for view in views:                          # "before" and/or "after", same frame
+                req = []                                # "before" and/or "after", same frame: rendered at the same time
+                for view in views:
                     clip = preview_clip(st, k, view)
                     if frame is not None:
                         n = min(clip.num_frames - 1, max(0, int(frame)))
                     else:
                         n = min(clip.num_frames - 1, max(0, int(frac * (clip.num_frames - 1))))
-                    f = clip.get_frame(n)
+                    try:
+                        fut = clip.get_frame_async(n)
+                    except Exception:                      # noqa: BLE001
+                        fut = None
+                    req.append((view, clip, n, fut))
+                for view, clip, n, fut in req:
+                    f = fut.result() if fut is not None else clip.get_frame(n)
                     if "_SrcN" in f.props:
                         out["src"] = int(f.props["_SrcN"])
-                    out[view], w, h = frame_image(f)
+                    out[view], w, h = frame_image(f, "BMP")
+                    out["mime"] = "image/bmp"
                     rate = f.props["_DurationDen"] / f.props["_DurationNum"] if f.props.get("_DurationNum") else 0
                     out.update(frame=n, total=clip.num_frames, width=w, height=h, rate=round(rate, 3))
                 out["vfr"] = runner.JobRunner.has_pass1(make_job(st, k)) if st.get("mode") == "vfr" else False

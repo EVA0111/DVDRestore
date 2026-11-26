@@ -160,7 +160,7 @@ ipcMain.handle("is-dir", (_e, p) => { try { return fs.statSync(p).isDirectory();
 function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 960, minWidth: 1280, minHeight: 720,
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.2 alpha", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.25 alpha", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
@@ -184,7 +184,7 @@ function openDeps(firstRun) {
   if (depsWin) { depsWin.focus(); return; }
   depsWin = new BrowserWindow({
     width: 760, height: 640, minWidth: 620, minHeight: 520, parent: firstRun ? undefined : (win || undefined),
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.2 alpha - Dependencies", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.25 alpha - Dependencies", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   depsWin.loadFile(path.join(__dirname, "renderer", "deps.html"), { query: { first: firstRun ? "1" : "0" } });

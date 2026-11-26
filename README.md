@@ -1,4 +1,4 @@
-# DVD Restore v0.2 alpha
+# DVD Restore v0.25 alpha
 
 Restores NTSC and PAL DVD video, other video files and still images: anime, cartoons and live action.
 A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch / TensorRT networks).
@@ -8,7 +8,7 @@ A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch 
 
 ## Download and run
 
-1. Download **`DVDRestore-v0.2-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
+1. Download **`DVDRestore-v0.25-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
 2. Unpack it anywhere: another drive or a USB disk is fine.
 3. Start **`DVD Restore.exe`**.
 4. **First start:** the *Dependencies* window installs what the engine needs with one click, into `runtime\` next to
@@ -42,6 +42,18 @@ Full documentation: **[the wiki](../../wiki)** (installation, every step of the 
 * Encode (x264 / x265 / SVT-AV1 / NVENC / ProRes / FFV1 / UT Video) and mux with all audio and subtitle tracks and a
   sync check. Still images (PNG / JPEG / TIFF / BMP / WebP) are saved as 16-bit PNG.
 * Opens `.iso` images, `VIDEO_TS` folders and Blu-ray `BDMV` folders directly.
+
+## New in v0.25
+
+* **Progressive files are treated as progressive**: 29.97p / 25p rips are recognised from the picture (not only their
+  flags) instead of being inverse-telecined, a Picture switch (Progressive / Interlaced) sits at the top of Repair, and
+  files that mix 24p and 30p keep every frame's own time - in the export, chapters, episodes and every time shown.
+* **Every Repair group can be moved** (all but Telecine and Composite artifacts), and the Colour page has a
+  **Side by side** view.
+* **Faster**: opening files, still previews, frame stepping, and the Universal stabilizer (+36 %).
+* **Fixes from a full walk through the app**: the colour grade always runs after all repairs, no more false
+  "audio out of sync" warnings, a better stabilizer suggestion, image mode without video-only settings, an edited
+  script no longer carries over to the next file, and more.
 
 ## New in v0.2
 
@@ -84,7 +96,7 @@ Python 3.12 is needed; ffmpeg (a *full* build, with the DVD-Video reader) and `m
 ### Build the release
 
 ```powershell
-python tools\build_portable.py dist\DVDRestore-v0.2-alpha --zip
+python tools\build_portable.py dist\DVDRestore-v0.25-alpha --zip
 ```
 
 ## Licence

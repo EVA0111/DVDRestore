@@ -7,7 +7,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const S = {
   opts: null, info: null, episodes: [], detected: [], checked: new Set(), current: 0,
   step: "source", analyzed: false, auto: {}, disc: null, titles: [], titleSel: 0, queue: {},
-  mode: "vfr", order: "tff", pal_mode: "auto", adv: {}, comb: "nnedi3", ai_model: "precise", stab: "off", stab_level: "normal",
+  scan: null, mode: "vfr", order: "tff", pal_mode: "auto", adv: {}, comb: "nnedi3", ai_model: "precise", stab: "off", stab_level: "normal", stab_pos: "default", repair_order: [],
   uni_crawl: 1, uni_rainbow: 1, uni_mpeg: 1, uni_halo: 1, uni_chroma: 1, uni_grain: 0, uni_detail: 1,
   crawl: "off", rainbow: "off", composite: "off",
   ghost: "off", ghost_strength: 1, ghost_taps: [], halo_rx: 0, halo_method: "ai", deblock: "off",
@@ -41,9 +41,9 @@ const SAVED = ["temp_dir", "stage_order", "backend", "repairnet", "ai_model", "a
                "enc_rate", "enc_bitrate", "enc_preset", "enc_tune", "enc_depth", "enc_chroma", "enc_keyint", "enc_extra", "audio_codec", "audio_bitrate"];
 // Picture settings: Repair, Colour (with its adjustment layers), Crop & size, and what Auto measured.
 // Every episode has its own (S.epSet[k]); a new episode starts from the defaults.
-const PICTURE = ["mode", "order", "pal_mode", "comb", "ivtc_repair", "chroma_unmix", "aa", "deblend", "crawl", "rainbow", "composite", "rainbow_fill",
+const PICTURE = ["scan", "mode", "order", "pal_mode", "comb", "ivtc_repair", "chroma_unmix", "aa", "deblend", "crawl", "rainbow", "composite", "rainbow_fill",
                  "deblock", "ghost", "ghost_strength", "ghost_taps", "halo_rx", "halo_method", "sx", "sy", "bleed", "warp", "neutral",
-                 "stab", "stab_level", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
+                 "stab", "stab_level", "stab_pos", "repair_order", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
                  "uni_crawl", "uni_rainbow", "uni_mpeg", "uni_halo", "uni_chroma", "uni_grain", "uni_detail",
                  "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "gradeAll", "layers", "tracks", "trackOff", "auto", "levels", "autoStrength", "autoUse", "colourRef",
                  "vs_filters", "vs_filters_pos", "vs_groups"];
@@ -66,7 +66,7 @@ function pictureLoad(o) {
 }
 function pictureFresh() {                        // defaults, with what the source itself says (field order)
   const o = structuredClone(PICTURE0);
-  if (S.info) { o.order = S.info.order; o.pal_mode = "auto"; }
+  if (S.info) { o.order = S.info.order; o.pal_mode = "auto"; o.scan = S.info.progressive ? "progressive" : "interlaced"; }
   return o;
 }
 function epSetAlign() { while (S.epSet.length < S.episodes.length) S.epSet.push(null); S.epSet.length = S.episodes.length; }
@@ -76,8 +76,44 @@ const NO_SCRIPT = new Set(["out_dir", "name"]);   // settings the preview does n
 
 // ---------------------------------------------------------------- helpers
 const fps = () => (S.info ? S.info.fps_num / S.info.fps_den : 30000 / 1001);
+// Variable-frame-rate sources (24p and 30p parts): the probe sends every frame's time (ms steps); times shown or
+// typed use them. Constant-rate sources: frames / rate as before.
+let FT = { path: null, t: null };
+function frameTimes() {
+  const i = S.info;
+  if (!i || !i.frame_ms) return null;
+  if (FT.path !== i.path || !FT.t) {
+    const t = new Float64Array(i.frame_ms.length);
+    let c = 0;
+    i.frame_ms.forEach((d, k) => { c += d; t[k] = c; });
+    const base = t[0];
+    for (let k = 0; k < t.length; k++) t[k] = (t[k] - base) / 1000;
+    FT = { path: i.path, t };
+  }
+  return FT.t;
+}
+function frameTime(f) {                          // seconds from the first frame (f may be fractional)
+  const t = frameTimes();
+  if (!t || t.length < 2) return f / fps();
+  if (f <= 0) return f * (t[1] - t[0]);
+  const n = t.length - 1;
+  if (f >= n) return t[n] + (f - n) * (t[n] - t[n - 1]);
+  const k = Math.floor(f);
+  return t[k] + (f - k) * (t[k + 1] - t[k]);
+}
+function timeFrame(s) {                          // the frame shown at time s
+  const t = frameTimes();
+  if (!t) return Math.round(s * fps());
+  let lo = 0, hi = t.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (t[m] < s - 0.0005) lo = m + 1; else hi = m; }
+  return lo;
+}
 function tc(frames) {
-  const s = frames / fps();
+  const s = frameTime(frames);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = (s % 60).toFixed(3).padStart(6, "0");
+  return `${h}:${String(m).padStart(2, "0")}:${sec}`;
+}
+function hmsms(s) {                             // h:mm:ss.sss of a number of seconds
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = (s % 60).toFixed(3).padStart(6, "0");
   return `${h}:${String(m).padStart(2, "0")}:${sec}`;
 }
@@ -88,7 +124,7 @@ function hms(sec) {
 function parseTc(text) {
   let s = 0;
   for (const p of String(text).trim().split(":")) s = s * 60 + parseFloat(p || "0");
-  return Math.round(s * fps());
+  return timeFrame(s);
 }
 const sign = (v) => (v >= 0 ? "+" : "") + v.toFixed(2);
 function dirname(p) { const i = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/")); return i > 0 ? p.slice(0, i) : p; }
@@ -120,8 +156,8 @@ async function rpc(method, params) {
 // state sent to the backend
 function backendState(selected) {
   return {
-    info: S.info, episodes: S.episodes, selected,
-    mode: S.mode, order: S.order, pal_mode: S.pal_mode, adv: S.adv, comb: S.comb, ai_model: S.ai_model, stab: S.stab, stab_level: S.stab_level, tfix_strength: S.tfix_strength,
+    info: S.info && S.info.frame_ms ? { ...S.info, frame_ms: null } : S.info, episodes: S.episodes, selected,
+    scan: S.scan || null, mode: S.mode, order: S.order, pal_mode: S.pal_mode, adv: S.adv, comb: S.comb, ai_model: S.ai_model, stab: S.stab, stab_level: S.stab_level, stab_pos: S.stab_pos || "default", repair_order: repairOrder(), tfix_strength: S.tfix_strength,
     uni_crawl: S.uni_crawl, uni_rainbow: S.uni_rainbow, uni_mpeg: S.uni_mpeg, uni_halo: S.uni_halo, uni_chroma: S.uni_chroma, uni_grain: S.uni_grain, uni_detail: S.uni_detail,
     crawl: S.crawl, rainbow: S.rainbow, composite: S.composite,
     ghost: S.ghost, ghost_strength: S.ghost_strength, ghost_taps: S.ghost_taps, halo_rx: S.halo_rx, halo_method: S.halo_method, deblock: S.deblock,
@@ -132,7 +168,6 @@ function backendState(selected) {
     enc_chroma: S.enc_chroma, enc_keyint: S.enc_keyint, enc_extra: S.enc_extra, audio_codec: S.audio_codec, audio_bitrate: S.audio_bitrate,
     colour_ref: S.colourRef, grade: S.gradeAll, layers: [...S.layers].sort((p, q) => (p.track || 1) - (q.track || 1) || p.start - q.start)     // bottom track first
       .map((l) => ({ start: l.start, end: l.end, on: l.on !== false && !S.trackOff[l.track || 1], opacity: l.opacity ?? 1, grade: l.grade })),
-    stage_order: S.stage_order,
     aspect: S.aspect, aspect_custom: S.aspect_custom,
     custom_w: S.custom_w, custom_h: S.custom_h, custom_lock: S.custom_lock,
     out_dir: S.out_dir, name: S.name, temp_dir: S.temp_dir || "", backend: S.backend, repairnet: S.repairnet, sharp: S.sharp, upscale: S.upscale,
@@ -196,9 +231,9 @@ function histButtons() {
 }
 
 // ---------------------------------------------------------------- workflows
-// A workflow = the picture settings of an episode (Repair, Crop & size, Colour, your filter groups and AI models) in
+// A workflow = the picture settings of an episode (Repair incl. crop & size, Colour, your filter groups and AI models) in
 // a .json file you can keep, send to someone and load onto another source. The field order is the source's own.
-const WF_SKIP = new Set(["order"]);
+const WF_SKIP = new Set(["order", "auto", "levels"]);   // field order and measurements belong to their own source
 async function saveWorkflow() {
   if (!S.info) { status("Open a source first: a workflow is the settings of the episode shown.", "err"); return; }
   histCommit();
@@ -381,14 +416,40 @@ function repairNetLabels() {
 // S.vs_groups = [{id, slot 0-6, own_ivtc, on, filters: [{type, on, label, doc, argspec, p: {call, args, ...}}]}]
 let VSF_LIB = null, VSF_GROUPS = null;
 const vsfOpen = {};                               // group id -> index of the filter whose settings are shown
-const VSF_SLOTS = ["before Telecine & interlacing", "after Telecine & interlacing", "after Composite artifacts",
-                   "after Compression", "after Halos", "after Colour alignment", "after the Temporal stabilizer",
-                   "after Crop", "after Shape and size (before sharpening)", "at the very end (after Sharpen & lines)"];
-function vsfPoint(g) {                            // slot -> the engine's point (vsgraph.VSF_POINTS)
-  if (g.own_ivtc && g.slot <= 1) return "ivtc";
-  return ["source", "after_ivtc", "after_cleanup", "after_cleanup", "after_halos", "repairs", "after_stab", "after_stab",
-          "after_size", "end"][g.slot] || "repairs";
+// A filter group remembers the Repair group it follows (g.after = its data-gid, "" = before Telecine): the Repair
+// groups after Composite artifacts can be dragged too (S.repair_order, vsgraph.repair_order), so numbers would shift.
+const STATIC_IDS = ["telecine", "composite", "compression", "halos", "colour", "stab", "crop", "size", "sharpen"];   // old slot numbers
+const REPAIR_STEPS = ["compression", "halos", "colour", "crop", "stab", "size", "sharpen"];   // movable, usual order
+const AFTER_POINT = { "": "source", telecine: "after_ivtc", composite: "after_composite", compression: "after_cleanup",
+  halos: "after_halos", colour: "repairs", stab: "after_stab", crop: "after_crop", size: "after_size", sharpen: "after_sharpen" };
+const STEP_NAME = { telecine: "Telecine & interlacing", composite: "Composite artifacts", compression: "Compression", halos: "Halos",
+  colour: "Colour alignment", stab: "the Temporal stabilizer", crop: "Crop", size: "Shape and size", sharpen: "Sharpen & lines" };
+function sharpAfterSize() { const o = repairOrder(); return o.indexOf("sharpen") > o.indexOf("size"); }
+function repairOrder() {                           // the movable steps in their order (older settings: from stab_pos)
+  const o = Array.isArray(S.repair_order) ? [...new Set(S.repair_order)].filter((x) => REPAIR_STEPS.includes(x)) : [];
+  if (o.length) { REPAIR_STEPS.forEach((x, i) => { if (!o.includes(x)) o.splice(Math.min(i, o.length), 0, x); }); return o; }
+  const out = REPAIR_STEPS.filter((x) => x !== "stab");
+  const a = { after_ivtc: null, after_cleanup: "compression", after_halos: "halos", after_size: "size", end: "sharpen" }[S.stab_pos] ?? "crop";
+  out.splice(a === null ? 0 : out.indexOf(a) + 1, 0, "stab");
+  return out;
 }
+const AFTER_NAME = new Proxy({}, { get: (_, a) => {
+  if (a === "") return "before Telecine & interlacing";
+  const o = repairOrder();
+  if (a === o[o.length - 1]) return `at the very end (after ${STEP_NAME[a]})`;
+  return STEP_NAME[a] ? `after ${STEP_NAME[a]}` : undefined;
+} });
+function vsfAfter(g) {                             // older groups: position number -> the group it follows
+  if (g.after === undefined) { const k = +g.slot || 0; g.after = k <= 0 ? "" : STATIC_IDS[Math.min(k, 9) - 1]; }
+  return g.after;
+}
+function vsfIvtcSpot(g) { const a = vsfAfter(g); return a === "" || a === "telecine"; }
+function vsfPoint(g) {                            // -> the engine's point (vsgraph.VSF_POINTS)
+  if (g.own_ivtc && vsfIvtcSpot(g)) return "ivtc";
+  const a = vsfAfter(g), o = repairOrder();
+  return a === o[o.length - 1] ? "end" : AFTER_POINT[a] || "repairs";
+}
+function vsfWhere(g) { return AFTER_NAME[vsfAfter(g)] || "after Colour alignment"; }
 async function vsfLibrary() {
   if (!VSF_LIB) {
     const r = await rpc("block_library", {});
@@ -482,13 +543,13 @@ function vsfArgsOf(f) {                          // [{name, hint}] for the setti
   return (f.args || []).map((a) => ({ name: a.name, hint: /VideoNode/.test(a.type || "") && a.default === "" ? "clip: group, prev or current"
     : a.default !== "" ? `default ${a.default}` : (a.required ? "required" : "") }));
 }
-function vsfNewGroup(slot = 5, filters = []) {
-  return { id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), slot, own_ivtc: false, on: true, filters };
+function vsfNewGroup(after = "colour", filters = []) {
+  return { id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), after, own_ivtc: false, on: true, filters };
 }
 function vsfMigrate() {                           // the earlier single list -> one group
   if (S.vs_filters && S.vs_filters.length && !(S.vs_groups || []).length) {
-    const slot = { source: 0, ivtc: 0, after_ivtc: 1, repairs: 5, end: 9 }[S.vs_filters_pos] ?? 5;
-    S.vs_groups = [Object.assign(vsfNewGroup(slot, S.vs_filters.map((f) => structuredClone(f))), { own_ivtc: S.vs_filters_pos === "ivtc" })];
+    const after = { source: "", ivtc: "", after_ivtc: "telecine", repairs: "colour", end: "sharpen" }[S.vs_filters_pos] ?? "colour";
+    S.vs_groups = [Object.assign(vsfNewGroup(after, S.vs_filters.map((f) => structuredClone(f))), { own_ivtc: S.vs_filters_pos === "ivtc" })];
     S.vs_filters = [];
   }
   if (!Array.isArray(S.vs_groups)) S.vs_groups = [];
@@ -599,14 +660,14 @@ async function vsfEngineOpen(g, i, isNew) {
 function engineUi(fillText = true) {
   const e = ENG.e, i = ENG.info || {};
   const seg = (id, v) => { for (const b of $(id).children) b.classList.toggle("on", b.dataset.v === String(v)); };
-  seg("engType", e.type); seg("engShape", e.shape); seg("engPrecision", e.precision); seg("engOpt", e.opt_level ?? 3); seg("engWs", e.workspace ?? 4096);
+  seg("engType", e.type); seg("engShape", e.shape); seg("engPrecision", e.precision);
   $("engShape").querySelector('[data-v="dynamic"]').disabled = !!i.fixed;
   $("engType").querySelector('[data-v="vsr"]').disabled = i.kind !== "onnx";
   $("engTypeTxt").textContent = e.type === "vsr" ? `VSR (${e.frames || i.frames || 5} frames in, the middle one out)` : "Image (single frame)";
   $("engShapeTxt").textContent = i.fixed ? `Static (the model has one size: ${i.fixed[0]}x${i.fixed[1]})` : e.shape === "dynamic" ? "Dynamic (multiple resolutions)" : "Static (one engine per picture size)";
   $("engPrecTxt").textContent = { fp16: "FP16 (build + inference, recommended)", bf16: "BF16 (fp32's number range: no overflow)", fp32: "FP32 (exact, slower)" }[e.precision] || "";
   if (fillText && document.activeElement !== $("engArgs")) $("engArgs").value = e.args || "";
-  if (document.activeElement !== $("engStrength")) $("engStrength").value = ENG.strength;
+
   const p = parseEngineArgs($("engArgs").value);
   $("engArgsNote").textContent = p.unknown.length ? `Not understood (ignored): ${p.unknown.join(" ")}` : "";
   $("engArgsNote").classList.toggle("err", !!p.unknown.length);
@@ -638,13 +699,12 @@ function initEngineDialog() {
     ENG.e[key] = num ? +b.dataset.v : b.dataset.v;
     if (key === "type" && ENG.e.type === "vsr" && !ENG.e.frames) ENG.e.frames = ENG.info.frames || 5;
     ENG.e.args = engineArgs(ENG.e, ENG.info); engineUi(); }; };
-  pick("engType", "type"); pick("engShape", "shape"); pick("engPrecision", "precision"); pick("engOpt", "opt_level", true); pick("engWs", "workspace", true);
+  pick("engType", "type"); pick("engShape", "shape"); pick("engPrecision", "precision");
   $("engArgs").oninput = () => {                   // a hand-edited command: the switches follow it
     const p = parseEngineArgs($("engArgs").value);
     for (const k of ["precision", "opt_level", "workspace", "shape", "type", "frames"]) if (p[k] !== undefined && !Number.isNaN(p[k])) ENG.e[k] = p[k];
     ENG.e.args = $("engArgs").value; engineUi(false);
   };
-  $("engStrength").onchange = () => { const v = parseFloat($("engStrength").value); ENG.strength = Number.isNaN(v) ? ENG.strength : Math.max(0, Math.min(1, v)); engineUi(false); };
   $("btnEngineClose").onclick = $("btnEngineCancel").onclick = () => engineDone(false);
   $("btnEngineSave").onclick = () => engineDone(true, false);
   $("btnEngineBuild").onclick = () => engineDone(true, true);
@@ -763,7 +823,7 @@ function vsfBrowserInfo() {
 }
 async function vsfBrowser(g) {
   VSFB.g = g; VSFB.sel = null;
-  $("vsfDlgFor").textContent = "→ group " + (VSF_SLOTS[g.slot] ? "running " + VSF_SLOTS[g.slot] : "");
+  $("vsfDlgFor").textContent = "→ group running " + vsfWhere(g);
   $("vsfDlg").classList.remove("hidden");
   $("vsfDlgSearch").value = ""; $("vsfDlgSearch").focus();
   vsfBrowserRender();
@@ -780,7 +840,7 @@ function vsfGroupEl(g, gi) {
   grip.ondragstart = (e) => { e.dataTransfer.setData("text/plain", g.id); e.dataTransfer.effectAllowed = "move"; box.classList.add("dragging"); };
   grip.ondragend = () => { box.classList.remove("dragging"); vsfDropMark(null); };
   const title = el("h3", null, "VapourSynth filters");
-  const where = el("div", "vsf-where", vsfPoint(g) === "ivtc" ? "Runs instead of the app's IVTC" : "Runs " + VSF_SLOTS[g.slot]);
+  const where = el("div", "vsf-where", vsfPoint(g) === "ivtc" ? "Runs instead of the app's IVTC" : "Runs " + vsfWhere(g));
   const sw = el("label", "switch"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = g.on !== false;
   cb.onchange = () => { g.on = cb.checked; vsgChanged(); }; sw.append(cb, el("span")); sw.title = "This group on / off";
   const btn = (t, tip, fn) => { const b = el("button", "ghost vsf-gbtn", t); b.title = tip; b.onclick = fn; return b; };
@@ -794,7 +854,7 @@ function vsfGroupEl(g, gi) {
   const tools = el("span", "vsf-gtools"); tools.append(sw, add, dup, del);
   head.append(grip, title, tools);
   box.append(head, where);
-  if (g.slot <= 1) {                             // next to Telecine: this group can do the IVTC itself
+  if (vsfIvtcSpot(g)) {                          // next to Telecine: this group can do the IVTC itself
     const f = el("div", "field");
     const lab = el("label", null, "IVTC"); lab.title = "Replace the app's IVTC / PAL handling with this group";
     const s2 = el("label", "switch"); const c2 = document.createElement("input"); c2.type = "checkbox"; c2.checked = !!g.own_ivtc;
@@ -816,8 +876,7 @@ function vsfDropMark(beforeEl) {                  // the line that shows where a
   if (!m) { m = el("div", "vsf-drop"); m.id = "vsfDropMark"; }
   beforeEl.parentNode.insertBefore(m, beforeEl);
 }
-function vsfSlotAt(y) {                           // mouse y -> slot 0-6 (before which static group)
-  const st = vsfStaticGroups();
+function vsfSlotAt(y, st = vsfStaticGroups()) {   // mouse y -> before which Repair group (index into st)
   for (let k = 0; k < st.length; k++) { const r = st[k].getBoundingClientRect(); if (y < r.top + r.height / 2) return k; }
   return st.length;
 }
@@ -828,22 +887,37 @@ function vsfBindDrop() {
   panel.addEventListener("dragover", (e) => {
     if (!e.dataTransfer.types.includes("text/plain")) return;
     e.preventDefault(); e.dataTransfer.dropEffect = "move";
-    const slot = vsfSlotAt(e.clientY), st = vsfStaticGroups();
+    const st = vsfStaticGroups().filter((x) => !x.classList.contains("dragging")), slot = vsfSlotAt(e.clientY, st);
     vsfDropMark(st[slot] || document.querySelector('[data-panel="adjust"] .vsf-new'));
   });
   panel.addEventListener("dragleave", (e) => { if (!panel.contains(e.relatedTarget)) vsfDropMark(null); });
   panel.addEventListener("drop", (e) => {
     const id = e.dataTransfer.getData("text/plain");
-    const k = S.vs_groups.findIndex((g) => g.id === id);
+    const st = vsfStaticGroups().filter((x) => !x.classList.contains("dragging"));
+    const slot = vsfSlotAt(e.clientY, st), after = slot <= 0 ? "" : st[slot - 1].dataset.gid;
     vsfDropMark(null);
+    if (id.startsWith("rep:")) {                  // a Repair group itself
+      e.preventDefault();
+      const step = id.slice(4);
+      if (after === "" || after === "telecine") { status("Telecine & interlacing and Composite artifacts always run first."); return; }
+      const o = repairOrder().filter((x) => x !== step);
+      o.splice(after === "composite" ? 0 : o.indexOf(after) + 1, 0, step);
+      if (o.join() !== repairOrder().join()) {
+        changed("repair_order", o);
+        const k = o.indexOf(step);
+        log(`${STEP_NAME[step].replace(/^the /, "")} now runs ${k ? "after " + STEP_NAME[o[k - 1]] : "right after Composite artifacts"}`, "ok");
+        const sz = o.indexOf("size"), later = o.slice(sz + 1).filter((x) => ["compression", "halos", "colour"].includes(x));
+        if (later.length) status(`${later.map((x) => STEP_NAME[x]).join(", ")} now work${later.length > 1 ? "" : "s"} at the output size: slower, and tuned for DVD size.`);
+      }
+      return;
+    }
+    const k = S.vs_groups.findIndex((g) => g.id === id);
     if (k < 0) return;
     e.preventDefault();
     const [g] = S.vs_groups.splice(k, 1);
-    g.slot = vsfSlotAt(e.clientY);
-    if (g.slot > 1) g.own_ivtc = false;
-    let at = S.vs_groups.length;                  // last of the groups already in that slot
-    for (let j = S.vs_groups.length - 1; j >= 0; j--) if (S.vs_groups[j].slot <= g.slot) { at = j + 1; break; } else at = j;
-    S.vs_groups.splice(at, 0, g);
+    g.after = after; delete g.slot;
+    if (!vsfIvtcSpot(g)) g.own_ivtc = false;
+    S.vs_groups.push(g);                          // last of the groups at that place
     vsgChanged();
   });
 }
@@ -854,15 +928,33 @@ function renderVsGroups() {
   vsfMigrate();
   vsfBindDrop();
   for (const old of panel.querySelectorAll(".vsf-group")) old.remove();
+  // the movable Repair groups in their order, after Composite artifacts
+  let prev = panel.querySelector('[data-gid="composite"]');
+  for (const step of repairOrder()) {
+    const g = panel.querySelector(`[data-gid="${step}"]`);
+    if (!g || !prev) continue;
+    if (prev.nextElementSibling !== g) prev.after(g);
+    prev = g;
+  }
   const st = vsfStaticGroups(), tail = panel.querySelector(".vsf-new");
   S.vs_groups.forEach((g, gi) => {
-    const anchor = st[g.slot] || tail;
+    const a = vsfAfter(g), i = a === "" ? 0 : st.findIndex((x) => x.dataset.gid === a) + 1;
+    const anchor = st[i] || tail;
     anchor.parentNode.insertBefore(vsfGroupEl(g, gi), anchor);
   });
 }
 
+function isProgressive() { return !!S.info && (S.info.image || (S.scan ? S.scan === "progressive" : !!S.info.progressive)); }
 function sync() {
   const pal = !!(S.info && S.info.pal);
+  document.body.classList.toggle("scan-prog", isProgressive());
+  if (S.info && !S.info.image) {
+    const sc = S.info.scan || {}, det = S.info.progressive ? "progressive" : "interlaced";
+    $("scanNote").textContent = isProgressive()
+      ? "Whole frames: no field matching, deinterlacing or VFR analysis - " + (S.info.vfr_hint ? "every frame keeps its own time (this file mixes frame rates)." : "the frame rate is kept.") +
+        (det !== "progressive" ? " (Detected as interlaced - you set Progressive.)" : sc.by === "picture" ? ` (Detected from the picture: ${(sc.combed * 100).toFixed(1)} % of ${sc.frames} frames combed.)` : " (Detected from the file's flags.)")
+      : "";
+  }
   for (const e of $$(".ntsc")) e.classList.toggle("hidden", pal);
   for (const e of $$(".pal")) e.classList.toggle("hidden", !pal);
   for (const c of $$("[data-bind]")) {
@@ -951,7 +1043,8 @@ function sync() {
   $("srcShort").textContent = S.info ? basename(S.info.path) : "no source";
   $("sharpNote").textContent = (S.sharp.luma > 0 || S.sharp.chroma > 0)
     ? (S.sharp.mode === "faithful" ? "Faithful: edges get steeper but never overshoot the pixels around them, so no halos." : "Unsharp: crisper, but can add bright / dark rims along outlines - check Split.")
-    : "Applied after resizing, so it acts on the final picture.";
+    : (sharpAfterSize() ? "Applied after resizing, so it acts on the final picture." : "Runs before Shape and size (moved in the Repair order): it acts on the picture before resizing.");
+  $("sharpWhere").textContent = sharpAfterSize() ? "at the output size" : "before resizing";
   encoderUi(); vfrButton(); syncColourUi();
   $("kernelNote").textContent = S.size === "keep" ? "" : ({
     mks2021: "Magic Kernel Sharp 2021: very little ringing or aliasing, crisp - a good default for upscaling cartoons.",
@@ -985,7 +1078,8 @@ function updateButtons() {
     $(id).disabled = !has || busy;
   for (const id of ["btnOpenFile", "btnOpenFolder", "btnChange", "btnImport"]) $(id).disabled = busy;
   $("btnExport").disabled = !has || busy || S.checked.size === 0;
-  $("btnExport").textContent = S.checked.size ? `Export ${S.checked.size} episode${S.checked.size === 1 ? "" : "s"}` : "Export";
+  $("btnExport").textContent = S.info && S.info.image ? "Save image"
+    : S.checked.size ? `Export ${S.checked.size} episode${S.checked.size === 1 ? "" : "s"}` : "Export";
   $("btnShowOut").disabled = !S.out_dir;
   $("nextAnalyze").disabled = !has;
   for (const b of $$("#stepNav button")) {
@@ -1119,10 +1213,13 @@ async function loadVideo(path) {
     pictureLoad(pictureFresh());                 // picture settings start from the defaults for every new source
     S.epSet = S.episodes.map(() => null);
     resetCleanup();
-    // colour correction belongs to a series: keep it for the next file of the same folder, reset otherwise
     S.layers = []; S.layerSel = -1; S.tracks = 1; S.trackOff = {}; S.src = null; S.vfrAuto = null;   // layers belong to this file
     S.gradeAll = structuredClone(GRADE0);
-    S.srcDir = dirname(path); S.levels = null; S.aspect = "auto";
+    S.levels = null; S.aspect = "auto";
+    if (S.script) {                              // an edited script belongs to the source it was written for
+      S.script = null; refreshScript(true);
+      log("Your edited script was for the previous source: the new one starts from its settings again (Script step).", "warn");
+    }
     $("discBox").classList.add("hidden");
     $("dropZone").classList.add("hidden");
     $("srcCard").classList.remove("hidden"); $("epBox").classList.remove("hidden");
@@ -1158,8 +1255,11 @@ function showSourceInfo() {
     if (m.bytes) add(m.bytes >= 1048576 ? `${(m.bytes / 1048576).toFixed(1)} MB` : `${Math.round(m.bytes / 1024)} KB`);
     return;
   }
-  add(i.pal ? "PAL 25 fps" : "NTSC 29.97 fps", i.pal ? "pal" : "ntsc");
-  add(`${i.width}x${i.height}`); add(i.dar > 1.5 ? "16:9" : "4:3"); add(tc(i.frames)); add(i.order === "bff" ? "bottom field first" : "top field first");
+  const rate = i.fps_num / i.fps_den, r = Math.abs(rate - Math.round(rate)) < 0.01 ? String(Math.round(rate)) : rate.toFixed(3).replace(/0+$/, "");
+  if (i.progressive) add(`Progressive ${i.vfr_hint ? "~" + r + " fps (variable)" : r + " fps"}`, "ntsc");
+  else add(i.pal ? "PAL 25 fps" : "NTSC 29.97 fps", i.pal ? "pal" : "ntsc");
+  add(`${i.width}x${i.height}`); add(i.dar > 1.5 ? "16:9" : "4:3"); add(tc(i.frames));
+  if (!i.progressive) add(i.order === "bff" ? "bottom field first" : "top field first");
   add(`${i.chapters.length} chapters`);
   if (i.audio.length) add("audio " + i.audio.map((a) => a.lang).join(", "));
   if (i.subs.length) add(`subs ${i.subs.map((s) => s.lang).join(", ")}`);
@@ -1220,7 +1320,7 @@ function renderEpisodes() {
       };
       return inp;
     };
-    const cells = [cb, el("span", null, String(k + 1)), mk(a, 0), mkc(0), mk(b, 1), mkc(1), el("span", null, tc(b - a).slice(2, -4))];
+    const cells = [cb, el("span", null, String(k + 1)), mk(a, 0), mkc(0), mk(b, 1), mkc(1), el("span", null, hmsms(span(a, b)).slice(2, -4))];
     cells.forEach((c) => { const td = el("td"); td.appendChild(c); tr.appendChild(td); });
     tr.onclick = () => selectEpisode(k);
     tb.appendChild(tr);
@@ -1229,7 +1329,8 @@ function renderEpisodes() {
 }
 
 // ---------------------------------------------------------------- chapters
-const chapFrames = () => (S.info && S.info.chapters ? S.info.chapters.map((t) => Math.round(t * fps())) : []);
+const chapFrames = () => (S.info && S.info.chapters ? S.info.chapters.map((t) => timeFrame(t)) : []);
+const span = (a, b) => frameTime(b) - frameTime(a);              // seconds between two frames
 function chapRange(a, b) {                       // "3-7" = chapters (1-based) that start inside [a, b)
   const cf = chapFrames();
   const ins = cf.map((f, i) => [f, i]).filter(([f]) => f >= a - 2 && f < b - 2).map(([, i]) => i + 1);
@@ -1253,7 +1354,7 @@ function renderChapters() {
     b("Start", "The selected episode starts at this chapter", () => setEpisodeEdge(0, f));
     b("End", "The selected episode ends after this chapter", () => setEpisodeEdge(1, nx));
     b("Split", "A new episode starts at this chapter", () => splitAt(f));
-    for (const c of [el("span", "mono", String(i + 1)), t, el("span", "mono", hms((nx - f) / fps()).replace(/^0:0?/, ""))]) {
+    for (const c of [el("span", "mono", String(i + 1)), t, el("span", "mono", hms(span(f, nx)).replace(/^0:0?/, ""))]) {
       const td = el("td"); td.appendChild(c); tr.appendChild(td);
     }
     tr.appendChild(btns);
@@ -1322,7 +1423,7 @@ function pictureState(k) {
   const st = backendState([k]), out = {};
   for (const key of ["mode", "order", "pal_mode", "comb", "ivtc_repair", "chroma_unmix", "aa", "deblend", "crawl", "rainbow", "composite", "rainbow_fill",
                      "deblock", "ghost", "ghost_strength", "ghost_taps", "halo_rx", "halo_method", "sx", "sy", "bleed", "warp", "neutral",
-                     "stab", "stab_level", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
+                     "stab", "stab_level", "stab_pos", "repair_order", "tfix_strength", "crop", "aspect", "aspect_custom", "size", "custom_w", "custom_h", "custom_lock",
                      "kernel", "kernel_b", "kernel_c", "sharp", "upscale", "grade", "layers", "vs_filters", "vs_filters_pos", "vs_groups"]) out[key] = st[key];
   if (k !== S.current) pictureLoad(live);
   return out;
@@ -1601,10 +1702,10 @@ async function collectReport() {
 
 // ---------------------------------------------------------------- preview
 let previewTimer = null, previewSeq = 0;
-function schedulePreview() {
+function schedulePreview(delay = 120) {          // 120 ms: slider drags (a render takes ~90 ms); one-off clicks pass less
   histArm();
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(renderPreview, 200);
+  previewTimer = setTimeout(renderPreview, delay);
   vsviewFollow();
 }
 // the open vsview follows every change: its job file is rewritten and it reloads itself (same tab and frame)
@@ -1639,7 +1740,7 @@ function vfrButton() {
   b.disabled = !failed || S.busy;
 }
 function autoVfr(r) {
-  if (!S.info || S.info.pal || S.mode !== "vfr") { S.vfrAuto = null; vfrButton(); return; }
+  if (!S.info || S.info.pal || S.mode !== "vfr" || isProgressive()) { S.vfrAuto = null; vfrButton(); return; }
   if (r.vfr) { S.vfrAuto = { state: "ready" }; vfrButton(); return; }
   rpc("vfr_auto", { state: backendState([S.current]), episode: S.current })
     .then((a) => { if (!(S.vfrAuto && S.vfrAuto.state === "running" && a.state === "running" && !a.progress)) S.vfrAuto = a; vfrButton(); }).catch(() => {});
@@ -1673,7 +1774,7 @@ function togglePlay(force) {
   if (!PLAY.on) { $("playFps").textContent = ""; window.api.rpc("stop_play", {}); return; }
   if (!S.info) { togglePlay(false); return; }
   if (S.total && S.frame >= S.total - 1) S.frame = 0;
-  const views = S.view === "split" ? ["before", "after"] : [S.view];
+  const views = viewsShown();
   $("playFps").textContent = "…";
   rpc("play", { state: backendState([S.current]), episode: S.current, frame: S.frame || 0, views })
     .catch(() => {}).finally(() => { if (PLAY.on) { PLAY.on = false; $("btnPlay").textContent = "▶"; $("btnPlay").classList.remove("on"); } });
@@ -1697,7 +1798,7 @@ function seekTo(v) {
   if (isNaN(n)) { showFrameInfo(S.frame, S.total); return; }
   S.frame = Math.max(0, Math.min(Math.max(0, S.total - 1), n));
   $("rngPos").value = S.frame;
-  schedulePreview();
+  schedulePreview(30);
 }
 function srcFrameAt(k) {                     // preview frame -> source frame of episode k
   const [a, b] = S.episodes[k];
@@ -1843,7 +1944,7 @@ function trimFields(a, b, live = false) {        // In / Out as times (frame in 
     x.title = x.title.split(" · ")[0] + ` · source frame ${v}`;
     x.classList.toggle("live", live);
   }
-  $("tpLen").textContent = tc(b - a).replace(/\.\d+$/, "") + (live ? " · release" : "");
+  $("tpLen").textContent = hmsms(span(a, b)).replace(/\.\d+$/, "") + (live ? " · release" : "");
 }
 function trimInfo() {
   renderTimeline();
@@ -1858,14 +1959,15 @@ function trimInfo() {
 async function renderPreview() {
   if (!S.info || !S.episodes.length) return;
   const seq = ++previewSeq;
-  const views = S.view === "split" ? ["before", "after"] : [S.view];
+  const views = viewsShown();
   $("spinner").classList.remove("hidden");
   try {
     const r = await rpc("preview", { state: backendState([S.current]), episode: S.current, pos: previewPos(), views,
                                      frame: S.total && S.frame != null ? S.frame : null });
     if (seq !== previewSeq) return;
-    if (r.before) $("imgBefore").src = "data:image/png;base64," + r.before;
-    if (r.after) $("imgAfter").src = "data:image/png;base64," + r.after;
+    const mime = r.mime || "image/png";
+    if (r.before) $("imgBefore").src = `data:${mime};base64,` + r.before;
+    if (r.after) $("imgAfter").src = `data:${mime};base64,` + r.after;
     S.img = { w: r.width, h: r.height };
     S.frame = r.frame; S.total = r.total;
     if (r.src != null && r.src !== S.src) { S.src = r.src; layerUi(); }
@@ -1885,9 +1987,11 @@ function stepFrame(d) {
   S.frame = Math.max(0, Math.min(S.total - 1, (S.frame || 0) + d));
   $("rngPos").value = S.frame;
   showFrameInfo(S.frame, S.total);
-  schedulePreview();
+  schedulePreview(30);
 }
-function setView(v) { const was = PLAY.on; togglePlay(false); S.view = v; setSegView(); if (S.img) schedulePreview(); if (was) setTimeout(() => togglePlay(true), 300); }
+function viewsShown() { return S.view === "split" || S.view === "sbs" ? ["before", "after"] : [S.view]; }
+function setView(v) { if (v === "sbs" && !document.body.classList.contains("step-colour")) v = "split";
+  const was = PLAY.on; togglePlay(false); S.view = v; setSegView(); if (S.img) schedulePreview(30); if (was) setTimeout(() => togglePlay(true), 300); }
 function setSegView() { for (const b of $("segView").children) b.classList.toggle("on", b.dataset.v === S.view); }
 
 // Colour step: the viewer is as wide as the picture (no empty bars beside it), in the middle; the width left over
@@ -1899,26 +2003,34 @@ function fitStageRow() {
     stage.style.flex = ""; stage.style.width = ""; side.classList.remove("wide"); return;
   }
   const row = stage.parentNode, gap = 8, minSide = 250;    // Auto correction left and Scopes right of the picture
-  const want = Math.round((stage.clientHeight - 4) * S.img.w / S.img.h) + 6;
+  const n = S.view === "sbs" ? 2 : 1;                       // side by side: two pictures and the gap between them
+  const want = Math.round((stage.clientHeight - 4) * S.img.w / S.img.h) * n + (n - 1) * SBS_GAP + 6;
   stage.style.flex = "none";
   const cols = document.body.classList.contains("grade-collapsed") ? 1 : 2;   // panel hidden: one stacked column
   stage.style.width = Math.max(240, Math.min(row.clientWidth - cols * (minSide + gap), want)) + "px";
 }
+const SBS_GAP = 6;
 function layoutImage() {
   if (!S.img) return;
+  if (S.view === "sbs" && !document.body.classList.contains("step-colour")) { S.view = "split"; setSegView(); }
   fitStageRow();
   const stage = $("stage"), wrap = $("imgWrap"), before = $("imgBefore"), after = $("imgAfter");
   const { w, h } = S.img;
-  const scale = S.zoom === "Fit" ? Math.min((stage.clientWidth - 4) / w, (stage.clientHeight - 4) / h)
+  const sbs = S.view === "sbs", n = sbs ? 2 : 1, gap = sbs ? SBS_GAP : 0;
+  const scale = S.zoom === "Fit" ? Math.min((stage.clientWidth - 4 - gap) / (w * n), (stage.clientHeight - 4) / h)
                                  : S.zoom === "1:1" ? 1 : parseInt(S.zoom, 10);
-  const W = Math.round(w * scale), H = Math.round(h * scale);
-  wrap.style.width = W + "px"; wrap.style.height = H + "px";
-  wrap.style.margin = `${Math.max(0, (stage.clientHeight - H) / 2)}px ${Math.max(0, (stage.clientWidth - W) / 2)}px`;
+  const W = Math.round(w * scale), H = Math.round(h * scale), WW = W * n + gap;
+  wrap.style.width = WW + "px"; wrap.style.height = H + "px";
+  wrap.classList.toggle("sbs", sbs);
+  for (const t of wrap.querySelectorAll(".sbs-tag")) t.classList.toggle("hidden", !sbs);
+  wrap.querySelector(".sbs-a").style.left = W + gap + 8 + "px";
+  wrap.style.margin = `${Math.max(0, (stage.clientHeight - H) / 2)}px ${Math.max(0, (stage.clientWidth - WW) / 2)}px`;
   stage.classList.toggle("pixel", scale >= 1.5 || S.zoom !== "Fit");
   stage.classList.toggle("zoomed", S.zoom !== "Fit");
   for (const im of [before, after]) { im.style.width = W + "px"; im.style.height = H + "px"; }
   const split = S.view === "split";
   before.classList.toggle("hidden", S.view === "after");
+  before.style.marginRight = sbs ? gap + "px" : "";
   after.classList.toggle("hidden", S.view === "before");
   after.classList.toggle("layer", split);
   after.style.clipPath = split ? `inset(0 0 0 ${S.split}%)` : "none";
@@ -1961,6 +2073,7 @@ function initViewer() {
     else if (e.key === "b" || e.key === "B") setView("before");
     else if (e.key === "a" || e.key === "A") setView("after");
     else if (e.key === "s" || e.key === "S") setView("split");
+    else if ((e.key === "d" || e.key === "D") && document.body.classList.contains("step-colour")) setView(S.view === "sbs" ? "split" : "sbs");
     else if (e.key === " ") { e.preventDefault(); togglePlay(); }
     else if (e.key === "i" || e.key === "I") trim("in");
     else if (e.key === "o" || e.key === "O") trim("out");
@@ -1977,7 +2090,8 @@ function renderQueue() {
     const [a, b] = S.episodes[k] || [0, 0];
     const st = S.queue[k] || "waiting";
     const row = el("div", "qrow " + st);
-    row.append(el("span", "mono", `#${k + 1}`), el("span", "file", `${tc(a).slice(0, -4)} – ${tc(b).slice(0, -4)}`),
+    const what = S.info && S.info.image ? `${basename(S.info.path).replace(/\.[^.]+$/, "")}.png` : `${tc(a).slice(0, -4)} – ${tc(b).slice(0, -4)}`;
+    row.append(el("span", "mono", `#${k + 1}`), el("span", "file", what),
                el("span", "st", { waiting: "waiting", running: "encoding…", done: "done ✓", failed: "failed" }[st]));
     q.appendChild(row);
   }
@@ -2054,7 +2168,11 @@ function progressText(cur, tot) {
 
 // ---------------------------------------------------------------- wiring
 function bind() {
-  $("vsfNewGroup").onclick = () => { vsfMigrate(); S.vs_groups.push(vsfNewGroup(5)); vsgChanged(); };
+  $("vsfNewGroup").onclick = () => { vsfMigrate(); S.vs_groups.push(vsfNewGroup("colour")); vsgChanged(); };
+  for (const sg of document.querySelectorAll(".rep-grip")) {      // drag a Repair group (job "repair_order")
+    sg.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "rep:" + sg.dataset.step); e.dataTransfer.effectAllowed = "move"; sg.closest(".group").classList.add("dragging"); });
+    sg.addEventListener("dragend", () => { sg.closest(".group").classList.remove("dragging"); vsfDropMark(null); });
+  }
   initEngineDialog();
   initGradeTabs();
   $("btnUndo").onclick = () => histGo(-1); $("btnRedo").onclick = () => histGo(1);
@@ -2560,7 +2678,7 @@ function gapAt(t, f, skip) {                            // free range on track t
 function addLayer(track, at) {
   if (!S.info) return;
   const [a, b] = epRange();
-  const f = Math.max(a, Math.min(b - 2, at ?? playhead())), len = Math.round(5 * fps());
+  const f = Math.max(a, Math.min(b - 2, at ?? playhead())), len = Math.max(2, timeFrame(frameTime(f) + 5) - f);
   let t = track, g = null;
   if (t) g = gapAt(t, f);
   else for (t = 1; t <= S.tracks; t++) { g = gapAt(t, f); if (g && g[1] - f >= 2) break; }
@@ -2684,7 +2802,7 @@ const LT = { zoom: 60, v0: null, drag: null, seekF: null, manual: false };
 function ltWindow() {
   const [a, b] = epRange();
   if (!LT.zoom) return [a, b];
-  const len = Math.min(b - a, Math.round(LT.zoom * fps()));
+  const len = Math.min(b - a, Math.max(2, timeFrame(frameTime(a) + LT.zoom) - a));
   const h = LT.seekF ?? S.src ?? Math.round(headSrcFrame());
   if (LT.v0 == null || (!LT.drag && !LT.manual && (h < LT.v0 || h > LT.v0 + len))) LT.v0 = h - len * 0.25;
   LT.v0 = Math.max(a, Math.min(b - len, LT.v0));
@@ -2707,9 +2825,11 @@ function renderLayerTrack() {
   for (const z of $("ltZoom").children) z.classList.toggle("on", +z.dataset.v === LT.zoom);
   const w = ltWindow(), span = w[1] - w[0], [a, b] = epRange();
   const ruler = $("ltRuler"); ruler.innerHTML = "";
-  const step = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900].map((s) => s * fps()).find((s) => span / s <= 10) || 1800 * fps();
-  for (let f = Math.ceil(w[0] / step) * step; f < w[1]; f += step) {
-    const lab = el("span", "lab", hms(f / fps()).replace(/^0:/, "")); lab.style.left = ltX(f, w) + "%"; ruler.appendChild(lab);
+  const t0 = frameTime(w[0]), t1 = frameTime(w[1]);                 // ticks at round times (real frame times)
+  const step = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900].find((s) => (t1 - t0) / s <= 10) || 1800;
+  for (let ts = Math.ceil(t0 / step) * step; ts < t1; ts += step) {
+    const f = timeFrame(ts);
+    const lab = el("span", "lab", hms(ts).replace(/^0:/, "")); lab.style.left = ltX(f, w) + "%"; ruler.appendChild(lab);
     const d = el("div", "cut"); d.style.left = ltX(f, w) + "%"; ruler.appendChild(d);
   }
   const heads = $("ltHeads"); heads.innerHTML = ""; heads.appendChild(el("div", "sp"));

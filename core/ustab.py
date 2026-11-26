@@ -210,11 +210,36 @@ def still_smooth(clip, reach=10, thr=1.0, pair=0.0, thr_lo=None, pair_lo=None, m
     def box(x, r=2):
         return F.avg_pool2d(F.pad(x, (r, r, r, r), mode="replicate"), 2 * r + 1, 1)
 
+    # frames already on the GPU, by frame number: output frame n+1 needs 20 of the 21 frames frame n needed, so each
+    # is uploaded once (was: 21 uploads + float conversions per output frame, ~84 MB at SD). Sized for the VapourSynth
+    # threads working on nearby frames at the same time; bytes capped (HD)
+    import collections
+    import threading
+    cache, lock = collections.OrderedDict(), threading.Lock()
+    cap = max(2 * reach + 2, min(6 * (2 * reach + 1), int(700e6 // max(1, c.width * c.height * 3 * 4))))
+
+    def upload(fr_):
+        a = np.stack([np.asarray(fr_[p]) for p in range(3)]).view(np.int16)       # 16-bit as it is, widened on the GPU
+        return torch.from_numpy(a).to(dev, non_blocking=False).to(torch.int32).bitwise_and_(0xFFFF).to(torch.float32)
+
+    def frame_t(i, fr_):
+        with lock:
+            t_ = cache.get(i)
+            if t_ is not None:
+                cache.move_to_end(i)
+                return t_
+        t_ = upload(fr_)
+        with lock:
+            cache[i] = t_
+            while len(cache) > cap:
+                cache.popitem(last=False)
+        return t_
+
     def proc(n, f):
-        fr = lambda i: torch.from_numpy(np.stack([np.asarray(f[i][p], dtype=np.float32) for p in range(3)])).to(dev)
         with torch.no_grad():
-            frames = [fr(i) for i in range(2 * reach + 1)]
             valid = [0 <= n + k < n_all for k in range(-reach, reach + 1)]
+            frames = [frame_t(n + k, f[reach + k]) if valid[reach + k] else None for k in range(-reach, reach + 1)]
+            frames = [x if x is not None else frames[reach] for x in frames]   # outside the clip: never used
             ctr = frames[reach]
             num = ctr.clone()
             den = torch.ones_like(ctr[:1])

@@ -1,6 +1,6 @@
 r"""Builds the shareable, portable DVD Restore: one folder that runs from anywhere, nothing personal in it.
 
-    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\DVDRestore-v0.2-alpha)
+    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\DVDRestore-v0.25-alpha)
 
 Result (about 0.7 GB):
     DVD Restore.exe        starts the app (tools\launcher.cs)     Self-test.bat    checks this PC can run everything
@@ -24,8 +24,8 @@ SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 FULL = "--full" in sys.argv
 ZIP = "--zip" in sys.argv
-DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "DVDRestore-v0.2-alpha")
-VERSION = "0.2.0-alpha"
+DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "DVDRestore-v0.25-alpha")
+VERSION = "0.25.0-alpha"
 PY = os.path.dirname(sys.executable)                      # the Python this runs with (3.12 with everything installed)
 GITHUB = "https://github.com/EVA0111"
 
@@ -120,7 +120,7 @@ def python_runtime(dst):
 
 
 def readme(dst):
-    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# DVD Restore v0.2 alpha (portable)
+    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# DVD Restore v0.25 alpha (portable)
 
 Restores NTSC and PAL DVD video, other video files and still images - anime, cartoons and live action:
 
