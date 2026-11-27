@@ -357,6 +357,20 @@ def detect_episodes(info):
 
 # ---------------------------------------------------------------- audio
 
+_T0 = {}
+
+
+def _start_time(path):
+    """the container's start time (s): where its timestamps begin"""
+    if path not in _T0:
+        r = _run([TOOLS["ffprobe"], "-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0", path])
+        try:
+            _T0[path] = max(0.0, float((r.stdout or "0").strip().split(",")[0] or 0))
+        except ValueError:
+            _T0[path] = 0.0
+    return _T0[path]
+
+
 def _pcm(path, t, dur, sr=48000):
     import numpy as np
     if t < 5:
@@ -369,8 +383,11 @@ def _pcm(path, t, dur, sr=48000):
         # a fast seek to 2 s before, then cut on the real audio timestamps (-copyts + atrim): seeking straight to t
         # landed on the 32 ms AC3 frame grid in one of the two files, and the sync check read up to -28 ms on an
         # export that was exactly in sync (0.0 ms at every point when measured sample-exactly)
+        # -copyts keeps the file's own timestamps, which start at its start time (a VOB: 0.2336 s), while t counts from
+        # the start of the file: without the offset every reading of such a source was off by it (-233.6 ms)
+        t0 = _start_time(path)
         cmd = [TOOLS["ffmpeg"], "-v", "error", "-ss", f"{max(0.0, t - 2):.6f}", "-copyts", "-i", path, "-map", "0:a:0",
-               "-af", f"atrim=start={t:.6f}:duration={dur:.6f},asetpts=PTS-STARTPTS",
+               "-af", f"atrim=start={t + t0:.6f}:duration={dur:.6f},asetpts=PTS-STARTPTS",
                "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
     r = subprocess.run(cmd,
                        capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
