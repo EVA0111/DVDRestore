@@ -112,7 +112,7 @@ Python 3.12 is needed; ffmpeg (a *full* build, with the DVD-Video reader) and `m
 ### Build the release
 
 ```powershell
-python tools\build_portable.py dist\DVDRestore-v0.25-alpha --zip
+python tools\build_portable.py dist\EVAtoolkit-v0.25-alpha --zip
 ```
 
 ## Licence
