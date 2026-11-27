@@ -1,4 +1,4 @@
-"""Every folder DVD Restore uses, in one place. The engine lives in core/, the project root is one level up:
+"""Every folder EVA toolkit uses, in one place. The engine lives in core/, the project root is one level up:
     app/       Electron front-end            models/    network weights (+ the network code some of them need)
     core/      this engine (Python)          engines/   TensorRT engines, built once per model and size (cache)
     runtime/   portable version only: python/, ffmpeg/, mkvtoolnix/   temp/  work folders (cache)

@@ -1,4 +1,4 @@
-"""VapourSynth processing graph for DVD Restore.
+"""VapourSynth processing graph for EVA toolkit.
 
 Pipeline per episode:
     source (pulldown flags applied, colour tagged) -> trim to episode
@@ -1805,6 +1805,24 @@ def pal_process(clip, job):
     return _deblend(out, job)
 
 
+def ntsc_bob(clip, job):
+    """NTSC interlaced video (shot or edited on tape: live action, concerts, sport): every field becomes a whole frame,
+    59.94 fps (QTGMC, as PAL's deint50) - all the motion kept, where inverse telecine to 24p would drop half of it.
+    Telecined film should be inverse-telecined instead (here its 24 pictures just repeat in a 3-2 pattern)."""
+    order = _order(job)
+    try:
+        from vsdeinterlace import QTempGaussMC
+        bob = QTempGaussMC().deinterlace(core.std.SetFieldBased(clip, 2 if order else 1))
+    except Exception:
+        bob = core.bwdif.Bwdif(clip, field=order + 2)
+    bob = core.std.AssumeFPS(core.std.SetFieldBased(bob, 0), fpsnum=clip.fps.numerator * 2, fpsden=clip.fps.denominator)
+    s0 = int(job.get("start", 0))                         # source frame and field of every output frame
+    bob = core.akarin.PropExpr(bob, lambda: {"_SrcN": f"N 2 / floor {s0} +", "_Phase": "N 2 %"})
+    if opt(job, "aa") == "repair":                        # every bobbed frame is a deinterlaced one
+        bob = _aa(bob, job)
+    return _deblend(bob, job)
+
+
 # ---------------------------------------------------------------- chroma
 
 EXTREME_RELAX = 0.0       # how much the colour check relaxes for near-white / near-black pixels (0 = off)
@@ -2369,6 +2387,11 @@ def auto_group(kind, job, progress=None):
             job = dict(job, order=od["order"])
         res = {**measure_chroma_unmix(job), **measure_cadence(job), **measure_unmatched(job)}
         res.update(order=opt(job, "order"), order_measured=od["order"], order_ratio=od["order_ratio"])
+        # interlaced video (shot / edited on tape): nearly every moving cycle changes every frame AND many frames
+        # cannot be field-matched clean - deinterlace to 59.94p. (30p progressive video or film leaves next to no
+        # unmatched frames.) Live-action tape VOB: 98.4 % video-rate, 36.5 % unmatched -> was VFR (30p + combing repair)
+        if res.get("video_share", 0) >= 90 and res.get("unmatched_share", 0) >= 10:
+            res["mode"] = "bob"
         return res
     if kind == "composite":
         if is_pal(job):
@@ -3260,7 +3283,7 @@ def script_text(job, title=""):
     st = {k: v for k, v in job.items() if k not in EPISODE_KEYS and k != "chain"}   # Chain step: the dr.block lines are the chain
     pal, ntsc = is_pal(job), not is_pal(job)
     L = [
-        "# DVD Restore - VapourSynth script" + (f" for {title}" if title else ""),
+        "# EVA toolkit - VapourSynth script" + (f" for {title}" if title else ""),
         f"# Made {datetime.datetime.now():%Y-%m-%d %H:%M}. Edit freely: the Script step previews and exports this text.",
         "# Every stage reads its settings from `job`; change a value there, or add / remove / reorder lines below.",
         "# Run outside the app:  vspipe -c y4m script.vpy - | ffmpeg -i - ...   or open it in vsview.",
@@ -3273,7 +3296,7 @@ def script_text(job, title=""):
         "# ---- settings ----",
         "job = " + pprint.pformat(st, indent=1, width=110, sort_dicts=True).replace("\n", "\n      "),
         "",
-        "# ---- episode (DVD Restore fills this block in for every episode it exports) ----",
+        "# ---- episode (EVA toolkit fills this block in for every episode it exports) ----",
         "EPISODE = " + pprint.pformat(ep, indent=1, width=110, sort_dicts=False).replace("\n", "\n          "),
         "# ---- end of episode ----",
         "job.update(EPISODE)",
@@ -3302,6 +3325,8 @@ def script_text(job, title=""):
         vline("ivtc", "your own IVTC (instead of the app's)")
     elif pal:
         L.append("clip = dr.pal_process(clip, job)               # PAL: progressive / field-shifted / interlaced")
+    elif job.get("mode") == "bob":
+        L.append("clip = dr.ntsc_bob(clip, job)                 # deinterlace: every field a frame, 59.94 fps")
     elif job.get("mode") == "vfr":
         L.append("clip = dr.ivtc_vfr(clip, job)                  # inverse telecine, VFR (needs the app's pass 1 files in job['work'])")
     else:
@@ -3429,7 +3454,8 @@ def build(job, ivtc=True, chroma=True, clean=True):
         if is_pal(job):
             clip = pal_process(clip, job)
         else:
-            clip = ivtc_vfr(clip, job) if job.get("mode") == "vfr" else ivtc_cfr(clip, job)
+            clip = (ntsc_bob(clip, job) if job.get("mode") == "bob" else
+                    ivtc_vfr(clip, job) if job.get("mode") == "vfr" else ivtc_cfr(clip, job))
         clip = deblend_ai(clip, job)
     if clean:
         clip = vs_filters(clip, job, "after_ivtc")
@@ -3539,7 +3565,8 @@ def detect_scenes(job, progress=None, cancelled=None, min_len=12):
 
 def locate_source_frame(job, src_n):
     """Preview frame (the CFR or VFR frames the Colour step shows) that holds source frame src_n."""
-    tm = "vfr" if job.get("mode") == "vfr" and job.get("preview_vfr") and not is_pal(job) else "cfr"
+    tm = ("bob" if job.get("mode") == "bob" and not is_pal(job) else
+          "vfr" if job.get("mode") == "vfr" and job.get("preview_vfr") and not is_pal(job) else "cfr")
     j = dict(job, mode=tm, grade={}, grade_layers=[], sharp={}, upscale={}, stab="off",
              deblend="off" if opt(job, "deblend") == "ai" else opt(job, "deblend"), aa="off", ivtc_repair="off")
     if is_pal(j) or j.get("chain"):
@@ -3577,7 +3604,7 @@ def preview_outputs(job):
     import pass1sig                                     # only a pass 1 made for THIS clip (else TFM: crc32 mismatch)
     have_pass1 = bool(w) and pass1sig.matches(job, w)
     vfr = job.get("mode") == "vfr" and have_pass1
-    pj = dict(job, mode="vfr" if vfr else "cfr")
+    pj = dict(job, mode="vfr" if vfr else "bob" if job.get("mode") == "bob" else "cfr")
     ch = dict(job.get("chroma", {}))
 
     raw = source(job, clean=False)
@@ -3621,7 +3648,8 @@ def preview(job, after=True):
     """Preview converted to RGB24 at square-pixel display size. CFR (no VFR pass needed) - unless the job is VFR
     and its pass 1 exists (job["preview_vfr"]): then the frames and timing are exactly the export's (30p video
     sections such as scrolling captions play evenly instead of skipping a step every 5 frames)."""
-    tm = "vfr" if job.get("mode") == "vfr" and job.get("preview_vfr") and not is_pal(job) else "cfr"
+    tm = ("bob" if job.get("mode") == "bob" and not is_pal(job) else
+          "vfr" if job.get("mode") == "vfr" and job.get("preview_vfr") and not is_pal(job) else "cfr")
     # "Before" = the untouched DVD, only field-matched, cropped and sized like "After" so Split lines up:
     # no colour correction, stabilizer, AI blend removal, anti-aliasing, AI upscale, sharpening or line darkening
     pjob = dict(job, mode=tm) if after else dict(job, mode=tm, grade={}, grade_layers=[], sharp={}, upscale={}, stab="off",

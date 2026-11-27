@@ -1,4 +1,6 @@
-# DVD Restore v0.25 alpha
+# EVA toolkit v0.25 alpha
+
+*Formerly **DVD Restore**.*
 
 Restores NTSC and PAL DVD video, other video files and still images: anime, cartoons and live action.
 A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch / TensorRT networks).
@@ -11,11 +13,11 @@ A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch 
 
 1. Download **`DVDRestore-v0.25-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
 2. Unpack it anywhere: another drive or a USB disk is fine.
-3. Start **`DVD Restore.exe`**.
+3. Start **`EVA toolkit.exe`** (in the v0.25 zip it is still called `DVD Restore.exe`).
 4. **First start:** the *Dependencies* window installs what the engine needs with one click, into `runtime\` next to
    the app: Python 3.12, PyTorch (CUDA 13), TensorRT, VapourSynth with its plugins, ffmpeg and MKVToolNix. That's
    about **5.5 GB download, 9 GB on disk**, from their official download sites. Nothing is installed outside the
-   folder: no registry, no PATH, no admin rights. Then press *Start DVD Restore*.
+   folder: no registry, no PATH, no admin rights. Then press *Start EVA toolkit*.
 
 The folder stays portable: move or copy it any time. On every start the app checks itself and reopens the
 Dependencies window if a part is missing or needs an update. Optional: `Self-test.bat` checks every stage on test
@@ -43,6 +45,19 @@ Full documentation: **[the wiki](../../wiki)** (installation, every step of the 
 * Encode (x264 / x265 / SVT-AV1 / NVENC / ProRes / FFV1 / UT Video) and mux with all audio and subtitle tracks and a
   sync check. Still images (PNG / JPEG / TIFF / BMP / WebP) are saved as 16-bit PNG.
 * Opens `.iso` images, `VIDEO_TS` folders and Blu-ray `BDMV` folders directly.
+
+## New since v0.25 (on `main`, coming in the next release)
+
+* **New name: EVA toolkit.** Same app, same folder layout; settings and the installed engine carry over.
+* **Auto-update**: a few seconds after start the app asks GitHub for the latest release (one plain request, nothing
+  about you is sent). If there is a newer one, a banner offers it: download, unpack, and after the app closes the new
+  files are copied over the folder and the new version starts. Your settings, `runtime\python`, `engines\`, `temp\`
+  and your own filters stay. Switch it off or check by hand in *Settings > Updates*.
+* **60p deinterlace for NTSC**: a third *Frame rate* choice next to VFR and CFR: every field becomes a frame (QTGMC,
+  59.94 fps) for video shot or edited on tape. The Telecine *Auto* picks it when a disc is real interlaced video;
+  film and anime stay inverse-telecined.
+* Fixes: the VFR analysis no longer keeps running after you choose CFR or 60p; an export no longer fails when a VOB's
+  audio runs past its last picture; the self-test no longer needs the optional `descale` plugin.
 
 ## New in v0.25
 
@@ -79,7 +94,7 @@ Full documentation: **[the wiki](../../wiki)** (installation, every step of the 
 | `app/` | Electron front-end (`main.js`, `deps.js` = the Dependencies installer, `renderer/`) |
 | `core/` | the engine: `server.py` (backend), `runner.py` (probe / export / mux), `vsgraph.py` (processing chain), networks; `requirements.txt` = exact package versions |
 | `models/` | trained network weights (+ the network code some of them need) |
-| `tools/` | `selftest.py`, `build_portable.py` (makes the release folder + zip), `launcher.cs` (`DVD Restore.exe`), `make_icon.py` |
+| `tools/` | `selftest.py`, `build_portable.py` (makes the release folder + zip), `launcher.cs` (`EVA toolkit.exe`), `make_icon.py` |
 
 ### Run from source
 
@@ -102,7 +117,7 @@ python tools\build_portable.py dist\DVDRestore-v0.25-alpha --zip
 
 ## Licence
 
-DVD Restore is free software under the **MIT License** (see `LICENSE`).
+EVA toolkit is free software under the **MIT License** (see `LICENSE`).
 
 The tools it downloads keep their own licences: ffmpeg (GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its
 plugins, PyTorch (BSD-3), NVIDIA TensorRT (NVIDIA licence), Electron (MIT). The NeuFlow v2 optical-flow weights keep

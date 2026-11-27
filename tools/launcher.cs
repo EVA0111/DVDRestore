@@ -1,6 +1,6 @@
-// DVD Restore.exe - starts the app from wherever the folder is (portable: no install, no registry, no PATH).
+// EVA toolkit.exe - starts the app from wherever the folder is (portable: no install, no registry, no PATH).
 // Built by tools\build_portable.py with the C# compiler that comes with Windows (.NET Framework 4).
-//   <folder>\DVD Restore.exe      this launcher
+//   <folder>\EVA toolkit.exe      this launcher
 //   <folder>\runtime\electron\    the window (shipped)          <folder>\app\  core\  models\
 //   <folder>\runtime\python\ ...  installed by the Dependencies window on first start
 using System;
@@ -9,9 +9,9 @@ using System.IO;
 using System.Text;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("DVD Restore")]
-[assembly: System.Reflection.AssemblyProduct("DVD Restore")]
-[assembly: System.Reflection.AssemblyDescription("DVD Restore v0.2 alpha")]
+[assembly: System.Reflection.AssemblyTitle("EVA toolkit")]
+[assembly: System.Reflection.AssemblyProduct("EVA toolkit")]
+[assembly: System.Reflection.AssemblyDescription("EVA toolkit v0.25 alpha")]
 [assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
 [assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
 
@@ -19,7 +19,7 @@ static class Launcher
 {
     static void Fail(string text)
     {
-        MessageBox.Show(text, "DVD Restore", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(text, "EVA toolkit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
     static string Quote(string a)
@@ -46,14 +46,14 @@ static class Launcher
         string temp = Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\');
         if (root.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && root.IndexOf(".zip", StringComparison.OrdinalIgnoreCase) >= 0)
         {
-            Fail("DVD Restore is running from inside the zip file.\n\nUnpack the whole zip first (right-click > Extract All), then start DVD Restore.exe in the unpacked folder.");
+            Fail("EVA toolkit is running from inside the zip file.\n\nUnpack the whole zip first (right-click > Extract All), then start EVA toolkit.exe in the unpacked folder.");
             return 1;
         }
         string electron = Path.Combine(root, "runtime", "electron", "electron.exe");
         string app = Path.Combine(root, "app");
         if (!File.Exists(electron) || !File.Exists(Path.Combine(app, "main.js")))
         {
-            Fail("Parts of DVD Restore are missing next to this file:\n\n" +
+            Fail("Parts of EVA toolkit are missing next to this file:\n\n" +
                  (File.Exists(electron) ? "" : "  runtime\\electron\\electron.exe\n") +
                  (File.Exists(Path.Combine(app, "main.js")) ? "" : "  app\\main.js\n") +
                  "\nUnpack the whole download again, keeping all folders together.");
@@ -65,7 +65,7 @@ static class Launcher
         psi.UseShellExecute = false;
         psi.WorkingDirectory = root;
         try { Process.Start(psi); }
-        catch (Exception e) { Fail("Could not start DVD Restore:\n\n" + e.Message); return 1; }
+        catch (Exception e) { Fail("Could not start EVA toolkit:\n\n" + e.Message); return 1; }
         return 0;
     }
 }

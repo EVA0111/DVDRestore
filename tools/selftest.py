@@ -1,4 +1,4 @@
-"""DVD Restore self-test: checks that everything the app needs is present and that every stage runs.
+"""EVA toolkit self-test: checks that everything the app needs is present and that every stage runs.
 Uses only test footage it makes itself (ffmpeg's test patterns), so it works on any PC - also the portable version.
 
     runtime\\python\\python.exe tools\\selftest.py        (portable)      python tools\\selftest.py   (installed Python)
@@ -36,7 +36,7 @@ def main():
     import paths
     work = os.path.join(paths.TEMP, "selftest")
     os.makedirs(work, exist_ok=True)
-    print(f"DVD Restore self-test - {ROOT}")
+    print(f"EVA toolkit self-test - {ROOT}")
     print("1. Python packages and tools")
     mods = {}
 
@@ -123,7 +123,10 @@ def main():
                              "p": {"call": call, "args": a}}
     check("VapourSynth filters: MVTools + clip settings", build(vs_filters_pos="repairs", vs_filters=[
         vsf("mv.Degrain2"), vsf("mvu.Degrain3"), vsf("vsrgtools.contrasharpening", src="group"),
-        vsf("vszip.LimitFilter", src="@group"), vsf("std.MaskedMerge", clipb="@prev"), vsf("descale.Debicubic", width="@w", height="@h")]))
+        vsf("vszip.LimitFilter", src="@group"), vsf("std.MaskedMerge", clipb="@prev"),
+        # the size tokens: descale where it is installed (an optional plugin, not in the app's own runtime), else the
+        # built-in resizer - the portable copy's self-test failed here
+        vsf("descale.Debicubic", width="@w", height="@h") if hasattr(core, "descale") else vsf("resize.Spline36", width="@w", height="@h")]))
     check("resize to 1080 lines, EWA (GPU)", build(size="1080", kernel="ewa_lanczossharp"))
 
     print("5. Export")

@@ -1,4 +1,4 @@
-"""Live vsview preview: the preview script starts this inside vsview. It watches the job file DVD Restore rewrites on
+"""Live vsview preview: the preview script starts this inside vsview. It watches the job file EVA toolkit rewrites on
 every change and then triggers vsview's own Reload (Ctrl+R), which keeps the open tab, frame and zoom.
 vsview calls the destroy hook before every reload and when the tab closes, so exactly one watcher runs."""
 import os

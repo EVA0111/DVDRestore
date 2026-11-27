@@ -1,4 +1,4 @@
-/* DVD Restore - one design system: tokens -> controls -> containers -> layout. */
+/* EVA toolkit - one design system: tokens -> controls -> containers -> layout. */
 :root {
   --bg: #0e1014;
   --rail: #12151b;
@@ -752,3 +752,15 @@ body:not(.image-mode) .img-only { display: none !important; }
 body.scan-prog [data-gid="telecine"] .field:not(.scan-field), body.scan-prog [data-gid="telecine"] #btnAdvanced,
 body.scan-prog [data-gid="telecine"] .auto-btn, body.scan-prog #advBox, body.scan-prog #btnVfrPrev { display: none !important; }
 body:not(.scan-prog) .scan-note { display: none; }
+/* NTSC 60p deinterlace: the field-matching fine-tuning does not apply */
+body.mode-bob [data-gid="telecine"] #btnAdvanced, body.mode-bob #advBox { display: none !important; }
+/* update banner (sidebar) */
+.upd-banner { border: 1px solid #34407a; background: var(--accent-bg); border-radius: var(--r); padding: 8px 10px; margin-bottom: 6px; }
+.upd-title { font-weight: 600; font-size: 12.5px; color: var(--text); }
+.upd-text { font-size: 11.5px; color: var(--muted); margin: 2px 0 6px; }
+.upd-bar { height: 4px; background: var(--field); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+.upd-bar span { display: block; height: 100%; width: 0; background: var(--accent2); transition: width .2s; }
+.upd-btns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.upd-btns button.primary { height: 26px; padding: 0 10px; font-size: 12px; }
+.upd-btns button.link { font-size: 11.5px; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 8px; color: var(--text); font-size: 13px; }

@@ -1,4 +1,4 @@
-# DVD Restore v0.1 alpha - the Python packages the engine needs (exact versions, the ones it was tested with).
+# EVA toolkit v0.25 alpha - the Python packages the engine needs (exact versions, the ones it was tested with).
 # The dependency window installs these into runtime\python with:
 #   python -m pip install -r core\requirements.txt
 # PyTorch with CUDA 13 comes from the PyTorch index, TensorRT from NVIDIA's index, everything else from PyPI.

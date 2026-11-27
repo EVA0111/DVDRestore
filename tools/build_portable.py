@@ -1,9 +1,9 @@
-r"""Builds the shareable, portable DVD Restore: one folder that runs from anywhere, nothing personal in it.
+r"""Builds the shareable, portable EVA toolkit: one folder that runs from anywhere, nothing personal in it.
 
-    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\DVDRestore-v0.25-alpha)
+    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\EVAtoolkit-v0.25-alpha)
 
 Result (about 0.7 GB):
-    DVD Restore.exe        starts the app (tools\launcher.cs)     Self-test.bat    checks this PC can run everything
+    EVA toolkit.exe        starts the app (tools\launcher.cs)     Self-test.bat    checks this PC can run everything
     app\                   the window + the Dependencies window   core\            the engine (+ requirements.txt)
     models\                network weights (+ code)               runtime\electron\ Electron
     portable.json          marks the copy as portable: it uses only its own runtime\ and installs what is missing there
@@ -24,7 +24,7 @@ SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 FULL = "--full" in sys.argv
 ZIP = "--zip" in sys.argv
-DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "DVDRestore-v0.25-alpha")
+DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "EVAtoolkit-v0.25-alpha")
 VERSION = "0.25.0-alpha"
 PY = os.path.dirname(sys.executable)                      # the Python this runs with (3.12 with everything installed)
 GITHUB = "https://github.com/EVA0111"
@@ -120,7 +120,7 @@ def python_runtime(dst):
 
 
 def readme(dst):
-    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# DVD Restore v0.25 alpha (portable)
+    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# EVA toolkit v0.25 alpha (portable)
 
 Restores NTSC and PAL DVD video, other video files and still images - anime, cartoons and live action:
 
@@ -141,14 +141,14 @@ Project page: {GITHUB}
 ## Run
 
 1. Unpack the zip anywhere - another drive or a USB disk is fine (a path without special characters is safest).
-2. Start **`DVD Restore.exe`**.
+2. Start **`EVA toolkit.exe`**.
 3. **First start:** the *Dependencies* window lists what the engine still needs and installs it with one click into
    `runtime\` next to the app: Python 3.12, PyTorch (CUDA 13), TensorRT, VapourSynth with its plugins, ffmpeg and
    MKVToolNix - about **5.5 GB download, 9 GB on disk**, from their official download sites. Then press
-   *Start DVD Restore*. Nothing is installed outside the folder: no registry, no PATH, no admin rights.
+   *Start EVA toolkit*. Nothing is installed outside the folder: no registry, no PATH, no admin rights.
 4. Optional: **`Self-test.bat`** checks that this PC can run every stage (a few minutes; it makes its own test video).
 
-The folder can be moved or copied at any time - everything is found relative to `DVD Restore.exe`. On every start the
+The folder can be moved or copied at any time - everything is found relative to `EVA toolkit.exe`. On every start the
 app checks its folders: deleted cache folders are made again, and a missing or outdated part (for example after an
 update changed `core\requirements.txt`) opens the Dependencies window again. The *Dependencies* button in the
 sidebar opens it any time (repair, or add the optional vsview preview window).
@@ -166,7 +166,7 @@ sidebar opens it any time (repair, or add the optional vsview preview window).
 
 | Folder | What |
 |---|---|
-| `DVD Restore.exe` | starts the app |
+| `EVA toolkit.exe` | starts the app |
 | `app\` | the window (Electron front-end) and the Dependencies window |
 | `core\` | the engine (Python + VapourSynth), `requirements.txt` = the exact package versions |
 | `models\` | the trained networks |
@@ -176,7 +176,7 @@ sidebar opens it any time (repair, or add the optional vsview preview window).
 
 ## Licences
 
-DVD Restore itself: **MIT** (see `LICENSE`).
+EVA toolkit itself: **MIT** (see `LICENSE`).
 
 The tools it uses: ffmpeg (LGPL / GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its plugins, PyTorch (BSD-3), NVIDIA TensorRT
 (NVIDIA licence), Electron (MIT), NeuFlow v2 weights (see `models\neuflow\LICENSE`). Each keeps its own licence. Apart
@@ -185,19 +185,19 @@ from Electron they are not in the zip: the Dependencies window downloads them fr
 
 
 def launchers(dst):
-    r"""DVD Restore.exe (compiled from tools\launcher.cs with the C# compiler every Windows has), Self-test.bat"""
+    r"""EVA toolkit.exe (compiled from tools\launcher.cs with the C# compiler every Windows has), Self-test.bat"""
     csc = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe")
     r = subprocess.run([csc, "-nologo", "-target:winexe", "-optimize", "-win32icon:" + os.path.join(SRC, "app", "icon.ico"),
-                        "-out:" + os.path.join(dst, "DVD Restore.exe"), os.path.join(SRC, "tools", "launcher.cs")],
+                        "-out:" + os.path.join(dst, "EVA toolkit.exe"), os.path.join(SRC, "tools", "launcher.cs")],
                        capture_output=True, text=True)
     if r.returncode:
         raise SystemExit("launcher did not compile:\n" + r.stdout + r.stderr)
     open(os.path.join(dst, "Self-test.bat"), "w").write(
         '@echo off\r\ncd /d "%~dp0"\r\nif not exist "runtime\\python\\python.exe" (\r\n'
-        '  echo Start DVD Restore.exe first: its Dependencies window installs what the self-test needs.\r\n  pause\r\n  exit /b 1\r\n)\r\n'
+        '  echo Start EVA toolkit.exe first: its Dependencies window installs what the self-test needs.\r\n  pause\r\n  exit /b 1\r\n)\r\n'
         '"%~dp0runtime\\python\\python.exe" -I -W ignore tools\\selftest.py\r\npause\r\n')
     import json
-    json.dump({"name": "DVD Restore", "version": VERSION, "portable": True,
+    json.dump({"name": "EVA toolkit", "version": VERSION, "portable": True,
                "note": "This file makes the app use only its own runtime folder. Delete it to use installed tools."},
               open(os.path.join(dst, "portable.json"), "w"), indent=2)
 
@@ -233,17 +233,17 @@ def scan(dst):
 
 
 def main():
-    log(f"Building the portable DVD Restore in {DEST}")
+    log(f"Building the portable EVA toolkit in {DEST}")
     if os.path.exists(DEST) and os.listdir(DEST):
         raise SystemExit(f"{DEST} is not empty - delete it or give another destination")
     os.makedirs(DEST, exist_ok=True)
     log("app/")
-    for f in ("main.js", "preload.js", "deps.js", "package.json", "icon.png", "icon.ico"):
+    for f in ("main.js", "preload.js", "deps.js", "update.js", "package.json", "icon.png", "icon.ico"):
         copy(os.path.join(SRC, "app", f), os.path.join(DEST, "app", f))
     copytree(os.path.join(SRC, "app", "renderer"), os.path.join(DEST, "app", "renderer"))
     log("core/")
     copytree(os.path.join(SRC, "core"), os.path.join(DEST, "core"))
-    copy(os.path.join(SRC, "LICENSE"), os.path.join(DEST, "LICENSE"))       # DVD Restore: MIT
+    copy(os.path.join(SRC, "LICENSE"), os.path.join(DEST, "LICENSE"))       # EVA toolkit: MIT
     log("my_filters/ (the example of your own filters; an empty plugins folder)")
     os.makedirs(os.path.join(DEST, "my_filters", "plugins"), exist_ok=True)
     copy(os.path.join(SRC, "my_filters", "example_filters.py"), os.path.join(DEST, "my_filters", "example_filters.py"))
@@ -258,7 +258,7 @@ def main():
     copytree(os.path.join(SRC, "app", "node_modules", "electron", "dist"), os.path.join(DEST, "runtime", "electron"))
     if FULL:
         log("runtime/ffmpeg, mkvtoolnix (--full)")
-        import runner as _r                               # the tools this PC's DVD Restore uses
+        import runner as _r                               # the tools this PC's EVA toolkit uses
         for t in ("ffmpeg", "ffprobe"):
             copy(_r.TOOLS[t], os.path.join(DEST, "runtime", "ffmpeg", t + ".exe"))
         mkv = _r.TOOLS["mkvmerge"]

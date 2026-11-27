@@ -1,4 +1,4 @@
-"""Example of your own filters for DVD Restore (Repair -> + VapourSynth filters -> + Add filter -> Your own filters).
+"""Example of your own filters for EVA toolkit (Repair -> + VapourSynth filters -> + Add filter -> Your own filters).
 Every function here whose first argument is the clip becomes a filter: its other arguments are its settings (with
 their defaults), its docstring is the help shown in the window. Edit this file or add your own .py files next to it;
 plugins (.dll) go into the plugins folder. Settings are typed as Python values (2, 0.5, True, 'text')."""

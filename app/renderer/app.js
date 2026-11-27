@@ -1,4 +1,4 @@
-// DVD Restore - renderer. All processing happens in the Python backend; this file is UI + state.
+// EVA toolkit - renderer. All processing happens in the Python backend; this file is UI + state.
 // Flow: Source (open / import disc / episodes) -> Analyze (all detectors) -> Repair (pipeline order, one Auto per group) -> Colour -> Crop & size -> Script -> Export.
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -27,7 +27,7 @@ const S = {
   audio_codec: "copy", audio_bitrate: 192,
   busy: false, view: "after", zoom: "Fit", split: 50, img: null, frame: null, total: 0,
   backend: "pytorch", repairnet: "on", env: null,
-  ai_dirs: [], ai_files: [],            // your AI model folders / single files (filter window: AI upscale & restore models)
+  ai_dirs: [], ai_files: [], auto_update: true,            // your AI model folders / single files (filter window: AI upscale & restore models)
   sharp: { luma: 0, chroma: 0, mode: "faithful", radius: "fine", lines: 0 },
   vs_filters: [],                       // Repair -> VapourSynth filters: [{type: "vs"|"jet", on, p: {call, args, ...}}]
   vs_filters_pos: "repairs",            // where they run: source | ivtc (instead of the app's) | after_ivtc | repairs | end
@@ -37,7 +37,7 @@ const S = {
 };
 // Preferences: kept between sessions and for every DVD. Picture settings (PICTURE below) are not: they belong to
 // one episode of one source and start from the defaults for every new DVD.
-const SAVED = ["temp_dir", "stage_order", "backend", "repairnet", "ai_model", "ai_dirs", "ai_files", "encoder", "crf", "name", "adv",
+const SAVED = ["auto_update", "temp_dir", "stage_order", "backend", "repairnet", "ai_model", "ai_dirs", "ai_files", "encoder", "crf", "name", "adv",
                "enc_rate", "enc_bitrate", "enc_preset", "enc_tune", "enc_depth", "enc_chroma", "enc_keyint", "enc_extra", "audio_codec", "audio_bitrate"];
 // Picture settings: Repair, Colour (with its adjustment layers), Crop & size, and what Auto measured.
 // Every episode has its own (S.epSet[k]); a new episode starts from the defaults.
@@ -70,7 +70,8 @@ function pictureFresh() {                        // defaults, with what the sour
   return o;
 }
 function epSetAlign() { while (S.epSet.length < S.episodes.length) S.epSet.push(null); S.epSet.length = S.episodes.length; }
-const NO_PREVIEW = new Set(["mode", "encoder", "crf", "out_dir", "name", "enc_rate", "enc_bitrate", "enc_preset", "enc_tune",
+// "mode" is not here: CFR / VFR / 60p change the frames shown, and a VFR analysis must stop when you leave VFR
+const NO_PREVIEW = new Set(["encoder", "crf", "out_dir", "name", "enc_rate", "enc_bitrate", "enc_preset", "enc_tune",
                             "enc_keyint", "enc_extra", "audio_codec", "audio_bitrate"]);
 const NO_SCRIPT = new Set(["out_dir", "name"]);   // settings the preview does not show
 
@@ -240,20 +241,20 @@ async function saveWorkflow() {
   const settings = {};
   for (const [k, v] of Object.entries(pictureSnap())) if (!WF_SKIP.has(k)) settings[k] = v;
   const name = (S.info.path.split(/[\\/]/).pop() || "workflow").replace(/\.[^.]+$/, "");
-  const wf = { app: "DVD Restore", kind: "workflow", version: 1, saved_with: document.querySelector(".brand .ver")?.textContent || "",
+  const wf = { app: "EVA toolkit", kind: "workflow", version: 1, saved_with: document.querySelector(".brand .ver")?.textContent || "",
                created: new Date().toISOString(), name, source: S.info.path.split(/[\\/]/).pop(), settings };
-  const p = await window.api.saveText(`${name}.dvdrestore.json`, JSON.stringify(wf, null, 1),
-                                      [{ name: "DVD Restore workflow", extensions: ["json"] }]);
+  const p = await window.api.saveText(`${name}.evatoolkit.json`, JSON.stringify(wf, null, 1),
+                                      [{ name: "EVA toolkit workflow", extensions: ["json"] }]);
   if (p) { log(`Workflow saved: ${p}`, "ok"); status(`Workflow saved: ${p}`, "ok"); }
 }
 async function loadWorkflow() {
   if (!S.info) { status("Open a source first: a workflow is applied to its episodes.", "err"); return; }
-  const r = await window.api.openText([{ name: "DVD Restore workflow", extensions: ["json"] }]);
+  const r = await window.api.openText([{ name: "EVA toolkit workflow", extensions: ["json"] }]);
   if (!r) return;
   let wf;
   try { wf = JSON.parse(r.text); } catch { status("Not a workflow file (not JSON).", "err"); return; }
   const st = wf && wf.kind === "workflow" && wf.settings;
-  if (!st || typeof st !== "object") { status("Not a DVD Restore workflow file.", "err"); return; }
+  if (!st || typeof st !== "object") { status("Not a EVA toolkit workflow file.", "err"); return; }
   const known = Object.keys(st).filter((k) => PICTURE.includes(k) && !WF_SKIP.has(k));
   if (!known.length) { status("This workflow holds no settings this version knows.", "err"); return; }
   const all = S.episodes.length > 1 && confirm(`Apply the workflow "${wf.name || ""}" to all ${S.episodes.length} episodes?\nOK = all episodes, Cancel = only episode ${S.current + 1}.`);
@@ -948,6 +949,7 @@ function isProgressive() { return !!S.info && (S.info.image || (S.scan ? S.scan 
 function sync() {
   const pal = !!(S.info && S.info.pal);
   document.body.classList.toggle("scan-prog", isProgressive());
+  document.body.classList.toggle("mode-bob", S.mode === "bob" && !pal && !isProgressive());   // 60p: no field matching
   if (S.info && !S.info.image) {
     const sc = S.info.scan || {}, det = S.info.progressive ? "progressive" : "interlaced";
     $("scanNote").textContent = isProgressive()
@@ -1479,7 +1481,8 @@ function autoText(kind, r) {
   const pc = (v) => (v == null ? "?" : `${v}`);
   const T = {
     frames: () => r.pal_mode ? `Telecine & interlacing: PAL ${r.pal_mode}, ${r.order === "bff" ? "bottom" : "top"} field first (combed ${(100 * r.raw_combed).toFixed(1)} % -> ${(100 * r.matched_combed).toFixed(1)} % after field matching).`
-      : `Telecine & interlacing: ${r.mode === "vfr" ? `VFR - ${r.video_sections} video-rate section(s) found (captions / titles at 30p)` : "CFR 23.976 - film only, no video-rate sections"} `
+      : `Telecine & interlacing: ${r.mode === "bob" ? "60p deinterlace - interlaced video (every field is its own moment; inverse telecine would drop half the motion)"
+          : r.mode === "vfr" ? `VFR - ${r.video_sections} video-rate section(s) found (captions / titles at 30p)` : "CFR 23.976 - film only, no video-rate sections"} `
         + `(${pc(r.video_share)} % of moving cycles). Unmatched frames ${pc(r.unmatched_share)} % (combing ${pc(r.comb_strength)} % of the picture) -> combing repair ${r.comb}, anti-aliasing ${r.aa}`
         + `${r.line_doubled > 40 ? ` (source looks line-doubled: ${r.line_doubled} %)` : ""}. ICP ${r.chroma_unmix === "on" ? "found" : "not found"}.`
         + (r.order_measured ? ` Field order from the picture: ${r.order_measured === "bff" ? "bottom" : "top"} first${S.info && S.info.order !== r.order_measured ? " (the file says otherwise - corrected)" : ""}.` : ""),
@@ -1723,30 +1726,36 @@ function previewPos() {
 // ---------------------------------------------------------------- play + trim
 const PLAY = { on: false, t: 0, n: 0, last: 0 };
 function vfrButton() {
-  const b = $("btnVfrPrev"), vfr = S.mode === "vfr" && S.info && !S.info.pal;
+  const b = $("btnVfrPrev"), vfr = S.mode === "vfr" && S.info && !S.info.pal && !isProgressive();
   b.classList.toggle("hidden", !S.info);
-  const rate = S.rate ? " · " + (Math.abs(S.rate - 23.976) < 0.1 ? "24p" : Math.abs(S.rate - 29.97) < 0.1 ? "30p" : Math.abs(S.rate - 25) < 0.1 ? "25p" : S.rate.toFixed(2)) : "";
+  const near = (r) => Math.abs(S.rate - r) < r * 0.01;           // ms-rounded timestamps: 23.976 can read 23.81
+  const rate = S.rate ? " · " + (near(23.976) ? "24p" : near(29.97) ? "30p" : near(25) ? "25p" : near(59.94) ? "60p" : near(50) ? "50p" : S.rate.toFixed(2)) : "";
   const a = S.vfrAuto || {};
   let t, failed = false;
   if (!S.info) t = "";
-  else if (!vfr) t = (S.info.pal ? "PAL preview" : "CFR preview") + rate;
+  else if (!vfr) t = (S.info.pal ? "PAL preview" : isProgressive() ? "Progressive" : S.mode === "bob" ? "60p deinterlaced" : "CFR preview") + rate;
   else if (S.vfrPrev) t = "VFR preview ✓" + rate;
   else if (a.state === "failed") { t = "VFR analysis failed · retry"; failed = true; }
   else t = `VFR analysis ${a.progress ? Math.round(100 * a.progress) + " %" : "…"} · 24p meanwhile`;
   b.textContent = t;
-  b.title = !vfr ? "The preview shows the export's frames (constant frame rate)."
+  b.title = !vfr ? "The preview shows the export's frames (constant frame rate; no VFR analysis runs)."
     : "VFR: the analysis of this episode runs by itself in the background; until it is done the preview shows 24p, then the export's own frames and frame rates (30 fps video parts such as scrolling captions play smoothly). The export reuses it.";
   b.classList.toggle("primary", failed);
   b.disabled = !failed || S.busy;
 }
 function autoVfr(r) {
-  if (!S.info || S.info.pal || S.mode !== "vfr" || isProgressive()) { S.vfrAuto = null; vfrButton(); return; }
+  if (!S.info || S.info.pal || S.mode !== "vfr" || isProgressive()) {
+    S.vfrAuto = null; vfrButton();
+    if (S.info) rpc("vfr_auto", { state: backendState([S.current]), episode: S.current }).catch(() => {});   // stops a running one
+    return;
+  }
   if (r.vfr) { S.vfrAuto = { state: "ready" }; vfrButton(); return; }
   rpc("vfr_auto", { state: backendState([S.current]), episode: S.current })
     .then((a) => { if (!(S.vfrAuto && S.vfrAuto.state === "running" && a.state === "running" && !a.progress)) S.vfrAuto = a; vfrButton(); }).catch(() => {});
 }
 async function onVfrAuto(m) {
   if (m.episode !== undefined && m.episode !== S.current) return;     // an episode no longer shown
+  if (S.mode !== "vfr" || isProgressive() || (S.info && S.info.pal)) return;   // switched away from VFR meanwhile
   if (S.vfrPrev) return;
   if (m.state === "running") { S.vfrAuto = { state: "running", progress: m.progress }; vfrButton(); return; }
   S.vfrAuto = { state: m.state }; vfrButton();
@@ -2965,6 +2974,62 @@ function initColourUi() {
 }
 function syncColourUi() { lutUi(); layerUi(); findingsUi(); refUi(); syncSliders(); for (const w of $$(".wheel[data-wheel]")) if (w._bg) drawWheel(w); drawCurves(); }
 
+// ---------------------------------------------------------------- updates (app/update.js in the main process)
+const UPD = { info: null, state: "idle", hidden: false };
+function updBanner() {
+  const b = $("updBanner"), i = UPD.info;
+  b.classList.toggle("hidden", !i || !i.newer || UPD.hidden);
+  if (!i || !i.newer) return;
+  const mb = i.asset ? Math.round(i.asset.size / 1048576) + " MB" : "";
+  $("updTitle").textContent = `${i.name || i.latest} is available`;
+  $("updText").textContent = UPD.state === "downloading" ? "Downloading…" : UPD.state === "unpack" ? "Unpacking…"
+    : UPD.state === "ready" ? "Downloaded. Restart to install it (your settings and engine stay)."
+    : UPD.state === "error" ? UPD.error : `You have ${i.current}.${mb ? " Download " + mb + "." : ""}`;
+  $("updBar").classList.toggle("hidden", !["downloading", "unpack"].includes(UPD.state));
+  $("btnUpdGo").textContent = UPD.state === "ready" ? "Restart & install" : UPD.state === "downloading" || UPD.state === "unpack" ? "Cancel" : "Update";
+  $("btnUpdLater").classList.toggle("hidden", UPD.state === "downloading" || UPD.state === "unpack");
+}
+async function updCheck(manual) {
+  if (manual) $("updStatus").textContent = "Checking…";
+  const r = await window.api.updateCheck();
+  if (r.error) {
+    if (manual) $("updStatus").textContent = `Could not check: ${r.error}`;
+    return;
+  }
+  UPD.info = r; UPD.hidden = false;
+  $("updStatus").textContent = r.newer ? `${r.latest} is available (you have ${r.current}).` : `You have the latest version (${r.current}).`;
+  if (r.newer) log(`Update available: ${r.name || r.latest} (you have ${r.current})`, "ok");
+  updBanner();
+}
+async function updGo() {
+  if (UPD.state === "downloading" || UPD.state === "unpack") { await window.api.updateCancel(); return; }
+  if (UPD.state === "ready") {
+    if (S.busy || S.exporting && S.exporting.length) { status("Finish (or stop) the export first - installing restarts the app.", "err"); return; }
+    if (!confirm(`Install ${UPD.info.latest} now?\n\nEVA toolkit closes, the new files are copied over this folder and the new version starts. ` +
+                 "Your settings, the installed engine, engines\\, temp\\ and your own filters stay.")) return;
+    const r = await window.api.updateInstall();
+    if (r.error) { UPD.state = "error"; UPD.error = r.error; updBanner(); }
+    return;
+  }
+  UPD.state = "downloading"; updBanner();
+  const r = await window.api.updateDownload();
+  if (r.error) { UPD.state = r.error === "cancelled" ? "idle" : "error"; UPD.error = `Download failed: ${r.error}`; }
+  else { UPD.state = "ready"; log(`Update ${UPD.info.latest} downloaded - restart to install it.`, "ok"); }
+  updBanner();
+}
+function initUpdates() {
+  $("btnUpdGo").onclick = updGo;
+  $("btnUpdNotes").onclick = () => window.api.openRelease();
+  $("btnUpdLater").onclick = () => { UPD.hidden = true; updBanner(); };
+  $("btnUpdCheck").onclick = () => updCheck(true);
+  window.api.onUpdate((m) => {
+    if (m.stage === "download") { UPD.state = "downloading"; $("updFill").style.width = (m.total ? 100 * m.got / m.total : 0).toFixed(1) + "%"; }
+    else if (m.stage === "unpack") { UPD.state = "unpack"; $("updFill").style.width = "100%"; }
+    updBanner();
+  });
+  if (S.auto_update !== false && !window.__selftest) setTimeout(() => updCheck(false).catch(() => {}), 4000);
+}
+
 async function init() {
   bind();
   let hello;
@@ -2977,6 +3042,7 @@ async function init() {
   if (!S.opts.ai_model.some((o) => o[0] === S.ai_model)) S.ai_model = "precise";   // UniNet / StableNet were removed from the menu
   buildControls(); buildAdvanced(); initColourUi(); initTempUi(); applyStageOrder(); initStageDrag(); goto("source"); sync();
 
+  initUpdates();
   if (hello.missing.length) { log("Missing tools: " + hello.missing.join(", "), "err"); status("Missing tools: " + hello.missing.join(", "), "err"); }
   else status("Ready - open or drop a DVD or video.");
 }

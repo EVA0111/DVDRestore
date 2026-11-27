@@ -25,4 +25,11 @@ contextBridge.exposeInMainWorld("api", {
   depsOpen: () => ipcRenderer.invoke("deps-open"),
   depsStart: () => ipcRenderer.invoke("deps-start"),
   onDeps: (cb) => ipcRenderer.on("deps-event", (_e, msg) => cb(msg)),
+  // updates
+  updateCheck: () => ipcRenderer.invoke("update-check"),
+  updateDownload: () => ipcRenderer.invoke("update-download"),
+  updateCancel: () => ipcRenderer.invoke("update-cancel"),
+  updateInstall: () => ipcRenderer.invoke("update-install"),
+  openRelease: () => ipcRenderer.invoke("open-release"),
+  onUpdate: (cb) => ipcRenderer.on("update-event", (_e, msg) => cb(msg)),
 });

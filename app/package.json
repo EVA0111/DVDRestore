@@ -1,6 +1,6 @@
 {
   "name": "dvd-restore",
-  "productName": "DVD Restore",
+  "productName": "EVA toolkit",
   "version": "0.25.0-alpha",
   "description": "DVD restoration: IVTC (VFR/CFR), PAL, dot crawl / rainbow / halo clean-up, chroma fixes, encode + mux",
   "main": "main.js",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
-<title>DVD Restore v0.25 alpha</title>
+<title>EVA toolkit v0.25 alpha</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
 
 <!-- ============ step rail ============ -->
 <nav class="rail">
-  <div class="brand"><span class="logo"></span><div><b>DVD Restore</b><i class="ver">v0.25 alpha</i><small id="srcShort">no source</small></div></div>
+  <div class="brand"><span class="logo"></span><div><b>EVA toolkit</b><i class="ver">v0.25 alpha</i><small id="srcShort">no source</small></div></div>
   <div class="steps" id="stepNav">
     <button data-step="source"><span class="dot">1</span><span class="lbl">Source<small>disc, file, episodes</small></span></button>
     <button data-step="adjust"><span class="dot">2</span><span class="lbl">Repair<small>fix the source, crop &amp; size</small></span></button>
@@ -22,12 +22,18 @@
     <button data-step="export"><span class="dot">7</span><span class="lbl">Export<small>encode the episodes</small></span></button>
   </div>
   <div class="rail-foot">
+    <div id="updBanner" class="upd-banner hidden">
+      <div class="upd-title" id="updTitle">Update available</div>
+      <div class="upd-text" id="updText"></div>
+      <div class="upd-bar hidden" id="updBar"><span id="updFill"></span></div>
+      <div class="upd-btns"><button id="btnUpdGo" class="primary">Update</button><button id="btnUpdNotes" class="link">What's new</button><button id="btnUpdLater" class="link">Later</button></div>
+    </div>
     <div id="backendBadge" class="backend-badge" title="Where the neural models run - change in Settings">PyTorch</div>
     <div class="wf-row"><button id="btnWfSave" class="ghost" title="Save the settings of the episode shown (Repair, Colour, your filter groups) as a file to keep or share (Ctrl+S)">Save workflow</button><button id="btnWfLoad" class="ghost" title="Apply a saved or shared workflow file to this episode or all episodes">Load workflow</button></div>
     <button id="btnReport" class="ghost wide" title="Measure this source and save a zip (measurements, sample frames, short clips, settings, log) to send for tuning">Collect report</button>
     <button id="btnSettings" class="ghost wide">⚙ Settings</button>
     <button id="btnDeps" class="ghost wide" title="Python, PyTorch, TensorRT, VapourSynth, ffmpeg, MKVToolNix: check, repair or add vsview">Dependencies</button>
-    <button id="btnGithub" class="ghost wide" title="DVD Restore on GitHub: updates, issues, source">GitHub ↗</button>
+    <button id="btnGithub" class="ghost wide" title="EVA toolkit on GitHub: updates, issues, source">GitHub ↗</button>
   </div>
 </nav>
 
@@ -125,14 +131,14 @@
         <div class="field scan-field"><label title="Progressive = whole frames (a rip, a web or Blu-ray file, a progressive DVD): nothing to field-match or deinterlace, the frame rate and every frame's time are kept. Interlaced / telecined = fields (most DVDs): the controls below apply. Set when the file is opened (its flags and a check of the picture for combing); change it if the detection was wrong.">Picture</label>
           <div class="seg" data-bind="scan"><button data-v="progressive">Progressive</button><button data-v="interlaced">Interlaced / telecined</button></div></div>
         <div id="scanNote" class="note scan-note"></div>
-        <div class="field ntsc" data-key="mode"><label title="CFR 23.976 = everything becomes 24p film. VFR = film parts 24p, parts made at video rate (scrolling captions, video titles) stay 30p so they move smoothly. Frames Auto measures which this source needs.">Frame rate</label>
-          <div class="seg" data-bind="mode"><button data-v="vfr">VFR (24p + 30p)</button><button data-v="cfr">CFR 23.976</button></div></div>
+        <div class="field ntsc" data-key="mode"><label title="CFR 24p = everything becomes 23.976 fps film. VFR = film parts 24p, parts made at video rate (scrolling captions, video titles) stay 30p so they move smoothly. 60p = deinterlace interlaced video: every field becomes a frame (59.94 fps). Auto measures which this source needs.">Frame rate</label>
+          <div class="seg" data-bind="mode"><button data-v="vfr" title="Inverse telecine: film parts 24p, parts made at video rate stay 30p">VFR 24/30p</button><button data-v="cfr" title="Inverse telecine to a constant 23.976 fps">CFR 24p</button><button data-v="bob" title="Deinterlace: every field becomes a frame - 59.94 fps, all the motion of video kept. For material shot or edited on video (live action on tape, concerts, sport). Telecined film and anime: use VFR or CFR - at 60p their 24 pictures only repeat.">60p</button></div></div>
         <div class="field pal" data-key="pal_mode"><label>PAL type</label><select data-bind="pal_mode" data-opts="pal_modes"></select></div>
         <div class="field" data-key="order"><label>Field order</label>
           <div class="seg" data-bind="order"><button data-v="tff">Top first</button><button data-v="bff">Bottom first</button></div></div>
-        <div class="field ntsc" data-key="comb" data-show="ai_model!field"><label>Combing repair</label><select data-bind="comb" data-opts="comb"></select></div>
-        <div class="field ntsc" data-show="ai_model!field"><label title="Frames field matching cannot clean (video-rate titles over film, orphan fields at cuts). Only the combed areas: the rest of the frame keeps its full detail. Whole frame: the complete frame is deinterlaced.">Unmatched frames</label><select data-bind="ivtc_repair" data-opts="ivtc_repair"></select></div>
-        <div class="field ntsc" data-key="chroma_unmix" data-show="ai_model!field"><label title="ICP = interlaced chroma problem: the disc's colour was subsampled as if the video were progressive, so the film frames IVTC has to assemble from two source frames carry colour ghosts of the frames before and after (colour trailing moving objects). This unmixes their colour. Analyze switches it on when it finds the problem.">ICP fix</label>
+        <div class="field ntsc" data-key="comb" data-show="ai_model!field&mode!bob"><label>Combing repair</label><select data-bind="comb" data-opts="comb"></select></div>
+        <div class="field ntsc" data-show="ai_model!field&mode!bob"><label title="Frames field matching cannot clean (video-rate titles over film, orphan fields at cuts). Only the combed areas: the rest of the frame keeps its full detail. Whole frame: the complete frame is deinterlaced.">Unmatched frames</label><select data-bind="ivtc_repair" data-opts="ivtc_repair"></select></div>
+        <div class="field ntsc" data-key="chroma_unmix" data-show="ai_model!field&mode!bob"><label title="ICP = interlaced chroma problem: the disc's colour was subsampled as if the video were progressive, so the film frames IVTC has to assemble from two source frames carry colour ghosts of the frames before and after (colour trailing moving objects). This unmixes their colour. Analyze switches it on when it finds the problem.">ICP fix</label>
           <div class="seg" data-bind="chroma_unmix"><button data-v="off">Off</button><button data-v="on">Repair</button></div></div>
         <div class="field" data-show="ai_model!field"><label title="Removes the stair-steps that deinterlacing leaves on outlines. Neural model, luma only.">Anti-aliasing</label><select data-bind="aa" data-opts="aa"></select></div>
         <div class="field"><label title="Frames that are a mix of the frame before and after (ghost / double image from standards conversion or a blending deinterlacer). Fades and dissolves are left alone.">Blend removal</label><select data-bind="deblend" data-opts="deblend"></select></div>
@@ -603,6 +609,14 @@
       <div class="auto-row"><span id="tempInfo" class="muted"></span><span class="push"></span>
         <button id="btnTempOpen">Open</button><button id="btnTempClear" title="Delete the temporary files of all sources (they are made again when needed)">Clear…</button></div>
       <div class="note">VFR analysis, encode logs and scripts of each export, one sub-folder per source. Default: <code>temp\</code> in the app folder. The finished videos go to the output folder set in Export.</div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>Updates</h3></div>
+      <label class="check-row"><input type="checkbox" data-bind="auto_update"> Check for updates when EVA toolkit starts</label>
+      <div class="auto-row"><span id="updStatus" class="muted"></span><span class="push"></span><button id="btnUpdCheck">Check now</button></div>
+      <div class="note">One request to GitHub (github.com/EVA0111/DVDRestore releases); nothing about you or your files is sent. Installing
+        downloads the release zip and copies it over this folder after the app closes - your settings, installed engine
+        (runtime\python), engines\, temp\ and your own filters stay. Then the new version starts.</div>
     </div>
     <div class="group">
       <div class="group-head"><h3>About the two</h3></div>

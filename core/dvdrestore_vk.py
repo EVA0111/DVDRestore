@@ -1,14 +1,14 @@
-"""DVD Restore's repair stages as VapourKit filters (the .vkfilter files in VapourKit's filter-templates call these).
+"""EVA toolkit's repair stages as VapourKit filters (the .vkfilter files in VapourKit's filter-templates call these).
 
-Each function takes VapourKit's clip and returns it repaired, running exactly the stage DVD Restore runs (blocks.py):
-the picture is handed over the way DVD Restore's own chain hands it (8-bit 4:2:0, DVD colour tags), so the result is the
-same as in DVD Restore; it comes back at 16-bit (VapourKit's working depth), 4:4:4 when the stage makes full-size colour.
+Each function takes VapourKit's clip and returns it repaired, running exactly the stage EVA toolkit runs (blocks.py):
+the picture is handed over the way EVA toolkit's own chain hands it (8-bit 4:2:0, DVD colour tags), so the result is the
+same as in EVA toolkit; it comes back at 16-bit (VapourKit's working depth), 4:4:4 when the stage makes full-size colour.
 
     import sys; sys.path.insert(0, r"D:\\projects\\DVDRestore")
     import dvdrestore_vk as dr
     clip = dr.ai_cleanup(clip, model="uni", mpeg=1.0)
 
-Order (as in DVD Restore): Composite decode (optional, on the telecined frames) -> Inverse telecine -> AI cleanup / classic crawl filter -> MPEG repair -> Halos -> Colour
+Order (as in EVA toolkit): Composite decode (optional, on the telecined frames) -> Inverse telecine -> AI cleanup / classic crawl filter -> MPEG repair -> Halos -> Colour
 alignment -> Clean white/black -> Temporal stabilizer -> Still lock. The temporal stages (UniNet, StableNet, stabilizer,
 still lock) remember earlier frames: judge them while playing forward, not by jumping around."""
 import os
@@ -35,9 +35,9 @@ def _job(clip, dar=None, backend="pytorch", **extra):
 
 
 def _to_dvd(clip):
-    """VapourKit's 16-bit picture -> what DVD Restore's stages are fed: YUV 4:2:0 8-bit, BT.601 tags (dithered)"""
+    """VapourKit's 16-bit picture -> what EVA toolkit's stages are fed: YUV 4:2:0 8-bit, BT.601 tags (dithered)"""
     if clip.format is None:
-        raise vs.Error("DVD Restore: the clip changes format - add a format conversion before this filter")
+        raise vs.Error("EVA toolkit: the clip changes format - add a format conversion before this filter")
     kw = {}
     if clip.format.color_family == vs.RGB:
         kw["matrix_s"] = "170m"
@@ -65,7 +65,7 @@ def _back(out, depth=16):
 
 
 def run(clip, stage, backend="pytorch", dar=None, **p):
-    """any DVD Restore stage by its block id (blocks.BLOCKS), settings as in DVD Restore"""
+    """any EVA toolkit stage by its block id (blocks.BLOCKS), settings as in EVA toolkit"""
     import blocks
     import nnbackend
     nnbackend.set_backend(backend)
@@ -74,7 +74,7 @@ def run(clip, stage, backend="pytorch", dar=None, **p):
     return _back(blocks.block(_to_dvd(clip), job, stage, p, ctx))
 
 
-# ---------------------------------------------------------------- the stages (DVD Restore's names and defaults)
+# ---------------------------------------------------------------- the stages (EVA toolkit's names and defaults)
 def composite_decode(clip, mode="full", order="tff", **kw):
     """Composite artifacts at the source: re-encodes the picture into the composite signal the master went through and
     decodes it again with a motion-adaptive 3D comb (vapoursynth-composite). Put it FIRST, on the telecined frames,

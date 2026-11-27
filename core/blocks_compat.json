@@ -6,32 +6,15 @@
    "akarin:PluginVersion(major=1, minor=5)",
    "avs:PluginVersion(major=81, minor=0)",
    "awarp:PluginVersion(major=3, minor=1)",
-   "bm3d:PluginVersion(major=12, minor=0)",
    "bs:PluginVersion(major=22, minor=0)",
    "bwdif:PluginVersion(major=5, minor=1)",
    "composite:PluginVersion(major=0, minor=2)",
-   "d2v:PluginVersion(major=1, minor=4)",
-   "deblock:PluginVersion(major=9, minor=0)",
-   "descale:PluginVersion(major=12, minor=0)",
-   "dfttest2_cpu:PluginVersion(major=11, minor=1)",
-   "dmetrics:PluginVersion(major=1, minor=0)",
-   "dvdsrc2:PluginVersion(major=1, minor=0)",
    "edgemasks:PluginVersion(major=4, minor=1)",
-   "fb:PluginVersion(major=4, minor=0)",
-   "ffms2:PluginVersion(major=1281, minor=512)",
-   "fmtc:PluginVersion(major=31, minor=0)",
-   "hysteresis:PluginVersion(major=1, minor=3)",
-   "lsmas:PluginVersion(major=1, minor=0)",
    "mv:PluginVersion(major=29, minor=0)",
    "mvu:PluginVersion(major=9, minor=0)",
-   "nlm_ispc:PluginVersion(major=4, minor=1)",
-   "ov:PluginVersion(major=17, minor=1)",
-   "placebo:PluginVersion(major=2, minor=0)",
    "resize2:PluginVersion(major=5, minor=1)",
    "resize:PluginVersion(major=81, minor=0)",
-   "sangnom:PluginVersion(major=45, minor=0)",
    "std:PluginVersion(major=81, minor=0)",
-   "sub:PluginVersion(major=7, minor=0)",
    "text:PluginVersion(major=81, minor=0)",
    "tivtc:PluginVersion(major=4, minor=0)",
    "vivtc:PluginVersion(major=1, minor=0)",
@@ -40,7 +23,7 @@
    "zsmooth:PluginVersion(major=0, minor=20)"
   ]
  },
- "made": "2026-11-25 23:46",
+ "made": "2026-11-27 01:15",
  "results": {
   "vs:akarin.DLISR": {
    "status": "hidden",
@@ -50,25 +33,9 @@
    "status": "hidden",
    "why": "needs NVIDIA's Video Effects SDK (NvVFX), not installed"
   },
-  "vs:bm3d.OPP2RGB": {
-   "status": "hidden",
-   "why": "only after bm3d.RGB2OPP + bm3d.Basic/Final (opponent colour) - use vsdenoise or Custom code"
-  },
   "vs:composite.Decode": {
    "status": "hidden",
    "why": "needs a composite (GRAY16) signal from composite.Encode - use Custom code"
-  },
-  "vs:descale.Decustom": {
-   "status": "hidden",
-   "why": "needs a Python kernel function - use a Custom code block"
-  },
-  "vs:descale.ScaleCustom": {
-   "status": "hidden",
-   "why": "needs a Python kernel function - use a Custom code block"
-  },
-  "vs:dfttest2_cpu.DFTTest": {
-   "status": "hidden",
-   "why": "the low-level part of DFTTest2 - use vsdenoise DFTTest instead"
   },
   "vs:mv.Analyse": {
    "status": "hidden",
@@ -130,14 +97,6 @@
    "status": "hidden",
    "why": "needs motion vectors from mvu.Analyse - use Custom code"
   },
-  "vs:placebo.Shader": {
-   "status": "args",
-   "need": "shader: the path of a .glsl shader file, e.g. D:\\shaders\\FSRCNNX_x2_8-0-4-1.glsl"
-  },
-  "vs:placebo.Tonemap": {
-   "status": "hidden",
-   "why": "HDR -> SDR only (no DVD is HDR)"
-  },
   "vs:resize2.Custom": {
    "status": "hidden",
    "why": "needs a Python kernel function - use a Custom code block"
@@ -197,14 +156,6 @@
   "vs:std.SplitPlanes": {
    "status": "hidden",
    "why": "returns several clips - use Custom code"
-  },
-  "vs:sub.ImageFile": {
-   "status": "args",
-   "need": "file: the path of a subtitle image file (.sup / .sub)"
-  },
-  "vs:sub.TextFile": {
-   "status": "args",
-   "need": "file: the path of a subtitle file (.ass / .srt)"
   },
   "vs:vszip.PackRGB": {
    "status": "hidden",
@@ -348,7 +299,7 @@
    ],
    "format": "YUV420P8"
   },
-  "vs:bm3d.Basic": {
+  "vs:awarp.AWarp": {
    "status": "ok",
    "formats": [
     "YUV444P8",
@@ -362,53 +313,6 @@
     "RGBS"
    ],
    "format": "YUV444P8"
-  },
-  "vs:bm3d.Final": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV444P8"
-  },
-  "vs:bm3d.RGB2OPP": {
-   "status": "ok",
-   "formats": [
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV444P16"
-  },
-  "vs:bm3d.VAggregate": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS"
-   ],
-   "format": "YUV444P16"
-  },
-  "vs:bm3d.VBasic": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
   },
   "vs:bwdif.Bwdif": {
    "status": "ok",
@@ -451,31 +355,6 @@
     "YUV444PS"
    ],
    "format": "YUV444P16"
-  },
-  "vs:deblock.Deblock": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:dmetrics.DMetrics": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8"
-   ],
-   "format": "YUV420P8"
   },
   "vs:edgemasks.Cross": {
    "status": "ok",
@@ -712,146 +591,6 @@
    "format": "YUV420P8"
   },
   "vs:edgemasks.Tritical": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:fb.FillBorders": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "GRAY8",
-    "GRAY16",
-    "RGB24",
-    "RGB48"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:fmtc.bitdepth": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:fmtc.histluma": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "GRAY8",
-    "GRAY16",
-    "RGB24",
-    "RGB48"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:fmtc.matrix": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "RGB24"
-  },
-  "vs:fmtc.matrix2020cl": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "RGB48"
-  },
-  "vs:fmtc.nativetostack16": {
-   "status": "ok",
-   "formats": [
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P16",
-    "GRAY16",
-    "RGB48"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:fmtc.resample": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P16"
-  },
-  "vs:fmtc.stack16tonative": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV444P8",
-    "GRAY8",
-    "RGB24"
-   ],
-   "format": "YUV420P16"
-  },
-  "vs:fmtc.transfer": {
-   "status": "ok",
-   "formats": [
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "Gray16"
-  },
-  "vs:hysteresis.Hysteresis": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -1579,44 +1318,6 @@
    ],
    "format": "YUV420P8"
   },
-  "vs:nlm_ispc.NLMeans": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:placebo.Deband": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV444PS",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:placebo.Resample": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8"
-   ],
-   "format": "YUV420P8"
-  },
   "vs:resize.Bicubic": {
    "status": "ok",
    "formats": [
@@ -1868,24 +1569,6 @@
    "format": "YUV420P8"
   },
   "vs:resize2.Spline64": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
-  "vs:sangnom.SangNom": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -2707,24 +2390,6 @@
    ],
    "format": "YUV420P8"
   },
-  "vs:sub.Subtitle": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
-  },
   "vs:text.ClipInfo": {
    "status": "ok",
    "formats": [
@@ -2875,6 +2540,7 @@
    "status": "ok",
    "formats": [
     "YUV420P8",
+    "YUV420P10",
     "YUV420P16",
     "YUV444P8",
     "YUV444P16",
@@ -3736,6 +3402,24 @@
    ],
    "format": "YUV420P8"
   },
+  "jet:vstools.plane": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray8"
+  },
   "jet:vstools.replace_every": {
    "status": "ok",
    "formats": [
@@ -3827,22 +3511,9 @@
    "format": "YUV420P8"
   },
   "jet:vsdenoise.deblock_qed": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "AttributeError: There is no attribute or namespace named deblock. Did you mistype a plugin namespace or forget to install a plugin?",
+   "error_last": "AttributeError: There is no attribute or namespace named deblock. Did you mistype a plugin namespace or forget to install a plugin?"
   },
   "jet:vsdenoise.decrease_size": {
    "status": "ok",
@@ -3995,58 +3666,19 @@
    "format": "YUV420P8"
   },
   "jet:vsdehalo.hq_dering": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
+   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
   },
   "jet:vsdehalo.smooth_dering": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
+   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
   },
   "jet:vsdehalo.vine_dehalo": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "CustomRuntimeError: No available NLMeans plugin found. Please install one.",
+   "error_last": "UnsupportedFieldBasedError: (vine_dehalo) Only progressive video is supported!"
   },
   "jet:vsdeinterlace.deblend": {
    "status": "ok",
@@ -4085,6 +3717,11 @@
    "format": "YUV420P8"
   },
   "jet:vsdeinterlace.dmetrics": {
+   "status": "error",
+   "error": "UnsupportedFieldBasedError: (FieldBased.is_tff) Progressive video isn't field based.",
+   "error_last": "AttributeError: No attribute with the name dmetrics exists. Did you mistype a plugin namespace or forget to install a plugin?"
+  },
+  "jet:vsdeinterlace.get_field_difference": {
    "status": "ok",
    "formats": [
     "YUV420P8"
@@ -4092,7 +3729,7 @@
    "interlaced": true,
    "format": "YUV420P8"
   },
-  "jet:vsdeinterlace.get_field_difference": {
+  "jet:vsdeinterlace.jivtc": {
    "status": "ok",
    "formats": [
     "YUV420P8"
@@ -4213,7 +3850,6 @@
    "status": "ok",
    "formats": [
     "YUV420P8",
-    "YUV420P10",
     "YUV420P16",
     "YUV444P8",
     "YUV444P16",
@@ -4221,6 +3857,24 @@
     "GRAY8",
     "GRAY16",
     "GRAYS"
+   ],
+   "format": "Gray8"
+  },
+  "jet:vsmasktools.based_diff_mask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "Gray8"
   },
@@ -4258,19 +3912,9 @@
    "format": "Gray8"
   },
   "jet:vsmasktools.diff_hardsub_mask": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
+   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
   },
   "jet:vsmasktools.flat_mask": {
    "status": "ok",
@@ -4858,21 +4502,9 @@
    "format": "YUV420P8"
   },
   "jet:vsdeband.placebo_deband": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV420P8"
+   "status": "error",
+   "error": "AttributeError: There is no attribute or namespace named placebo. Did you mistype a plugin namespace or forget to install a plugin?",
+   "error_last": "AttributeError: There is no attribute or namespace named placebo. Did you mistype a plugin namespace or forget to install a plugin?"
   },
   "jet:vskernels.resample_to": {
    "status": "ok",
@@ -4942,214 +4574,6 @@
     "RGBS"
    ],
    "format": "YUV420P8"
-  },
-  "vs:awarp.AWarp": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV444P8"
-  },
-  "vs:bm3d.VFinal": {
-   "status": "ok",
-   "formats": [
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Bicubic": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Bilinear": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Debicubic": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Debilinear": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Delanczos": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Depoint": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Despline16": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Despline36": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Despline64": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Lanczos": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Point": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Spline16": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Spline36": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:descale.Spline64": {
-   "status": "ok",
-   "formats": [
-    "YUV444PS",
-    "GRAYS",
-    "RGBS"
-   ],
-   "format": "YUV444PS"
-  },
-  "vs:fmtc.primaries": {
-   "status": "ok",
-   "formats": [
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "RGB48"
-  },
-  "jet:vstools.plane": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "Gray8"
-  },
-  "jet:vsdeinterlace.jivtc": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8"
-   ],
-   "interlaced": true,
-   "format": "YUV420P8"
-  },
-  "jet:vsmasktools.based_diff_mask": {
-   "status": "ok",
-   "formats": [
-    "YUV420P8",
-    "YUV420P10",
-    "YUV420P16",
-    "YUV444P8",
-    "YUV444P16",
-    "YUV444PS",
-    "GRAY8",
-    "GRAY16",
-    "GRAYS",
-    "RGB24",
-    "RGB48",
-    "RGBS"
-   ],
-   "format": "Gray8"
   }
  }
 }

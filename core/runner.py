@@ -1,4 +1,4 @@
-"""Job runner for DVD Restore: external tools, probing, episode detection, ripping, encoding, muxing."""
+"""Job runner for EVA toolkit: external tools, probing, episode detection, ripping, encoding, muxing."""
 import json
 import os
 import re
@@ -84,7 +84,7 @@ def open_in_vsview(job):
         "import vsgraph\n"
         f"with open({str(jp)!r}, encoding='utf-8') as f:\n    job = json.load(f)\n"
         "vsgraph.preview_outputs(job)\n"
-        "import vsview_live\n"                                        # reloads itself when DVD Restore changes the job
+        "import vsview_live\n"                                        # reloads itself when EVA toolkit changes the job
         f"vsview_live.watch({str(jp)!r}, {str(vpy)!r})\n", encoding="utf-8")
     if not TOOLS["vsview"]:
         raise RuntimeError("vsview is not installed - add it in the Dependencies window (Settings)")
@@ -704,7 +704,7 @@ class JobRunner:
         import time
         import zipfile
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        name = f"DVDRestore_report_{Path(job['source']).stem}_{stamp}"
+        name = f"EVAtoolkit_report_{Path(job['source']).stem}_{stamp}"
         dest_dir = Path(dest_dir)
         tmp = Path(job["work"]).with_name(".report_tmp") / name
         shutil.rmtree(tmp, ignore_errors=True)
@@ -908,6 +908,18 @@ class JobRunner:
             self.log(f"Done: {out_png}")
             return
         pal = job_is_pal(job)
+        # the probe estimates the frame count from the container's duration; a VOB's audio can run past the last
+        # picture (VTS_02_1: 66392 estimated, 66348 decoded = 1.47 s): an episode ending "at the end" is clamped to
+        # the frames that exist, so the length check and the audio cut use the real length (was: export failed)
+        try:
+            import vsgraph as _vgc
+            n_real = _vgc.source({"source": job["source"]}, clean=False).num_frames
+            if 0 < n_real < job["end"]:
+                self.log(f"The source has {n_real} frames ({job['end'] - n_real} fewer than its length suggested): episode end adjusted")
+                job["end"] = n_real
+                jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
+        except Exception as e:                           # noqa: BLE001
+            print(f"frame count not checked: {e}", file=sys.stderr)
         if pal and not job.get("progressive"):
             job["mode"] = "cfr"
             if job.get("pal_mode", "auto") == "auto" and not job.get("pal_mode_resolved"):
@@ -1052,7 +1064,8 @@ class JobRunner:
                 self.log(f"Your IVTC gives {n_video} frames for {dur_s:.2f} s: {num / den:.3f} fps")
             else:
                 rate = (job["fps_num"] / job["fps_den"] if job.get("progressive") else
-                        50.0 if pal and job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50" else (25.0 if pal else 24000 / 1001))
+                        50.0 if pal and job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50" else
+                        (25.0 if pal else 60000 / 1001 if job["mode"] == "bob" else 24000 / 1001))
                 diff = n_video / rate - dur_s
                 if abs(diff) > 0.5:
                     raise RuntimeError(
@@ -1074,6 +1087,8 @@ class JobRunner:
         elif pal:
             m += ["--default-duration", "0:50p" if job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50"
                   else "0:25p"]
+        elif job["mode"] == "bob":
+            m += ["--default-duration", "0:60000/1001p"]                             # NTSC deinterlaced: 59.94p
         else:
             m += ["--default-duration", "0:24000/1001p"]
         if job.get("anamorphic"):

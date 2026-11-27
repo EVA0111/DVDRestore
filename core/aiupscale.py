@@ -1,4 +1,4 @@
-"""AI upscaling step: run your own models (the ones you use in VapourKit) inside DVD Restore.
+"""AI upscaling step: run your own models (the ones you use in VapourKit) inside EVA toolkit.
 
 Formats
   .onnx                       VapourKit / chaiNNer exports. Fixed-size models (e.g. ..._static_720x540.onnx)

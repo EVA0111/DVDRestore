@@ -1,4 +1,4 @@
-// DVD Restore - Electron main process.
+// EVA toolkit - Electron main process.
 // Starts the Python backend (../core/server.py), relays JSON-line RPC between it and the window,
 // and provides native dialogs.
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
@@ -8,6 +8,7 @@ const fs = require("fs");
 const readline = require("readline");
 
 const deps = require("./deps");
+const update = require("./update");
 
 const APP_DIR = path.resolve(__dirname, "..");                 // project root: app/ core/ models/ runtime/
 const SERVER = path.join(APP_DIR, "core", "server.py");
@@ -15,7 +16,7 @@ const SERVER = path.join(APP_DIR, "core", "server.py");
 // installs that in the Dependencies window. The development folder uses the installed Python / tools as before.
 const PORTABLE = fs.existsSync(path.join(APP_DIR, "portable.json"));
 const ICON = path.join(__dirname, "icon.png");
-app.setAppUserModelId("DVDRestore");                           // taskbar: own group + icon, not Electron's
+app.setAppUserModelId("EVAtoolkit");                           // taskbar: own group + icon, not Electron's
 
 function findPython() {
   // the portable version's own Python first, then an override, then a normal install
@@ -32,10 +33,10 @@ function findPython() {
   return "python";
 }
 
-// ---------------------------------------------------------------- diagnostics log (temp\dvdrestore.log)
+// ---------------------------------------------------------------- diagnostics log (temp\evatoolkit.log)
 // Engine errors, failed requests, slow previews, engine exits, window errors / freezes - so a failure the user sees
 // can be traced afterwards. Rolls over at 5 MB (one old copy, .1).
-const LOG = path.join(APP_DIR, "temp", "dvdrestore.log");
+const LOG = path.join(APP_DIR, "temp", "evatoolkit.log");
 let logWrites = 0;
 function logf(...a) {
   try {
@@ -160,7 +161,7 @@ ipcMain.handle("is-dir", (_e, p) => { try { return fs.statSync(p).isDirectory();
 function createWindow() {
   win = new BrowserWindow({
     width: 1600, height: 960, minWidth: 1280, minHeight: 720,
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.25 alpha", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.25 alpha", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
@@ -175,6 +176,37 @@ function createWindow() {
   win.webContents.on("render-process-gone", (_e, d) => logf(`WINDOW renderer gone: ${d.reason} (exit ${d.exitCode})`));
 }
 
+// ---------------------------------------------------------------- updates (update.js)
+let updInfo = null, updPrepared = null, updJob = null;
+const sendUpd = (msg) => { if (win) win.webContents.send("update-event", msg); };
+ipcMain.handle("update-check", async () => {
+  try { updInfo = await update.check(app.getVersion()); return { ...updInfo, portable: PORTABLE }; }
+  catch (e) { return { error: String(e.message || e), portable: PORTABLE }; }
+});
+ipcMain.handle("update-download", async () => {
+  if (!updInfo || !updInfo.newer) return { error: "no newer version to download" };
+  if (updJob) return { error: "already downloading" };
+  updJob = { cancelled: false };
+  try {
+    updPrepared = await update.prepare(APP_DIR, updInfo, deps.download,
+      (stage, got, total) => sendUpd({ stage, got, total }), updJob);
+    logf(`update ${updPrepared.version} ready in ${updPrepared.root}`);
+    return { ok: true, version: updPrepared.version };
+  } catch (e) {
+    return { error: updJob.cancelled ? "cancelled" : String(e.message || e) };
+  } finally { updJob = null; }
+});
+ipcMain.handle("update-cancel", () => { if (updJob) { updJob.cancelled = true; updJob.onCancel && updJob.onCancel(); } return true; });
+ipcMain.handle("update-install", () => {
+  if (!updPrepared) return { error: "nothing downloaded" };
+  if (!PORTABLE) return { error: "this copy runs from the source folder - updates install only into the portable app" };
+  logf(`installing update ${updPrepared.version}`);
+  update.install(APP_DIR, updPrepared, process.pid);
+  setTimeout(() => app.quit(), 300);                          // the script waits for this process, copies, restarts
+  return { ok: true };
+});
+ipcMain.handle("open-release", () => { if (updInfo && /^https:\/\/github\.com\//.test(updInfo.page)) shell.openExternal(updInfo.page); });
+
 // ---------------------------------------------------------------- dependencies window
 let depsWin = null;
 let depsJob = null;                                            // the running install (cancel signal)
@@ -184,7 +216,7 @@ function openDeps(firstRun) {
   if (depsWin) { depsWin.focus(); return; }
   depsWin = new BrowserWindow({
     width: 760, height: 640, minWidth: 620, minHeight: 520, parent: firstRun ? undefined : (win || undefined),
-    backgroundColor: "#15171c", icon: ICON, title: "DVD Restore v0.25 alpha - Dependencies", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.25 alpha - Dependencies", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   depsWin.loadFile(path.join(__dirname, "renderer", "deps.html"), { query: { first: firstRun ? "1" : "0" } });
@@ -216,17 +248,17 @@ ipcMain.handle("deps-install", async (_e, opts) => {
 ipcMain.handle("deps-cancel", () => { if (depsJob) { depsJob.cancelled = true; depsJob.onCancel && depsJob.onCancel(); } });
 ipcMain.handle("deps-folder", () => shell.openPath(path.join(APP_DIR, "runtime")));
 ipcMain.handle("deps-open", () => openDeps(false));
-ipcMain.handle("deps-start", () => {                           // "Start DVD Restore" after the first install
+ipcMain.handle("deps-start", () => {                           // "Start EVA toolkit" after the first install
   if (!started) { started = true; startBackend(); createWindow(); }
   if (depsWin) depsWin.close();
 });
 
-// One DVD Restore at a time: two instances share the profile folder (AppData\Roaming\DVD Restore) and the second
+// One EVA toolkit at a time: two instances share the profile folder (AppData\Roaming\EVA toolkit) and the second
 // one crashed / froze the first (seen 2026-11-25: a renderer crash the second another copy started). Starting it
 // again brings the open window to the front. Test runs pass their own --user-data-dir, which has its own lock.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-  logf("second copy started: the open DVD Restore window is brought to the front instead");
+  logf("second copy started: the open EVA toolkit window is brought to the front instead");
   app.quit();
 } else {
   app.on("second-instance", () => {

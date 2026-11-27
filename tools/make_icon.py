@@ -1,4 +1,4 @@
-"""Draws the DVD Restore icon (the rainbow disc of the sidebar logo) -> app/icon.png (512) and app/icon.ico."""
+"""Draws the EVA toolkit icon (the rainbow disc of the sidebar logo) -> app/icon.png (512) and app/icon.ico."""
 import math
 import os
 

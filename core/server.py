@@ -1,4 +1,4 @@
-"""DVD Restore backend for the Electron app.
+"""EVA toolkit backend for the Electron app.
 
 Protocol: JSON lines over stdin / stdout.
     request   {"id": 1, "method": "probe", "params": {...}}
@@ -43,7 +43,7 @@ def emit(obj):
 
 def fail(rid, what, e):
     """Report a failed request: the window gets the error TYPE, message and where it happened (a bare KeyError
-    used to read "Preview: 'info'"); the full traceback goes to stderr, which the app writes to temp/dvdrestore.log."""
+    used to read "Preview: 'info'"); the full traceback goes to stderr, which the app writes to temp/evatoolkit.log."""
     tb = traceback.extract_tb(e.__traceback__)
     where = next((f"{os.path.basename(fr.filename)}:{fr.lineno}" for fr in reversed(tb) if "site-packages" not in fr.filename), "")
     msg = f"{what}{type(e).__name__}: {e}" + (f" ({where})" if where else "")
@@ -947,6 +947,9 @@ class AutoVfr:
     def request(self, st, k):
         job = make_job(st, k)
         if job.get("mode") != "vfr" or runner.job_is_pal(job):
+            # CFR / 60p / PAL / progressive (or switched to it while the analysis ran: a new file opens in VFR and it
+            # started at the first preview) - no VFR analysis: a running one is stopped instead of finishing for nothing
+            self.stop()
             return {"state": "off"}
         if runner.JobRunner.has_pass1(job):
             return {"state": "ready"}

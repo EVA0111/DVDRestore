@@ -1,4 +1,4 @@
-// DVD Restore - dependencies: what the engine needs next to the app, where it comes from, and the installer.
+// EVA toolkit - dependencies: what the engine needs next to the app, where it comes from, and the installer.
 // Everything goes into <root>\runtime\ (nothing outside the folder, no registry, no PATH): the copy keeps working
 // when the folder is moved or put on another drive. Downloads come from the official places only:
 //   Python 3.12 (python.org's NuGet package), PyTorch (download.pytorch.org), TensorRT / VapourSynth + plugins (PyPI),
@@ -72,7 +72,7 @@ function download(url, dest, onProgress, signal) {
     const part = dest + ".part";
     const out = fs.createWriteStream(part);
     const req = net.request({ url, redirect: "follow" });
-    req.setHeader("User-Agent", "DVDRestore/0.1");
+    req.setHeader("User-Agent", "EVAtoolkit/0.25");
     let got = 0, total = 0, last = 0;
     const abort = () => { try { req.abort(); } catch {} out.destroy(); reject(new Error("cancelled")); };
     if (signal) signal.onCancel = abort;
@@ -248,4 +248,4 @@ function syncLayout(root) {
   return { made, missing };
 }
 
-module.exports = { check, install, syncLayout, layout, COMPONENTS };
+module.exports = { check, install, syncLayout, layout, COMPONENTS, download };

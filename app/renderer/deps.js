@@ -1,4 +1,4 @@
-// DVD Restore - Dependencies window: shows what the engine needs, installs what is missing into runtime\.
+// EVA toolkit - Dependencies window: shows what the engine needs, installs what is missing into runtime\.
 const $ = (id) => document.getElementById(id);
 const FIRST = new URLSearchParams(location.search).get("first") === "1";
 const LABEL = { ok: "installed", missing: "missing", update: "update needed", downloading: "downloading",
@@ -33,13 +33,13 @@ function render() {
   const total = need.reduce((a, c) => a + c.size, 0) + ($("optView").checked && view.state !== "ok" ? view.size : 0);
   $("where").textContent = "Installed into " + state.folder + " - nothing outside this folder is changed.";
   if (state.ready) {
-    $("lead").textContent = FIRST ? "Everything is installed." : "Everything DVD Restore needs is installed.";
+    $("lead").textContent = FIRST ? "Everything is installed." : "Everything EVA toolkit needs is installed.";
     $("btnInstall").style.display = view.state === "ok" || !$("optView").checked ? "none" : "";
     $("btnInstall").textContent = "Install vsview";
     $("btnStart").style.display = FIRST ? "" : "none";
   } else {
     $("lead").textContent = (FIRST ? "First start: " : "") +
-      `DVD Restore needs ${need.length} more part${need.length > 1 ? "s" : ""} (download about ${gb(total)}). ` +
+      `EVA toolkit needs ${need.length} more part${need.length > 1 ? "s" : ""} (download about ${gb(total)}). ` +
       "They are installed next to the app, so the folder stays portable.";
     $("btnInstall").style.display = "";
     $("btnInstall").textContent = "Download and install";
@@ -109,7 +109,7 @@ $("btnInstall").addEventListener("click", async () => {
     failed.forEach((id) => $(id) && setBadge($(id), "failed"));     // keep the red badge on the part that failed
   } else {
     $("msg").className = "msg ok";
-    $("msg").textContent = "Done. Everything is installed" + (FIRST ? " - press Start DVD Restore." : ".");
+    $("msg").textContent = "Done. Everything is installed" + (FIRST ? " - press Start EVA toolkit." : ".");
     await refresh();
   }
 });
