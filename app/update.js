@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
 
-const REPO = "EVA0111/DVDRestore";
+const REPO = "EVA0111/EVA-toolkit";                     // renamed from DVDRestore (GitHub redirects the old name)
 const API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 // versions are counted as decimals, as the releases are numbered: 0.15 < 0.2 < 0.25 < 0.3 (then a patch number)
