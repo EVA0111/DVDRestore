@@ -440,6 +440,39 @@ def cut_audio(src, start_s, dur_s, out_path):
     return r.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0
 
 
+def _gray_frames(path, t, n, w=96, h=64):
+    import numpy as np
+    r = subprocess.run([TOOLS["ffmpeg"], "-v", "error", "-ss", f"{max(0.0, t):.4f}", "-i", path, "-map", "0:v:0",
+                        "-vf", f"scale={w}:{h},format=gray", "-frames:v", str(n), "-f", "rawvideo", "-"],
+                       capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+    a = np.frombuffer(r.stdout, np.uint8)
+    return a[: a.size // (w * h) * w * h].reshape(-1, h, w).astype(np.float32), r.returncode
+
+
+def picture_sync(src, start_s, out, dur_s, out_fps, points=(0.1, 0.3, 0.5, 0.7, 0.9), win=2.0):
+    """Picture against sound: the source picture at a few times is searched for in the output around the same time
+    (+-win s). The audio is cut on the source's timeline, so an offset here is how far picture and sound disagree -
+    the audio-only check cannot see it (a VOB's timeline jump put the picture 1.43 s early while the audio check
+    read 0.0). A point whose best match is weak or not clearly better than its neighbours is skipped."""
+    import numpy as np
+    res = []
+    for frac in points:
+        t = frac * dur_s
+        if t < win or t > dur_s - win:
+            continue
+        ref, rc = _gray_frames(src, start_s + t, 1)
+        cand, rc2 = _gray_frames(out, t - win, int(2 * win * out_fps) + 1)
+        if rc or rc2 or not len(ref) or len(cand) < 10:
+            continue
+        err = np.abs(cand - ref[0]).mean(axis=(1, 2))
+        k = int(np.argmin(err))
+        far = np.concatenate([err[:max(0, k - int(out_fps * 0.3))], err[k + int(out_fps * 0.3):]])
+        if err[k] > 6 or (far.size and far.min() < err[k] * 1.5):      # no clear match (still shot, scene cut at t)
+            continue
+        res.append(round((t - win + k / out_fps - t) * 1000, 1))
+    return res
+
+
 def verify_sync(src, start_s, out, dur_s):
     """Measure audio sync of the finished file against the source at several points."""
     res = []
@@ -1133,6 +1166,18 @@ class JobRunner:
                          + " ms" + ("  OK" if abs(worst) <= 2 else "  WARNING: out of sync!"))
             else:
                 self.log("Audio sync check: inconclusive (silent or repetitive audio) - not an error")
+            try:                                        # the picture against the sound (not only audio against audio)
+                ofps = (job["out_rate"][0] / job["out_rate"][1] if job.get("out_rate") else
+                        job["fps_num"] / job["fps_den"] if job.get("progressive") else
+                        (50.0 if job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50" else 25.0) if pal else
+                        60000 / 1001 if job["mode"] == "bob" else 24000 / 1001)
+                pic = picture_sync(job["source"], start_s, str(out), dur_s, ofps) if src_tc is None and job["mode"] != "vfr" else []
+                if pic:
+                    bad = [x for x in pic if abs(x) > 1500 / ofps]        # more than 1.5 frames off
+                    self.log(f"Picture sync check ({len(pic)} points): " + ", ".join(f"{x:+.0f}" for x in pic) + " ms"
+                             + ("  WARNING: picture and sound disagree!" if len(bad) * 2 > len(pic) else "  OK"))
+            except Exception as e:                       # noqa: BLE001
+                print(f"picture sync check skipped: {e}", file=sys.stderr)
         self.log(f"Done: {out}")
         if not job.get("keep_work"):
             for f in ("video.mkv", "audio.mka"):

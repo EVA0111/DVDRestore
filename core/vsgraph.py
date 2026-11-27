@@ -821,6 +821,75 @@ def note_bad_frame(path, err):
     return n
 
 
+def _timeline_gaps(path):
+    """jumps in a file's picture timeline (MPEG-PS / VOB cell boundaries: VTS_02_1 jumps 1.1 s at 47.3 s, picture and
+    audio alike): {"t0", "t_last", "gaps": [[time before the jump, length]]}, from the container's packet times (no
+    decoding; a few seconds for a 1 GB VOB), cached in temp\timeline next to the damaged-frame lists"""
+    import hashlib
+    st = os.stat(path)
+    key = hashlib.sha1(f"{os.path.abspath(path).lower()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:16]
+    f = os.path.join(paths.TEMP, "timeline", key + ".json")
+    try:
+        with open(f, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:                                    # noqa: BLE001
+        pass
+    import runner
+    r = runner._run([runner.TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time",
+                     "-of", "csv=p=0", path])
+    t = []
+    for x in (r.stdout or "").split():
+        try:
+            t.append(float(x.strip(",")))
+        except ValueError:
+            pass
+    t.sort()
+    info = {"t0": t[0] if t else 0.0, "t_last": t[-1] if t else 0.0,
+            "gaps": [[a, b - a] for a, b in zip(t, t[1:]) if b - a > 0.1]}   # pulldown leaves at most 0.067 s
+    try:
+        os.makedirs(os.path.dirname(f), exist_ok=True)
+        with open(f, "w", encoding="utf-8") as fh:
+            json.dump(info, fh)
+    except OSError:
+        pass
+    return info
+
+
+def timeline_holds(path, n_frames, fps):
+    """[(frame, count)]: where the decoder's frames fall short of the file's timeline. The decoder joins the pictures
+    on both sides of a timeline jump and also drops the undecodable ones next to it (VTS_02_1: 66348 frames for 66392
+    slots, all 44 at the 47.3 s jump), while the audio keeps its timestamps - everything after ran 1.43 s early. The
+    missing slots are held (copies of the last picture before the jump), shared between the jumps by their length."""
+    try:
+        tl = _timeline_gaps(path)
+    except Exception as e:                                # noqa: BLE001
+        print(f"timeline not read: {e}", file=sys.stderr)
+        return []
+    gaps = tl.get("gaps") or []
+    if not gaps:
+        return []
+    slots = int(round((tl["t_last"] - tl["t0"]) * fps)) + 1
+    missing = slots - n_frames
+    if missing <= 0:
+        return []
+    total = sum(g for _, g in gaps)
+    out, given = [], 0
+    for i, (t_end, g) in enumerate(gaps):
+        n = missing - given if i == len(gaps) - 1 else int(round(missing * g / total))
+        given += n
+        if n > 0:
+            out.append((min(n_frames, int(round((t_end - tl["t0"]) * fps)) + 1), n))
+    return out
+
+
+def _hold(src, holds):
+    """insert held copies: holds = [(frame, count)] in the decoder's numbering"""
+    for at, n in sorted(holds, reverse=True):
+        at = max(1, min(src.num_frames, at))
+        src = src[:at] + src[at - 1] * n + src[at:] if at < src.num_frames else src + src[-1] * n
+    return src
+
+
 def _skip_bad(src, bad):
     """every undecodable frame becomes a copy of the nearest decodable one before it (after it at the start);
     FreezeFrames never asks the decoder for the replaced frame"""
@@ -848,6 +917,10 @@ def source(job, clean=True):
         n = int(job.get("end") or 24)
         src = core.std.AssumeFPS(src[0] * max(1, n), fpsnum=job.get("fps_num", 30000), fpsden=job.get("fps_den", 1001))
     src = fix_fps(src, job)
+    if not (job.get("image") or job.get("progressive")):
+        holds = timeline_holds(job["source"], src.num_frames, src.fps.numerator / src.fps.denominator)
+        if holds:                                       # frame numbers follow the file's timeline (and its audio)
+            src = _hold(src, holds)
     tff = opt(job, "order") != "bff"
     # an image / progressive source has no fields: marked field-based, the 4:2:0 conversion below resized each FIELD
     # (an image 708x530 = two fields of 265 lines, odd -> "Resize error 1027")
