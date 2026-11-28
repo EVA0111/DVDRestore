@@ -3,9 +3,6 @@
 Restores NTSC and PAL DVD video, other video files and still images: anime, cartoons and live action.
 A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch / TensorRT networks).
 
-> **Alpha.** It works on the discs it was tuned on and passes its self-test (65 checks), but expect rough edges.
-> Bug reports with a sample are very welcome (Issues). **Help → Report a problem** in the app makes the report for you.
-
 ![EVA toolkit](docs/guide/g02-opened.png)
 
 **New here? Read the [easy guide](docs/guide/GUIDE.md)** (with pictures) or the **[wiki](../../wiki)**.
