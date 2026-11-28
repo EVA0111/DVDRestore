@@ -11,7 +11,7 @@ using System.Windows.Forms;
 
 [assembly: System.Reflection.AssemblyTitle("EVA toolkit")]
 [assembly: System.Reflection.AssemblyProduct("EVA toolkit")]
-[assembly: System.Reflection.AssemblyDescription("EVA toolkit v0.25 alpha")]
+[assembly: System.Reflection.AssemblyDescription("EVA toolkit v0.3 alpha")]
 [assembly: System.Reflection.AssemblyVersion("0.2.0.0")]
 [assembly: System.Reflection.AssemblyFileVersion("0.2.0.0")]
 
