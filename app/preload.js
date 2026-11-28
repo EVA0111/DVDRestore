@@ -3,6 +3,12 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   rpc: (method, params) => ipcRenderer.invoke("rpc", method, params),
+  sysStats: () => ipcRenderer.invoke("sys-stats"),
+  appLog: (level, text) => ipcRenderer.send("app-log", level, text),
+  captureWindow: () => ipcRenderer.invoke("capture-window"),
+  systemInfo: () => ipcRenderer.invoke("system-info"),
+  openLogs: () => ipcRenderer.invoke("open-logs"),
+  restartEngine: () => ipcRenderer.invoke("restart-engine"),
   onEvent: (cb) => ipcRenderer.on("backend-event", (_e, msg) => cb(msg)),
   openVideo: () => ipcRenderer.invoke("open-video"),
   openFolder: (title) => ipcRenderer.invoke("open-folder", title),

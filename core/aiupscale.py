@@ -16,6 +16,7 @@ import hashlib
 import os
 import sys
 import threading
+import time
 
 import numpy as np
 import vapoursynth as vs
@@ -371,6 +372,9 @@ class _TRTOnnx:
             cfg = b.create_builder_config()
             cfg.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, int(self.eng["workspace"]) << 20)
             cfg.builder_optimization_level = int(self.eng["opt_level"])
+            _mon = nnbackend.progress_monitor(trt, os.path.basename(self.orig))
+            if _mon is not None:
+                cfg.progress_monitor = _mon
             if not self.eng["tf32"]:
                 cfg.clear_flag(trt.BuilderFlag.TF32)
             prof = b.create_optimization_profile()
@@ -380,6 +384,7 @@ class _TRTOnnx:
             else:
                 prof.set_shape(nm, key, key, key)
             cfg.add_optimization_profile(prof)
+            _t_build = time.time()
             blob = b.build_serialized_network(net, cfg)
             if blob is None and dyn:
                 # a size range the model cannot be built for (memory of attention layers at the largest size,
@@ -392,6 +397,11 @@ class _TRTOnnx:
             if blob is None:
                 raise RuntimeError("TensorRT engine build failed")
             nnbackend.save_engine(ep, blob)
+            try:                                          # how long it took and with what (the model library lists it)
+                import engines
+                engines.write_meta(ep, time.time() - _t_build, self.eng, p if dyn else None)
+            except Exception:                            # noqa: BLE001
+                pass
         rt = nnbackend.runtime()                          # process-wide, outlives the engines (see nnbackend)
         with open(ep, "rb") as f:
             eng = rt.deserialize_cuda_engine(f.read())

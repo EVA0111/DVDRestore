@@ -72,7 +72,7 @@ function download(url, dest, onProgress, signal) {
     const part = dest + ".part";
     const out = fs.createWriteStream(part);
     const req = net.request({ url, redirect: "follow" });
-    req.setHeader("User-Agent", "EVAtoolkit/0.25");
+    req.setHeader("User-Agent", "EVAtoolkit/0.3");
     let got = 0, total = 0, last = 0;
     const abort = () => { try { req.abort(); } catch {} out.destroy(); reject(new Error("cancelled")); };
     if (signal) signal.onCancel = abort;

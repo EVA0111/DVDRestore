@@ -54,7 +54,7 @@ button.link:hover { text-decoration: underline; background: none; }
 button.big { height: 38px; padding: 0 22px; font-size: 14px; }
 button.wide { width: 100%; }
 
-input[type=text], select { height: var(--h); width: 100%; min-width: 0; padding: 0 8px;
+input[type=text], input[type=number], input[type=search], select { height: var(--h); color: var(--text); width: 100%; min-width: 0; padding: 0 8px;
   background: var(--field); border: 1px solid var(--line2); border-radius: var(--r); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
 input[type=checkbox] { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }

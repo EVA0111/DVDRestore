@@ -1,27 +1,27 @@
-# EVA toolkit v0.25 alpha
-
-*Formerly **DVD Restore**.*
+# EVA toolkit v0.3 alpha
 
 Restores NTSC and PAL DVD video, other video files and still images: anime, cartoons and live action.
 A Windows desktop app (Electron front-end, Python + VapourSynth engine, PyTorch / TensorRT networks).
 
-> **Alpha.** It works on the discs it was tuned on and passes its self-test, but expect rough edges.
-> Bug reports with a sample are very welcome (Issues).
-<img width="1711" height="985" alt="image" src="https://github.com/user-attachments/assets/1cf0e28a-0548-442b-a3ed-5d1411fdb0a8" />
+> **Alpha.** It works on the discs it was tuned on and passes its self-test (65 checks), but expect rough edges.
+> Bug reports with a sample are very welcome (Issues). **Help → Report a problem** in the app makes the report for you.
+
+![EVA toolkit](docs/guide/g02-opened.png)
+
+**New here? Read the [easy guide](docs/guide/GUIDE.md)** (with pictures) or the **[wiki](../../wiki)**.
 
 ## Download and run
 
-1. Download **`DVDRestore-v0.25-alpha.zip`** from [Releases](../../releases) (about 0.3 GB).
+1. Download **`EVAtoolkit-v0.3-alpha.zip`** from [Releases](../../releases) (about 0.5 GB).
 2. Unpack it anywhere: another drive or a USB disk is fine.
-3. Start **`EVA toolkit.exe`** (in the v0.25 zip it is still called `DVD Restore.exe`).
+3. Start **`EVA toolkit.exe`**.
 4. **First start:** the *Dependencies* window installs what the engine needs with one click, into `runtime\` next to
-   the app: Python 3.12, PyTorch (CUDA 13), TensorRT, VapourSynth with its plugins, ffmpeg and MKVToolNix. That's
-   about **5.5 GB download, 9 GB on disk**, from their official download sites. Nothing is installed outside the
-   folder: no registry, no PATH, no admin rights. Then press *Start EVA toolkit*.
+   the app: Python 3.12, PyTorch (CUDA 13), TensorRT, VapourSynth, ffmpeg and MKVToolNix. That is about
+   **5.5 GB download, 9 GB on disk**, from their official download sites. Nothing is installed outside the folder:
+   no registry, no PATH, no admin rights. Then press *Start EVA toolkit*.
 
-The folder stays portable: move or copy it any time. On every start the app checks itself and reopens the
-Dependencies window if a part is missing or needs an update. Optional: `Self-test.bat` checks every stage on test
-footage it makes itself.
+The folder stays portable: move or copy it any time. The app can update itself (*Settings → Updates*).
+Optional: `Self-test.bat` checks every stage on test footage it makes itself.
 
 ### Needs
 
@@ -30,70 +30,54 @@ footage it makes itself.
   the CPU and are very slow.
 * About 10 GB of free disk space, more for the work folders of long episodes.
 
-Full documentation: **[the wiki](../../wiki)** (installation, every step of the window, troubleshooting).
-
 ## What it does
 
-* **Inverse telecine** (VFR / CFR) and PAL field matching or deinterlacing. Progressive sources (23.976p, 24p, 25p,
-  50p, 60p, HD files) are recognised and keep their own frame rate.
-* **Dot crawl and rainbows** (composite artifacts): neural clean-up (Precise or Precise temporal)
-  or classic filters, optional composite re-decode.
-* **MPEG blocking**, **halos / ringing** (HaloNet), **colour bleed and colour shift** (ChromaNet), clean white / black.
-* **Temporal stabilizer "Universal"**: steadies flicker, boil and line wobble in every kind of shot. Fades, cuts,
-  flashes and zooms are never dragged into the next frame.
-* Colour correction with adjustment layers, crop, resize (incl. EWA on the GPU), sharpening, line darkening.
-* Encode (x264 / x265 / SVT-AV1 / NVENC / ProRes / FFV1 / UT Video) and mux with all audio and subtitle tracks and a
-  sync check. Still images (PNG / JPEG / TIFF / BMP / WebP) are saved as 16-bit PNG.
-* Opens `.iso` images, `VIDEO_TS` folders and Blu-ray `BDMV` folders directly.
+* **Inverse telecine** (VFR / CFR), **60p deinterlace** for tape-shot video, and PAL field matching or deinterlacing.
+  Progressive sources (23.976p to 60p, HD files) are recognised from the picture and keep their own frame rate.
+  One **Analyze** button decides it all.
+* **Dot crawl and rainbows**, **MPEG blocking**, **halos / ringing**, **colour bleed and shift** (RepairNet, HaloNet,
+  ChromaNet, BlockNet, FieldNet), clean white / black, and a **temporal stabilizer** (Universal) that steadies flicker,
+  boil and line wobble without dragging cuts, fades or flashes into the next frame.
+* **Colour** like a grading page: scopes, wheels, curves, LUTs and **adjustment layers on the Timeline**, with
+  **Auto colour** and **Auto white balance**.
+* **A Timeline editor**: razor, ripple, cut parts out, run any step or filter on only a range, adjustment layers.
+* **A library of 450+ filters** (VapourSynth plugins, vs-jetpack, the app's own stages, your own code) and
+  **AI models** (`.onnx`, `.pth`, `.safetensors`) with a **model library** that keeps, shows, builds and deletes
+  their TensorRT engines.
+* Encode (x264 / x265 / SVT-AV1 / NVENC / ProRes / FFV1 / UT Video) and mux with all audio and subtitle tracks, a
+  sound **and picture** sync check, and cuts joined exactly. Stills are saved as 16-bit PNG.
+* Opens `.iso` images, `VIDEO_TS` folders and Blu-ray `BDMV` folders directly. Damaged discs: undecodable frames are
+  found in seconds and replaced.
 
-## New since v0.25 (on `main`, coming in the next release)
+## New in v0.3 alpha
 
-* **New name: EVA toolkit.** Same app, same folder layout; settings and the installed engine carry over.
-* **Auto-update**: a few seconds after start the app asks GitHub for the latest release (one plain request, nothing
-  about you is sent). If there is a newer one, a banner offers it: download, unpack, and after the app closes the new
-  files are copied over the folder and the new version starts. Your settings, `runtime\python`, `engines\`, `temp\`
-  and your own filters stay. Switch it off or check by hand in *Settings > Updates*.
-* **60p deinterlace for NTSC**: a third *Frame rate* choice next to VFR and CFR: every field becomes a frame (QTGMC,
-  59.94 fps) for video shot or edited on tape. The Telecine *Auto* picks it when a disc is real interlaced video;
-  film and anime stay inverse-telecined.
-* Fixes: the VFR analysis no longer keeps running after you choose CFR or 60p; an export no longer fails when a VOB's
-  audio runs past its last picture; the self-test no longer needs the optional `descale` plugin.
-
-## New in v0.25
-
-* **Progressive files are treated as progressive**: 29.97p / 25p rips are recognised from the picture (not only their
-  flags) instead of being inverse-telecined, a Picture switch (Progressive / Interlaced) sits at the top of Repair, and
-  files that mix 24p and 30p keep every frame's own time - in the export, chapters, episodes and every time shown.
-* **Every Repair group can be moved** (all but Telecine and Composite artifacts), and the Colour page has a
-  **Side by side** view.
-* **Faster**: opening files, still previews, frame stepping, and the Universal stabilizer (+36 %).
-* **Fixes from a full walk through the app**: the colour grade always runs after all repairs, no more false
-  "audio out of sync" warnings, a better stabilizer suggestion, image mode without video-only settings, an edited
-  script no longer carries over to the next file, and more.
-
-## New in v0.2
-
-* **Colour page laid out like DaVinci Resolve**: the picture in the middle, Auto correction left, scopes right, and a
-  collapsible panel underneath with the wheels, light, colour, hue / shadow colour and curves on one page.
-* **RepairNet**: halos and colour bleed fixed in one neural pass.
-* **VapourSynth filter groups** in Repair: any installed plugin or vs-jetpack function, picked from a searchable,
-  categorised filter browser, in draggable / duplicable groups placed anywhere in the chain (even instead of the IVTC).
-  Plus **your own filters** (Python functions, `.dll` plugins, custom code) and **your AI upscale / restore models**
-  (`.onnx`, `.pth`, `.safetensors`) with a VapourKit-style TensorRT engine dialog.
-* **Leftover combing** after the IVTC is found and repaired much better: single frames field matching could not fix,
-  and credits / captions laid on at 60 fields per second over film.
-* **Damaged discs**: undecodable frames are found in seconds (a fast scan on open) and replaced; the VFR analysis no
-  longer takes an hour on such files.
-* **Undo / redo** (Ctrl+Z / Ctrl+Y), **workflows** you can save and share, crop & size moved into Repair, image
-  information for stills, render progress with ETA, Blu-ray import, a better IVTC and colour auto-correction.
+* **A new window**: *Filtering → Colour → Deliver* over a Timeline, Media / Presets on the left, a live script beside
+  the steps. Everything on one screen.
+* **Delete or add steps**: every built-in step has a ✕, **Delete all steps** starts empty, **+ Add a filter** builds your
+  own chain. A deleted step does nothing; filters placed after it still run.
+* **The filter library** (over 450): searchable, categorised, with before / after of the current frame and the script
+  of every filter. **75 more VapourSynth plugins** are in it (bm3d, cas, dedot, dotkill, fmtconv, removegrain, eedi3,
+  descale, chromanr, ttempsmooth, zboxblur…), each one load-tested, plus three stabilizers (**Stab**, **Steady camera**,
+  **Stab, repeated**) built on MVTools' Depan functions.
+* **Models**: compact AI model nodes you can drag by the whole header, a **model library** per model (list / pick /
+  edit / build / delete engines, with a build progress bar), and **upscale models by [evana01](https://huggingface.co/evana01)**
+  in the zip (`models\upscale`: 2xGTv6-cel, 2xGTv5-cel, 2xGTv5-digipaint, 2xGTv4, 2xGTv4.5, 1xGTv4.5s; non-commercial).
+* **Timeline**: razor / cut / ripple, ranges of 1/30 of the episode by default, colour layers and LUT layers, jumps
+  held exactly, picture-vs-sound check.
+* **Analyze** and **Auto** everywhere; a rebuilt IVTC with a truth benchmark; a faster damaged-frame scan (a disc
+  that took an hour to analyse now takes two minutes); auto-update; progressive-source detection.
+* **Reliability**: a persistent log, **Help → Report a problem**, auto-save of your settings per source, Reload.
+* Faster opening, previews, frame stepping and stabilizer.
 
 ## Source layout
 
 | Folder | What |
 |---|---|
-| `app/` | Electron front-end (`main.js`, `deps.js` = the Dependencies installer, `renderer/`) |
-| `core/` | the engine: `server.py` (backend), `runner.py` (probe / export / mux), `vsgraph.py` (processing chain), networks; `requirements.txt` = exact package versions |
-| `models/` | trained network weights (+ the network code some of them need) |
+| `app/` | Electron front-end (`main.js`, `deps.js` = the Dependencies installer, `update.js`, `renderer/`) |
+| `core/` | the engine: `server.py` (backend), `runner.py` (probe / export / mux), `vsgraph.py` (processing chain), `blocks.py` (filter library), networks; `requirements.txt` = exact package versions |
+| `models/` | trained network weights (+ the network code some need) and `upscale/` (evana01's models) |
+| `my_filters/` | examples of your own filters (`stabilizers.py` is one); plugin `.dll`s go in `my_filters\plugins` |
+| `docs/guide/` | the easy guide and its pictures |
 | `tools/` | `selftest.py`, `build_portable.py` (makes the release folder + zip), `launcher.cs` (`EVA toolkit.exe`), `make_icon.py` |
 
 ### Run from source
@@ -107,18 +91,18 @@ app\node_modules\electron\dist\electron.exe app
 ```
 
 Python 3.12 is needed; ffmpeg (a *full* build, with the DVD-Video reader) and `mkvmerge` must be on PATH or in
-`runtime\ffmpeg\` and `runtime\mkvtoolnix\`.
+`runtime\ffmpeg\` and `runtime\mkvtoolnix\`. The 75 extra VapourSynth plugins are only in the release zip (they are
+large binaries): drop your own `.dll` plugins into `my_filters\plugins`.
 
 ### Build the release
 
 ```powershell
-python tools\build_portable.py dist\EVAtoolkit-v0.25-alpha --zip
+python tools\build_portable.py dist\EVAtoolkit-v0.3-alpha --zip
 ```
 
 ## Licence
 
 EVA toolkit is free software under the **MIT License** (see `LICENSE`).
-
-The tools it downloads keep their own licences: ffmpeg (GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its
-plugins, PyTorch (BSD-3), NVIDIA TensorRT (NVIDIA licence), Electron (MIT). The NeuFlow v2 optical-flow weights keep
-theirs (`models/neuflow/LICENSE`).
+The release zip also contains other people's work, each under its own licence: the VapourSynth plugins in
+`my_filters\plugins` (sources and hashes in `_sources.json`), NeuFlow v2 (`models\neuflow\LICENSE`) and the upscale
+models by evana01 (`models\upscale\README.txt`: CC BY-NC / CC BY-NC-ND, non-commercial).

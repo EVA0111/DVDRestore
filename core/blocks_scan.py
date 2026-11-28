@@ -88,6 +88,9 @@ def scan(new_only=False):
             res[f"{kind}:{call}"] = {"status": "hidden", "why": cat["hide"][call]}
         elif call in cat["needs"]:
             res[f"{kind}:{call}"] = {"status": "args", "need": cat["needs"][call]}
+        elif call in cat.get("trust", {}):                # not tried here (e.g. builds a TensorRT engine for minutes)
+            res[f"{kind}:{call}"] = {"status": "ok", "note": cat["trust"][call],
+                                     **({"formats": [cat["adapt"][call]]} if cat["adapt"].get(call) else {})}
     for f in blocks.vs_catalogue():
         if "vs:" + f["call"] in res:
             continue

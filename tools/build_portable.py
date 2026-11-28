@@ -1,6 +1,6 @@
 r"""Builds the shareable, portable EVA toolkit: one folder that runs from anywhere, nothing personal in it.
 
-    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\EVAtoolkit-v0.25-alpha)
+    python tools\build_portable.py [destination] [--full] [--zip]     (default: dist\EVAtoolkit-v0.3-alpha)
 
 Result (about 0.7 GB):
     EVA toolkit.exe        starts the app (tools\launcher.cs)     Self-test.bat    checks this PC can run everything
@@ -24,8 +24,8 @@ SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 FULL = "--full" in sys.argv
 ZIP = "--zip" in sys.argv
-DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "EVAtoolkit-v0.25-alpha")
-VERSION = "0.25.0-alpha"
+DEST = ARGS[0] if ARGS else os.path.join(SRC, "dist", "EVAtoolkit-v0.3-alpha")
+VERSION = "0.3.0-alpha"
 PY = os.path.dirname(sys.executable)                      # the Python this runs with (3.12 with everything installed)
 GITHUB = "https://github.com/EVA0111"
 
@@ -120,7 +120,7 @@ def python_runtime(dst):
 
 
 def readme(dst):
-    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# EVA toolkit v0.25 alpha (portable)
+    open(os.path.join(dst, "README.md"), "w", encoding="utf-8").write(rf"""# EVA toolkit v0.3 alpha (portable)
 
 Restores NTSC and PAL DVD video, other video files and still images - anime, cartoons and live action:
 
@@ -181,6 +181,9 @@ EVA toolkit itself: **MIT** (see `LICENSE`).
 The tools it uses: ffmpeg (LGPL / GPL), MKVToolNix (GPL-2.0), VapourSynth (LGPL-2.1) and its plugins, PyTorch (BSD-3), NVIDIA TensorRT
 (NVIDIA licence), Electron (MIT), NeuFlow v2 weights (see `models\neuflow\LICENSE`). Each keeps its own licence. Apart
 from Electron they are not in the zip: the Dependencies window downloads them from their publishers.
+
+In the zip: the VapourSynth plugins in `my_filters\plugins` (each with its own licence, sources in `_sources.json`) and the upscale models by
+evana01 in `models\upscale` (non-commercial; see `models\upscale\README.txt`).
 """)
 
 
@@ -246,13 +249,18 @@ def main():
     copy(os.path.join(SRC, "LICENSE"), os.path.join(DEST, "LICENSE"))       # EVA toolkit: MIT
     log("my_filters/ (the example of your own filters; an empty plugins folder)")
     os.makedirs(os.path.join(DEST, "my_filters", "plugins"), exist_ok=True)
-    copy(os.path.join(SRC, "my_filters", "example_filters.py"), os.path.join(DEST, "my_filters", "example_filters.py"))
+    for n in ("example_filters.py", "stabilizers.py"):
+        copy(os.path.join(SRC, "my_filters", n), os.path.join(DEST, "my_filters", n))
+    for n in sorted(os.listdir(os.path.join(SRC, "my_filters", "plugins"))):         # the VapourSynth plugins added to the library (vsrepo, chaiNNer)
+        if n.lower().endswith((".dll", ".json")):
+            copy(os.path.join(SRC, "my_filters", "plugins", n), os.path.join(DEST, "my_filters", "plugins", n))
     log("models/")
     for m in RUNTIME_MODELS + MODEL_CODE:
         s = os.path.join(SRC, "models", m)
         if os.path.isfile(s):
             copy(s, os.path.join(DEST, "models", m))
     copytree(os.path.join(SRC, "models", "neuflow"), os.path.join(DEST, "models", "neuflow"))
+    copytree(os.path.join(SRC, "models", "upscale"), os.path.join(DEST, "models", "upscale"))      # evana01's upscale models (huggingface.co/evana01)
     copy(os.path.join(SRC, "tools", "selftest.py"), os.path.join(DEST, "tools", "selftest.py"))
     log("runtime/electron")
     copytree(os.path.join(SRC, "app", "node_modules", "electron", "dist"), os.path.join(DEST, "runtime", "electron"))

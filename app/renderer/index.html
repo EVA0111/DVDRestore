@@ -3,46 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
-<title>EVA toolkit v0.25 alpha</title>
+<title>EVA toolkit v0.3 alpha</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="workspace.css">
 </head>
 <body>
-<!-- Layout: step rail | current step | live preview.
-     Steps: Source -> Repair (incl. crop & size) -> Colour -> Script -> Export. Settings = dialog. -->
-<div class="app">
-
-<!-- ============ step rail ============ -->
-<nav class="rail">
-  <div class="brand"><span class="logo"></span><div><b>EVA toolkit</b><i class="ver">v0.25 alpha</i><small id="srcShort">no source</small></div></div>
-  <div class="steps" id="stepNav">
-    <button data-step="source"><span class="dot">1</span><span class="lbl">Source<small>disc, file, episodes</small></span></button>
-    <button data-step="adjust"><span class="dot">2</span><span class="lbl">Repair<small>fix the source, crop &amp; size</small></span></button>
-    <button data-step="colour"><span class="dot">3</span><span class="lbl">Colour<small>levels, white balance</small></span></button>
-    <button data-step="script"><span class="dot">6</span><span class="lbl">Script<small>VapourSynth, edit &amp; save</small></span></button>
-    <button data-step="export"><span class="dot">7</span><span class="lbl">Export<small>encode the episodes</small></span></button>
-  </div>
-  <div class="rail-foot">
-    <div id="updBanner" class="upd-banner hidden">
-      <div class="upd-title" id="updTitle">Update available</div>
-      <div class="upd-text" id="updText"></div>
-      <div class="upd-bar hidden" id="updBar"><span id="updFill"></span></div>
-      <div class="upd-btns"><button id="btnUpdGo" class="primary">Update</button><button id="btnUpdNotes" class="link">What's new</button><button id="btnUpdLater" class="link">Later</button></div>
+<!-- Workspace: top bar | Media + Presets | viewer | Inspector (Filtering / Colour / Deliver) | dock (Timeline, Queue, Script, Log) -->
+<div class="app ws" id="app">
+  <header class="topbar">
+    <div class="brand"><span class="logo"></span><b>EVA toolkit</b><i class="ver">v0.3 alpha</i></div>
+    <nav class="menus" id="menus">
+      <div class="menu"><button class="mbtn">File</button><div class="mlist">
+        <button data-click="btnOpenFile">Open file…<kbd>Ctrl+O</kbd></button>
+        <button data-click="btnOpenFolder">Open DVD / Blu-ray folder…</button>
+        <hr><button id="btnWfSave">Save workflow…<kbd>Ctrl+S</kbd></button>
+        <button id="btnWfLoad">Load workflow…</button>
+        <hr><button data-cmd="preset-save">Save settings as preset…</button>
+        <button data-cmd="queue-add">Add ticked episodes to the queue</button></div></div>
+      <div class="menu"><button class="mbtn">Edit</button><div class="mlist">
+        <button data-click="btnUndo">Undo<kbd>Ctrl+Z</kbd></button><button data-click="btnRedo">Redo<kbd>Ctrl+Y</kbd></button>
+        <hr><button data-click="btnCopyAll">Copy settings to all episodes</button>
+        <button data-cmd="snapshot">Take a snapshot (for A / B)</button><button data-cmd="bookmark">Bookmark this frame<kbd>M</kbd></button></div></div>
+      <div class="menu"><button class="mbtn">View</button><div class="mlist">
+        <button data-cmd="script-win">Script window<kbd>Ctrl+Shift+S</kbd></button><hr><button data-cmd="toggle-left">Media panel</button><button data-cmd="toggle-right">Inspector</button><button data-cmd="toggle-dock">Bottom dock</button>
+        <hr><button data-cmd="fullscreen">Viewer only<kbd>F</kbd></button><button data-click="btnVsview">Preview in vsview</button>
+        <hr><button data-cmd="layout-reset">Reset panel sizes</button>
+        <hr><button data-cmd="reload">Reload window<kbd>Ctrl+R</kbd></button><button data-cmd="autosave">Auto-save settings<kbd id="autosaveMark">on</kbd></button>
+        <button data-cmd="autosave-clear">Forget the saved settings of this source</button><button data-cmd="engine-restart">Restart the engine</button></div></div>
+      <div class="menu"><button class="mbtn">Help</button><div class="mlist">
+        <button data-cmd="report">Report a problem…</button><button data-cmd="open-logs">Open the logs folder</button><button id="btnReport">Full diagnostic report (about a minute)…</button><button id="btnDeps">Dependencies…</button>
+        <button data-click="btnSettings">Settings…</button><hr><button id="btnGithub">EVA toolkit on GitHub ↗</button></div></div>
+    </nav>
+    <div class="pages" id="pageTabs">
+      <button data-page="adjust">Filtering<kbd>1</kbd></button><button data-page="colour">Colour<kbd>2</kbd></button><button data-page="export">Deliver<kbd>3</kbd></button>
     </div>
+    <div class="undo-redo"><button id="btnUndo" disabled title="Undo (Ctrl+Z)">↶</button><button id="btnRedo" disabled title="Redo (Ctrl+Y)">↷</button></div>
+    <span class="push"></span>
+    <small id="srcShort" class="src-short">no source</small>
+    <label class="preset-pick" title="Apply a saved per-show preset to the episode shown">Preset<select id="presetSel"><option value="">-</option></select></label>
+    <button id="btnQueue" class="qbtn" title="The batch queue (bottom dock)">Queue <b id="queueCount">0</b></button>
     <div id="backendBadge" class="backend-badge" title="Where the neural models run - change in Settings">PyTorch</div>
-    <div class="wf-row"><button id="btnWfSave" class="ghost" title="Save the settings of the episode shown (Repair, Colour, your filter groups) as a file to keep or share (Ctrl+S)">Save workflow</button><button id="btnWfLoad" class="ghost" title="Apply a saved or shared workflow file to this episode or all episodes">Load workflow</button></div>
-    <button id="btnReport" class="ghost wide" title="Measure this source and save a zip (measurements, sample frames, short clips, settings, log) to send for tuning">Collect report</button>
-    <button id="btnSettings" class="ghost wide">⚙ Settings</button>
-    <button id="btnDeps" class="ghost wide" title="Python, PyTorch, TensorRT, VapourSynth, ffmpeg, MKVToolNix: check, repair or add vsview">Dependencies</button>
-    <button id="btnGithub" class="ghost wide" title="EVA toolkit on GitHub: updates, issues, source">GitHub ↗</button>
-  </div>
-</nav>
+    <button id="btnSettings" class="ghost icon" title="Settings">⚙</button>
+  </header>
 
-<!-- ============ step panels ============ -->
-<aside class="side">
-
-    <!-- ============ 1 SOURCE ============ -->
-    <section class="panel" data-panel="source">
-      <header class="panel-head"><h2>Source</h2><p>Open a DVD (ISO or VIDEO_TS), a Blu-ray (BDMV folder), a video file or an image. Each episode is cut from it.</p></header>
+  <div class="work" id="work">
+    <aside class="leftp pbox" id="leftPanel">
+      <div class="ptabs"><button data-left="media" class="on">Media</button><button data-left="presets">Presets</button><span class="push"></span>
+        <button class="ghost icon" data-cmd="toggle-left" title="Hide (View menu shows it again)">⟨</button></div>
+      <div class="pscroll" id="left-media">
+        <div id="srcList" class="src-list"></div>
+        <section class="panel" data-panel="source">
       <div id="dropZone" class="drop">
         <div class="drop-icon">⤓</div>
         <div class="drop-title">Drop a disc, video or image here</div>
@@ -84,10 +94,10 @@
           <button id="btnWhole">One episode</button>
           <button id="btnAddEp">Duplicate</button>
           <button id="btnDelEp">Remove</button>
-          <button id="btnCopyAll" title="Every episode gets the Repair and Colour settings of the episode shown (each can still be changed on its own afterwards)">Copy settings to all</button>
+          <button id="btnCopyAll" title="Every episode gets the Filtering and Colour settings of the episode shown (each can still be changed on its own afterwards)">Copy settings to all</button>
         </div>
         <div class="note">Click a row to preview it · tick the episodes to export · type a time (h:mm:ss.sss) or a chapter number in the Ch. boxes (↑ / ↓ step through chapters).
-          Every episode has its own Repair and Colour settings (a new one starts from the defaults, a duplicate from the one it copies) - <b>Copy settings to all</b> gives all episodes the ones of the episode shown.</div>
+          Every episode has its own Filtering and Colour settings (a new one starts from the defaults, a duplicate from the one it copies) - <b>Copy settings to all</b> gives all episodes the ones of the episode shown.</div>
       </div>
 
       <div id="chapBox" class="group hidden">
@@ -101,33 +111,92 @@
         <div class="note"><b>Start</b> / <b>End</b>: the selected episode starts at / ends after this chapter.
           <b>Split</b>: a new episode starts here. Click a chapter's time to preview it.</div>
       </div>
-      <div class="panel-foot"><span></span><button class="primary" data-goto="adjust" id="nextAnalyze">Next: Repair →</button></div>
-    </section>
-
-    <!-- ============ 2 ANALYZE ============ -->
-    <section class="panel hidden" data-panel="analyze" style="display:none">
-      <header class="panel-head"><h2>Analyze</h2><p>Runs every detector on <b id="anEpisode">episode 1</b> and sets the repairs in <i>Adjust</i>. Once per series is enough.</p></header>
-      <div class="group">
-        <p class="lead">Telecine / PAL type, dot crawl, rainbows, MPEG blocking, halos, colour shift and bleed.
-          Colour correction and crop are not touched: each has its own <b>Auto</b> button in its step.</p>
-        <div class="actions"><button id="btnAnalyze" class="primary big">Analyze</button></div>
+      
+        </section>
       </div>
-      <div id="anResults" class="group hidden">
-        <div class="group-head"><h3>Results</h3><span class="hint">measured → setting</span></div>
-        <div id="anList" class="results"></div>
+      <div class="pscroll hidden" id="left-presets">
+        <div class="hd">Per-show presets</div>
+        <div id="presetList" class="preset-list"></div>
+        <form id="presetForm" class="preset-form"><input id="presetName" type="text" spellcheck="false" placeholder="Name, e.g. Blue Dragon: clean film" aria-label="Preset name">
+          <button class="primary" type="submit">Save</button></form>
+        <div class="note">A preset is every Filtering and Colour setting of the episode shown (your filter groups too), saved by name. Apply it to
+          any episode or source of the same show. Kept in <code>presets\</code> in the app folder.</div>
       </div>
-      <div class="panel-foot"><button data-goto="source">← Source</button><button class="primary" data-goto="adjust">Next: Adjust →</button></div>
-    </section>
+      <div id="updBanner" class="upd-banner hidden">
+      <div class="upd-title" id="updTitle">Update available</div>
+      <div class="upd-text" id="updText"></div>
+      <div class="upd-bar hidden" id="updBar"><span id="updFill"></span></div>
+      <div class="upd-btns"><button id="btnUpdGo" class="primary">Update</button><button id="btnUpdNotes" class="link">What's new</button><button id="btnUpdLater" class="link">Later</button></div>
+    </div>
+    </aside>
+    <div class="splitv" data-split="left" title="Drag to resize"></div>
 
-    <!-- ============ 3 ADJUST (pipeline order) ============ -->
-    <section class="panel hidden" data-panel="adjust">
-      <header class="panel-head"><h2>Repair</h2><p>In processing order; drag a group by ⠿ to change it (Telecine and Composite artifacts always run first). Each group has its own <b>Auto</b> button that measures this source for that group only.
-        <span class="chip auto">auto</span> = set by Auto, <span class="chip edited">edited ↺</span> = changed by you (click to undo).</p></header>
-      <div class="note warn-note">Auto values are <b>suggestions</b>, measured on a sample of the episode - they can be wrong.
-        Always check the result in the preview (Split, Play) and change what does not look right.</div>
+    <section class="viewer">
+      <button class="edge-tab edge-left" data-cmd="toggle-left" title="Show the Media panel">›</button>
+      <button class="edge-tab edge-right" data-cmd="toggle-right" title="Show the Inspector">‹</button>
+      <div class="toolbar">
+    
+    <div class="seg" id="segView" title="B / A / S (D = side by side in Colour)">
+      <button data-v="before">Before</button><button data-v="after">After</button><button data-v="split">Split</button><button data-v="sbs" title="Before and After next to each other (D)">Side by side</button><button data-v="ab" title="Your settings now (A) next to a snapshot (B) - take one with + Snapshot">A / B</button>
+    </div>
+    <span id="abPick" class="ab-pick hidden"><span class="muted">B</span><select id="abSel" title="The snapshot shown as B"></select></span>
+    <button id="btnSnap" class="ghost" title="Keep the settings as they are now as a snapshot, to compare with A / B (also a vsview tab)">＋ Snapshot</button>
+    <button id="btnBookmark" class="ghost icon" title="Bookmark this frame (M) - shown on the timeline">★</button>
+    <button id="btnFull" class="ghost icon" title="Viewer only (F)">⤢</button>
+    <select id="selZoom" title="Zoom (click the picture to toggle 2x)"><option>Fit</option><option>1:1</option><option>2x</option><option>3x</option><option>4x</option></select>
+    <div class="frame-nav">
+      <button id="btnPrev" title="Previous frame (←), Shift = 1 s">◀</button>
+      <span class="seek"><input id="seekFrame" type="text" class="mono" title="Type a frame number and press Enter"><span id="frameInfo" class="mono">/ --</span></span>
+      <button id="btnNext" title="Next frame (→), Shift = 1 s">▶</button>
+    </div>
+    <span class="push"></span>
+    <button id="btnVfrPrev" class="hidden" title="Preview and Play run at 24 fps until the VFR analysis has run for this episode. Then they show the export's own frames and frame rates (30 fps video parts such as scrolling captions play smoothly). The export reuses the analysis.">VFR preview</button>
+    <span id="scriptFlag" class="chip edited hidden" title="The preview's After view runs your edited script">edited script</span>
+    <button id="btnVsview" class="primary" title="Open in vsview (its own window): Source, Before, FINAL and comparison tabs. It reloads by itself when you change a setting, keeping its tab and frame.">Preview in vsview</button>
+  </div>
+      <div class="stage-row">
+        <aside id="gradeSide" class="grade-side">
+        </aside>
+        <div id="stage" class="stage">
+    <div id="placeholder" class="placeholder"><div><div class="ph-big">▣</div>Open a source to see the preview.</div></div>
+    <div id="imgWrap" class="img-wrap hidden">
+      <img id="imgBefore" alt="">
+      <img id="imgAfter" alt="">
+      <div id="splitBar" class="split-bar hidden"><span>Before | After</span></div>
+      <span class="sbs-tag sbs-b hidden">Before</span><span class="sbs-tag sbs-a hidden">After</span>
+    </div>
+    <div id="spinner" class="spinner hidden"><div class="spin"></div><span id="spinnerText">Rendering preview…</span></div>
+  </div>
+      </div>
+    </section>
+    <div class="splitv" data-split="right" title="Drag to resize"></div>
+
+    <aside class="insp pbox" id="inspector">
+      <div class="ptabs"><span class="insp-title" id="inspTitle">Filtering</span><span class="push"></span>
+        <button class="ghost icon" data-cmd="toggle-right" title="Hide (View menu shows it again)">⟩</button></div>
+      <div class="isearch"><input id="findSetting" type="search" spellcheck="false" placeholder="Find a setting… (halo, crop, 60p, sharpen)" aria-label="Find a setting"></div>
+      <div class="pscroll" id="inspScroll">
+        <section class="panel" data-panel="adjust">
+      <div class="repair-top">
+        <button id="btnAnalyzeAll" class="primary" title="Checks the episode and sets every step: telecine, dots & rainbows, MPEG blocks, halos, colour, crop, stabilizer. Each step then says what was found.">Analyze everything</button>
+        <button id="btnAddModelTop" class="ghost" title="Your AI models (.onnx / .pth / .safetensors): upscalers and restorers, run on the GPU">+ Add a model</button>
+        <button id="btnAddFilterTop" class="ghost" title="Add a filter: any plugin, vs-jetpack function, AI model, your own filter or code (then drag its group by ⠿ to where it should run)">+ Add a filter</button>
+        <button id="btnScriptSide" class="ghost" title="Open the script of these steps: read it, edit it, or load your own .vpy">&lt;/&gt; Script</button>
+        <button id="btnBackList" class="ghost" title="Back to the Filtering panels">← Back to the panels</button>
+        <div id="analyzeBar" class="analyze-bar hidden"><i></i></div>
+      </div>
+      <div class="rmode hidden"><div class="seg" id="rmodeSeg"><button data-v="guided" title="The step panels: Telecine, Composite, Compression, …">Guided</button><button data-v="chain" title="Your own chain of blocks: any repair stage, plugin, vs-jetpack function, AI model or code, in any order">Chain</button><button data-v="script" title="Write your own VapourSynth script (made from your settings, then yours to edit)">Script</button></div>
+        <span id="rmodeNote" class="muted"></span>
+        <button id="btnLiveShow" class="live-show" data-live="show" title="Show the script beside the chain">‹ Show script</button></div>
+      <div id="chainPanel" class="chain-panel hidden"></div>
+      <div class="chain-pin" data-pin="source"><div class="group-head"><div><h3>Source</h3><div class="gsum">the file, as decoded · damaged frames replaced</div></div></div></div>
+      <div id="scriptPanel" class="script-panel hidden"></div>
+      <div class="note warn-note">Auto values are <b>suggestions</b>, measured on a sample of the episode, so they can be wrong.
+        Check the result in the preview (Split, Play) and adjust anything that looks off.<br>
+        To work scene by scene, <b>drag a filter, step or model onto the Timeline</b>: it then runs only on that part, which you can move or stretch.</div>
 
       <div class="group" data-gid="telecine">
-        <div class="group-head"><h3>Telecine &amp; interlacing</h3><span><button id="btnAdvanced" class="link">Fine-tune IVTC ▾</button> <button class="auto-btn" data-auto="frames" title="PAL: progressive / field-shifted / interlaced and field order. NTSC: film or hybrid (VFR / CFR) and whether the ICP fix is needed.">Auto</button></span></div>
+        <div class="group-head"><h3>Telecine &amp; interlacing</h3><span><button id="btnAdvanced" class="link" title="Fine-tune the IVTC: TFM / TDecimate thresholds">Fine-tune ▾</button> <button id="btnVfrAnalyze" class="an-btn primary" title="Analyze this episode: progressive or interlaced / telecined (the picture), then VFR / CFR / 60p, field order, the ICP fix and the repairs (like Auto), then - when it is VFR - the VFR analysis, so the preview shows the export's own frames">Analyze</button></span></div>
         <div class="field scan-field"><label title="Progressive = whole frames (a rip, a web or Blu-ray file, a progressive DVD): nothing to field-match or deinterlace, the frame rate and every frame's time are kept. Interlaced / telecined = fields (most DVDs): the controls below apply. Set when the file is opened (its flags and a check of the picture for combing); change it if the detection was wrong.">Picture</label>
           <div class="seg" data-bind="scan"><button data-v="progressive">Progressive</button><button data-v="interlaced">Interlaced / telecined</button></div></div>
         <div id="scanNote" class="note scan-note"></div>
@@ -258,98 +327,16 @@
           <div class="stepper" data-bind="sharp.lines" data-step="0.05" data-min="0" data-max="1"></div></div>
         <div id="sharpNote" class="note"></div>
       </div>
-      <div class="vsf-new"><button class="ghost" id="vsfNewGroup" title="A group of your own VapourSynth filters (any installed plugin or vs-jetpack function). Drag it by ⠿ to where it should run; duplicate it with ⧉.">+ VapourSynth filters</button>
+      <div class="chain-pin" data-pin="colour"><div class="group-head"><div><h3>Colour correction</h3><div class="gsum">the Colour page's grade and adjustment layers</div></div><button class="ghost" data-goto="colour">Open Colour ›</button></div></div>
+      <div class="chain-pin" data-pin="output"><div class="group-head"><div><h3>Output</h3><div class="gsum">encoder format and colour tags (Deliver)</div></div></div></div>
+      <div class="repair-next"><button id="btnRepairNext" class="primary">Next: Colour →</button></div>
+      <div class="vsf-new"><button class="ghost" id="vsfNewGroup" title="Add a filter: any plugin, vs-jetpack function, AI model, your own filter or code (drag it by ⠿ to where it should run)">+ Add a filter</button>
+        <button class="ghost" id="stepsDeleteAll" title="Delete every built-in step above, then build your own with + Add a filter">Delete all steps</button>
+        <button class="ghost hidden" id="stepsRestoreAll" title="Put the deleted built-in steps back">Restore deleted steps</button>
         <span class="note">Drag a group by ⠿ between the groups above: it runs at that point.</span></div>
-      <div class="panel-foot"><button data-goto="source">← Source</button><button class="primary" data-goto="colour">Next: Colour →</button></div>
-    </section>
-
-    <!-- ============ 4 COLOUR ============ -->
-    <section class="panel hidden" data-panel="colour">
-      <header class="panel-head"><h2>Colour</h2><p>Runs after all repairs. Everything at its default = picture untouched; <i>Before</i> is never corrected, so Split shows exactly this step. Double-click any slider, wheel or curve point to reset it. Click a section title to fold it.</p></header>
-
-      <div class="panel-foot"><button data-goto="adjust">← Repair</button><button class="primary" data-goto="script">Next: Script →</button></div>
-    </section>
-
-    <!-- ============ 5 CROP & SIZE ============ -->
-    <!-- ============ 6 SCRIPT ============ -->
-    <section class="panel hidden" data-panel="script">
-      <header class="panel-head"><h2>Script</h2><p>Everything you set, as a VapourSynth script. Edit it here: the preview and the export use your version.</p></header>
-      <div class="group script-group">
-        <div class="group-head">
-          <span id="scriptState" class="chip auto">from settings</span>
-          <span class="push"></span>
-          <button id="btnScriptCheck" title="Run the script and report frames, size and errors">Check</button>
-          <button id="btnScriptReset" title="Throw your edits away and rebuild the script from the settings">Rebuild from settings</button>
-          <button id="btnScriptSave" class="primary" title="Save the script as a .vpy file (vspipe, vsview, VapourSynth Editor)">Save .vpy…</button>
-        </div>
-        <textarea id="scriptBox" class="code" spellcheck="false" wrap="off"></textarea>
-        <div id="scriptMsg" class="note"></div>
-      </div>
-      <div class="note">While the script is <b>from settings</b> it follows every change in the other steps. Once you type in it, it is <b>edited</b>:
-        settings changes no longer reach it, until you press <i>Rebuild from settings</i>. The <code>EPISODE</code> block is filled in for each episode on export;
-        the preview shows VFR as CFR (VFR needs the analysis pass that runs on export).</div>
-      <div class="panel-foot"><button data-goto="colour">← Colour</button><button class="primary" data-goto="export">Next: Export →</button></div>
-    </section>
-
-    <!-- ============ 7 EXPORT ============ -->
-    <section class="panel hidden" data-panel="export">
-      <header class="panel-head"><h2>Export</h2><p class="vid-only">Encode the ticked episodes. Audio, subtitles and fonts are copied untouched and checked for sync.</p><p class="img-only">Saves the restored picture as a lossless PNG in the folder below.</p></header>
-      <div class="group vid-only">
-        <div class="group-head"><h3>File</h3></div>
-        <div class="field"><label>Encoder</label><select data-bind="encoder" data-opts="encoders"></select></div>
-        <div class="field" id="encPresetRow"><label id="encPresetLbl">Preset</label><select id="encPreset"></select></div>
-        <div class="field" id="encTuneRow"><label>Tune</label><select id="encTune"></select></div>
-        <div class="field" id="encRateRow"><label>Rate control</label>
-          <div class="seg" data-bind="enc_rate"><button data-v="q">Constant quality</button><button data-v="bitrate">Bitrate</button></div></div>
-        <div class="field" id="encQRow"><label id="encQLbl">Quality (CRF)</label>
-          <div class="stepper" data-bind="crf" data-step="0.5" data-min="0" data-max="63" data-hint="lower = better quality, bigger file"></div></div>
-        <div class="field" id="encBrRow"><label>Bitrate</label>
-          <div class="stepper" data-bind="enc_bitrate" data-step="500" data-min="500" data-max="100000" data-unit="kbit/s"></div></div>
-        <div class="field" id="encDepthRow"><label>Bit depth</label><div class="seg" id="encDepth"></div></div>
-        <div class="field" id="encChromaRow"><label title="4:2:0 = what a DVD has. 4:2:2 / 4:4:4 keep more colour resolution (after AI upscaling or for editing)">Chroma</label><div class="seg" id="encChroma"></div></div>
-        <div class="field" id="encKeyRow"><label title="Frames between keyframes. 0 = the encoder's default. Lower = faster seeking, bigger file.">Keyframe interval</label>
-          <div class="stepper" data-bind="enc_keyint" data-step="12" data-min="0" data-max="1200" data-unit="frames"></div></div>
-        <div class="field"><label title="Added to the ffmpeg command as typed, e.g. -x264-params aq-strength=0.8:psy-rd=1.0">Extra arguments</label><input type="text" data-bind="enc_extra" placeholder="e.g. -x264-params aq-strength=0.8"></div>
-        <div id="encNote" class="note"></div>
-      </div>
-      <div class="group">
-        <div class="group-head"><h3><span class="vid-only">Audio &amp; file</span><span class="img-only">File</span></h3></div>
-        <div class="field vid-only"><label>Audio</label><select data-bind="audio_codec" data-opts="audio_codecs"></select></div>
-        <div class="field" data-show="audio_codec=aac|audio_codec=opus"><label>Audio bitrate</label>
-          <div class="stepper" data-bind="audio_bitrate" data-step="16" data-min="64" data-max="512" data-unit="kbit/s"></div></div>
-        <div class="field"><label>Folder</label><div class="with-btn"><input type="text" data-bind="out_dir"><button id="btnOutDir">Browse…</button></div></div>
-        <div class="field" data-show="multi"><label>Name pattern</label><input type="text" data-bind="name" title="{n} = episode number, {name} = source name"></div>
-        <div id="exportNote" class="note"></div>
-      </div>
-      <div class="group">
-        <div class="group-head"><h3>Queue</h3><button id="btnShowOut">Open folder</button></div>
-        <div id="queue" class="queue"></div>
-        <div class="actions"><button id="btnExport" class="go big">Export</button></div>
-      </div>
-      <div class="panel-foot"><button data-goto="script">← Script</button><span></span></div>
-    </section>
-</aside>
-
-<!-- ============ preview ============ -->
-<section class="viewer">
-  <div class="toolbar">
-    <div class="undo-redo"><button id="btnUndo" disabled>↶</button><button id="btnRedo" disabled>↷</button></div>
-    <div class="seg" id="segView" title="B / A / S (D = side by side in Colour)">
-      <button data-v="before">Before</button><button data-v="after">After</button><button data-v="split">Split</button><button data-v="sbs" class="sbs-only" title="Before and After next to each other (D)">Side by side</button>
-    </div>
-    <select id="selZoom" title="Zoom (click the picture to toggle 2x)"><option>Fit</option><option>1:1</option><option>2x</option><option>3x</option><option>4x</option></select>
-    <div class="frame-nav">
-      <button id="btnPrev" title="Previous frame (←), Shift = 1 s">◀</button>
-      <span class="seek"><input id="seekFrame" type="text" class="mono" title="Type a frame number and press Enter"><span id="frameInfo" class="mono">/ --</span></span>
-      <button id="btnNext" title="Next frame (→), Shift = 1 s">▶</button>
-    </div>
-    <span class="push"></span>
-    <button id="btnVfrPrev" class="hidden" title="Preview and Play run at 24 fps until the VFR analysis has run for this episode. Then they show the export's own frames and frame rates (30 fps video parts such as scrolling captions play smoothly). The export reuses the analysis.">VFR preview</button>
-    <span id="scriptFlag" class="chip edited hidden" title="The preview's After view runs your edited script">edited script</span>
-    <button id="btnVsview" class="primary" title="Open in vsview (its own window): Source, Before, FINAL and comparison tabs. It reloads by itself when you change a setting, keeping its tab and frame.">Preview in vsview</button>
-  </div>
-    <div class="stage-row">
-    <aside id="gradeSide" class="grade-side">
+      
+        </section>
+        <section class="panel hidden" data-panel="colour">
 <div class="group fold" data-fold="scopes">
         <div class="group-head"><h3>Scopes</h3><span class="hint">frame shown, After</span></div>
         <div class="fold-body">
@@ -358,7 +345,8 @@
           <div id="scopeNote" class="note"></div>
         </div>
       </div>
-<div class="group accent" id="autoGroup" title="Corrects the transfer, not the art: black / white level, a cast on the whites and on the black line art, a heavy fade and clipped colour. With a reference of the same show it also matches saturation, contrast, midtones, shadow lift, shadow colour and hue. Untick a line to leave that part out.">
+          <div id="layerTarget" class="scene-target edit-target"></div>
+          <div class="group accent" id="autoGroup" title="Corrects the transfer, not the art: black / white level, a cast on the whites and on the black line art, a heavy fade and clipped colour. With a reference of the same show it also matches saturation, contrast, midtones, shadow lift, shadow colour and hue. Untick a line to leave that part out.">
         <div class="group-head"><h3>Auto correction</h3><button id="btnGradeReset" class="link">Reset all</button></div>
         <div class="auto-row">
           <button id="btnAutoColour" class="primary" title="Measure this source and correct what its transfer got wrong: black / white level, tinted whites and blacks, faded colour, clipped colour. A source that is already right is left as it is.">Auto colour</button>
@@ -374,69 +362,7 @@
           <div class="slider" data-bind="autoStrength" data-min="0" data-max="1.5" data-step="0.05" data-def="1"></div></div>
         <div id="autoNote" class="note">Corrects the transfer, not the art: black / white level, a cast on the whites and on the black line art, a heavy fade and clipped colour. With a reference of the same show it also matches saturation, contrast, midtones, shadow lift, shadow colour and hue. A cast that changes from shot to shot is the art and is left alone. Untick a line to leave that part out.</div>
       </div>
-    </aside>
-    <div id="stage" class="stage">
-    <div id="placeholder" class="placeholder"><div><div class="ph-big">▣</div>Open a source to see the preview.</div></div>
-    <div id="imgWrap" class="img-wrap hidden">
-      <img id="imgBefore" alt="">
-      <img id="imgAfter" alt="">
-      <div id="splitBar" class="split-bar hidden"><span>Before | After</span></div>
-      <span class="sbs-tag sbs-b hidden">Before</span><span class="sbs-tag sbs-a hidden">After</span>
-    </div>
-    <div id="spinner" class="spinner hidden"><div class="spin"></div><span id="spinnerText">Rendering preview…</span></div>
-  </div>
-  </div>
-
-  
-
-  <!-- whole-video timeline: other episodes faint, the selected one highlighted with In / Out handles -->
-  <div id="tl" class="tl hidden" title="Click or drag to seek · drag the handles to trim (they snap to chapters; hold Shift for single frames) · click another episode to open it">
-    <div class="tl-track"></div>
-    <div id="tlEps"></div>
-    <div id="tlTicks"></div>
-    <div id="tlSel" class="tl-sel"><div id="tlIn" class="tl-h tl-in"></div><div id="tlOut" class="tl-h tl-out"></div></div>
-    <div id="tlHead" class="tl-head"></div>
-    <div id="tlTip" class="tl-tip hidden"></div>
-  </div>
-  <!-- adjustment layer track (Colour step): zoomable, source frames of the title -->
-  <div id="lt" class="lt hidden">
-    <div class="lt-bar"><span class="lt-title">Timeline</span>
-      <div class="seg lt-zoom" id="ltZoom"><button data-v="0">Episode</button><button data-v="300">5 min</button><button data-v="60">1 min</button><button data-v="15">15 s</button></div>
-      <button id="ltAdd" class="primary" title="New adjustment layer at the playhead (5 s, on the lowest track that is free there)">+ Adjustment layer</button>
-      <button id="ltSplit" title="Cut the selected layer (or the top layer under the playhead) in two at the playhead (Ctrl+K)">Split at playhead</button>
-      <button id="ltTrack" title="Add a track on top">+ Track</button>
-      <span class="lt-hint" title="Double-click a track = new layer · drag = move (also to another track) · drag the ends = trim · Del = delete · Ctrl+K = split · Shift = no snapping · Ctrl+wheel = zoom">double-click a track = new layer · drag = move (also to another track) · drag the ends = trim · Del = delete · Shift = no snapping · Ctrl+wheel = zoom</span></div>
-    <div class="lt-grid">
-      <div id="ltHeads" class="lt-heads"></div>
-      <div id="ltBody" class="lt-body"><div id="ltRuler" class="lt-ruler"></div><div id="ltLanes" class="lt-lanes"></div><div id="ltHead" class="lt-head"></div><div id="ltTip" class="tl-tip hidden"></div></div>
-    </div>
-  </div>
-  <div class="transport">
-    <button id="btnPlay" class="play" title="Play / pause (Space). Plays as fast as the preview can be rendered.">▶</button>
-    <input id="rngPos" type="range" min="0" max="1000" value="100" class="hidden">
-    <div class="tp-now"><span id="tpTime" class="mono" title="Time of the frame shown (in the whole title)">-</span><span id="playFps" class="mono muted"></span></div>
-    <span class="push"></span>
-    <span id="tpEp" class="tp-ep"></span>
-    <div class="trim">
-      <span class="tp-lab">In</span>
-      <input id="trimStart" type="text" class="mono" title="Episode start: a time (h:mm:ss.sss) or a source frame number, then Enter">
-      <button id="btnTrimIn" title="The episode starts at the frame shown ( I )">Set</button>
-      <span class="tp-sep"></span>
-      <span class="tp-lab">Out</span>
-      <input id="trimEnd" type="text" class="mono" title="Episode end: a time (h:mm:ss.sss) or a source frame number, then Enter">
-      <button id="btnTrimOut" title="The episode ends after the frame shown ( O )">Set</button>
-      <span class="tp-sep"></span>
-      <span class="tp-lab">Length</span><span id="tpLen" class="mono tp-len"></span>
-      <button id="btnTrimReset" class="link hidden" title="Back to the start / end found when the file was opened">Undo trim</button>
-    </div>
-  </div>
-  <!-- Colour step, laid out like Resolve's Colour page: palettes on the left, scopes on the right -->
-  <div id="gradeDock" class="grade-dock">
-    <div class="gd-main">
-      <div class="gd-bar"><nav id="gradeTabs" class="grade-tabs"></nav><div id="layerTarget" class="scene-target edit-target"></div></div>
-      <div class="gd-page" data-page="primaries">
-
-<div class="group fold" data-fold="wheels" title="Shadows = lift, Midtones = gamma, Highlights = gain: the dot tints that range toward its colour, the slider under each wheel makes it brighter / darker. Auto colour puts its cast corrections here.">
+          <div class="group fold" data-fold="wheels" title="Shadows = lift, Midtones = gamma, Highlights = gain: the dot tints that range toward its colour, the slider under each wheel makes it brighter / darker. Auto colour puts its cast corrections here.">
         <div class="group-head"><h3>Colour wheels</h3><span class="hint">drag the dot · Shift = fine</span></div>
         <div class="fold-body">
           <div class="wheels">
@@ -465,7 +391,7 @@
         </div>
       </div>
 <div class="group fold" data-fold="colour">
-        <div class="group-head"><h3>Colour</h3><span class="hint">balance &amp; strength</span></div>
+        <div class="group-head"><h3>Colour</h3><span class="hint">balance, strength &amp; hue</span></div>
         <div class="fold-body">
           <div class="field" data-key="grade.temp"><label title="Negative = cooler (blue), positive = warmer (amber)">Temperature</label>
             <div class="slider temp" data-bind="grade.temp" data-min="-2" data-max="2" data-step="0.01" data-def="0"></div></div>
@@ -478,17 +404,13 @@
           <div class="field" data-key="grade.gamut"><label title="Strong reds and blues that a screen cuts off flat. Compress: the disc still stores them, they are squeezed back into range. AI rebuild: they were cut off before the disc or capture was made, a neural model puts the gradation back.">Clipped colour</label>
             <select data-bind="grade.gamut" data-opts="gamut"></select></div>
           <div id="gamutNote" class="note"></div>
-        </div>
-      </div>
-<div class="group fold" data-fold="more" data-closed="1">
-        <div class="group-head"><h3>More</h3><span class="hint">hue, shadow colour</span></div>
-        <div class="fold-body">
           <div class="field"><label title="Rotates every colour (degrees)">Hue</label>
             <div class="slider" data-bind="grade.hue" data-min="-60" data-max="60" data-step="1" data-def="0"></div></div>
           <div class="field"><label title="Extra saturation in the dark tones only: colour crushed together with the blacks">Shadow colour</label>
-            <div class="slider" data-bind="grade.dark_sat" data-min="0" data-max="2" data-step="0.05" data-def="0"></div></div>
+            <div class="slider" data-bind="grade.dark_sat" data-min="0" data-max="2" data-step="0.05" data-def="0"></div>
         </div>
       </div>
+
 <div class="group fold" data-fold="curves" data-closed="1">
         <div class="group-head"><h3>Curves</h3><button id="btnCurveReset" class="link">Reset curve</button></div>
         <div class="fold-body">
@@ -497,60 +419,237 @@
           <div class="note">Click to add a point, drag it, double-click to remove it. Master works on all three channels.</div>
         </div>
       </div>
-      </div>
-
-      <div class="gd-page" data-page="layers">
 <div class="group fold" data-fold="layers" id="layerGroup">
-        <div class="group-head"><h3>Adjustment layers</h3><span class="hint" id="layerCount"></span><button id="btnLayerAdd" title="New adjustment layer at the playhead (5 s)">+ Layer</button></div>
+        <div class="group-head"><h3>Colour adjustment layers</h3><span class="hint" id="layerCount"></span><button id="btnLayerAdd" title="New colour adjustment layer at the playhead (5 s)">+ Layer</button><button id="btnLutLoad" title="Add one or more .cube files (3D or 1D LUTs): each becomes a layer on the Timeline">+ LUT…</button></div>
         <div class="fold-body">
           <div id="layerList" class="layer-list"></div>
-          <div class="note">A grade for part of the video (one scene, a flashback): put layers on the tracks of the timeline under the picture. A layer grades everything under it - the base grade and lower tracks. Click a layer to edit it with the controls above; click it again for the <b>Base grade</b> (whole video).</div>
+          
         </div>
       </div>
-      </div>
-      <div class="gd-page" data-page="luts">
-<div class="group fold" data-fold="luts" data-closed="1">
-        <div class="group-head"><h3>LUTs</h3><span class="hint" id="lutCount"></span><button id="btnLutLoad" title="Add one or more .cube files">+ Add LUT…</button></div>
+<div class="group fold" data-fold="luts" data-closed="1" style="display:none"><!-- LUTs are layers now: they live in the Colour adjustment layers window -->
+        <div class="group-head"><h3>LUTs</h3><span class="hint" id="lutCount"></span></div>
         <div class="fold-body">
           <div id="lutList" class="lut-list"></div>
           <div class="note">.cube files (3D or 1D) from Resolve, Premiere or a LUT pack. Applied last, after the wheels and curves, top to bottom: each LUT works on the result of the one above. They expect normal TV-range picture as input.</div>
         </div>
       </div>
+        </section>
+        <section class="panel hidden" data-panel="export">
+      <div class="group vid-only">
+        <div class="group-head"><h3>File</h3></div>
+        <div class="field"><label>Encoder</label><select data-bind="encoder" data-opts="encoders"></select></div>
+        <div class="field" id="encPresetRow"><label id="encPresetLbl">Preset</label><select id="encPreset"></select></div>
+        <div class="field" id="encTuneRow"><label>Tune</label><select id="encTune"></select></div>
+        <div class="field" id="encRateRow"><label>Rate control</label>
+          <div class="seg" data-bind="enc_rate"><button data-v="q">Constant quality</button><button data-v="bitrate">Bitrate</button></div></div>
+        <div class="field" id="encQRow"><label id="encQLbl">Quality (CRF)</label>
+          <div class="stepper" data-bind="crf" data-step="0.5" data-min="0" data-max="63" data-hint="lower = better quality, bigger file"></div></div>
+        <div class="field" id="encBrRow"><label>Bitrate</label>
+          <div class="stepper" data-bind="enc_bitrate" data-step="500" data-min="500" data-max="100000" data-unit="kbit/s"></div></div>
+        <div class="field" id="encDepthRow"><label>Bit depth</label><div class="seg" id="encDepth"></div></div>
+        <div class="field" id="encChromaRow"><label title="4:2:0 = what a DVD has. 4:2:2 / 4:4:4 keep more colour resolution (after AI upscaling or for editing)">Chroma</label><div class="seg" id="encChroma"></div></div>
+        <div class="field" id="encKeyRow"><label title="Frames between keyframes. 0 = the encoder's default. Lower = faster seeking, bigger file.">Keyframe interval</label>
+          <div class="stepper" data-bind="enc_keyint" data-step="12" data-min="0" data-max="1200" data-unit="frames"></div></div>
+        <div class="field"><label title="Added to the ffmpeg command as typed, e.g. -x264-params aq-strength=0.8:psy-rd=1.0">Extra arguments</label><input type="text" data-bind="enc_extra" placeholder="e.g. -x264-params aq-strength=0.8"></div>
+        <div id="encNote" class="note"></div>
       </div>
-
-    </div>
-
+      <div class="group">
+        <div class="group-head"><h3><span class="vid-only">Audio &amp; file</span><span class="img-only">File</span></h3></div>
+        <div class="field vid-only"><label>Audio</label><select data-bind="audio_codec" data-opts="audio_codecs"></select></div>
+        <div class="field" data-show="audio_codec=aac|audio_codec=opus"><label>Audio bitrate</label>
+          <div class="stepper" data-bind="audio_bitrate" data-step="16" data-min="64" data-max="512" data-unit="kbit/s"></div></div>
+        <div class="field"><label>Folder</label><div class="with-btn"><input type="text" data-bind="out_dir"><button id="btnOutDir">Browse…</button></div></div>
+        <div class="field" data-show="multi"><label>Name pattern</label><input type="text" data-bind="name" title="{n} = episode number, {name} = source name"></div>
+        <div id="exportNote" class="note"></div>
+      </div>
+      
+          <div class="actions"><button id="btnExport" class="go big">Add to queue</button></div>
+        </section>
+      </div>
+      <aside id="liveScript" class="live-script hidden">
+        <div class="live-h"><b>Script</b><span>written from your settings, live</span><span id="liveCount" class="push-r"></span>
+          <button class="ghost" data-live="edit" title="Edit it as text (Script mode)">Edit</button>
+          <button class="ghost" data-live="save" title="Save the script as a .vpy file">Save .vpy…</button>
+          <button class="live-hide" data-live="hide" title="Hide the script (Show script brings it back)">⟩</button></div>
+        <div id="liveLines" class="live-lines"></div>
+        <div class="live-f">Click a panel: its lines light up. Click a line: its panel opens. Every change rewrites the script at once.</div>
+      </aside>
+    </aside>
   </div>
-  <div id="trimInfo" class="hidden"></div>
 
+  <div class="splith" id="splitH" title="Drag to resize"></div>
+  <section class="dock" id="dock">
+    <div class="ptabs" id="dockTabs"><button data-dock="timeline" class="on">Timeline</button><button data-dock="queue">Queue</button>
+      <button data-dock="log">Log</button><span class="push"></span>
+      <button class="ghost icon" data-cmd="toggle-dock" title="Hide (View menu shows it again)">⌄</button></div>
+    <div class="dpage" data-dpage="timeline">
+      <div id="tlx" class="tlx empty">
+        <div class="tlx-seq"><div id="tlxSeq" class="tlx-seqtabs"></div><span class="push"></span>
+          <span id="tlxHint" class="tlx-hint"></span></div>
+        <div class="tlx-bar">
+          <span id="tlxTc" class="tlx-tc mono" title="Timecode of the playhead (hours:minutes:seconds:frames) - click for frame numbers">00:00:00:00</span>
+          <button id="tlxUnits" class="tlx-units" title="Timecode or frame numbers (the playhead, In / Out, length and the ruler)">TC</button>
+          <div class="tlx-transport">
+            <button id="tlxStart" class="ghost" title="Go to the episode's In (Home)">⇤</button>
+            <button id="tlxPrevEdit" class="ghost" title="Previous edit point (↑)">⏮</button>
+            <button id="tlxBack" class="ghost" title="One frame back (←)">◂</button>
+            <button id="btnPlay" class="play" title="Play / pause (Space). Plays as fast as the preview can be rendered; parts cut out are skipped.">▶</button>
+            <button id="tlxFwd" class="ghost" title="One frame on (→)">▸</button>
+            <button id="tlxNextEdit" class="ghost" title="Next edit point (↓)">⏭</button>
+            <button id="tlxEnd" class="ghost" title="Go to the episode's Out (End)">⇥</button>
+          </div>
+          <span id="playFps" class="mono muted"></span>
+          <div class="trim">
+            <span class="tp-lab">In</span>
+            <input id="trimStart" type="text" class="mono" title="Episode start: a time (h:mm:ss.sss) or a source frame number, then Enter">
+            <button id="btnTrimIn" title="The episode starts at the frame shown ( I )">Set</button>
+            <span class="tp-lab">Out</span>
+            <input id="trimEnd" type="text" class="mono" title="Episode end: a time (h:mm:ss.sss) or a source frame number, then Enter">
+            <button id="btnTrimOut" title="The episode ends after the frame shown ( O )">Set</button>
+            <span class="tp-lab">Dur</span><span id="tpLen" class="mono tp-len"></span>
+            <span id="tlxEdited" class="chip warn hidden" title="Length of the export: the episode without the parts cut out"></span>
+            <button id="btnTrimReset" class="link hidden" title="Back to the start / end found when the file was opened">Undo trim</button>
+          </div>
+          <span class="push"></span>
+          <button id="tlxSnap" class="tog on" title="Snap to edits, the playhead, chapters, markers and layer ends (hold Shift for single frames)">Snap</button>
+          <button id="tlxMarker" class="ghost" title="Add a marker at the playhead (M)">◆ Marker</button>
+          <button id="tlxReset" class="ghost" title="Remove every edit and cut of this episode">Clear edits</button>
+          <button id="ltTrack" class="ghost" title="Add an adjustment layer track on top">+ Track</button>
+          <button id="ltAdd" class="primary" title="New colour adjustment layer at the playhead (5 s, on the lowest track that is free there)">+ Colour adjustment layer</button>
+        </div>
+        <div class="tlx-main">
+          <div id="tlxTools" class="tlx-tools">
+            <button data-tool="sel"><svg viewBox="0 0 16 16"><path d="M3 1l10 7-5 1-2 5z" fill="currentColor"/></svg></button>
+            <button data-tool="razor"><svg viewBox="0 0 16 16"><path d="M2 14L12 4M10 2l4 4-2 2-4-4z" stroke="currentColor" fill="none" stroke-width="1.6"/></svg></button>
+            <button data-tool="ripple"><svg viewBox="0 0 16 16"><path d="M5 2v12M11 2v12M5 8h6M8 5l3 3-3 3" stroke="currentColor" fill="none" stroke-width="1.6"/></svg></button>
+            <button data-tool="hand"><svg viewBox="0 0 16 16"><path d="M5 8V3.5a1 1 0 012 0V7M7 7V2.5a1 1 0 012 0V7M9 7V3.5a1 1 0 012 0V9c0 3-2 5-4 5S3 12 3 10V7.5a1 1 0 012 0" stroke="currentColor" fill="none" stroke-width="1.3"/></svg></button>
+            <button data-tool="zoom"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" stroke="currentColor" fill="none" stroke-width="1.6"/><path d="M10.5 10.5L14 14M5 7h4M7 5v4" stroke="currentColor" stroke-width="1.6"/></svg></button>
+          </div>
+          <div id="tlxScrollV" class="tlx-scrollv">
+            <div id="ltHeads" class="tlx-heads"></div>
+            <div id="ltBody" class="tlx-body"><div id="ltRuler" class="tlx-ruler"></div><div id="ltLanes" class="tlx-lanes"></div>
+              <div id="ltHead" class="tlx-ph hidden"></div><div id="tlxRazor" class="tlx-razor hidden"></div><div id="ltTip" class="tl-tip hidden"></div></div>
+          </div>
+        </div>
+        <div class="tlx-foot">
+          <button id="tlxZout" class="ghost" title="Zoom out (-)">−</button>
+          <div id="tlxScroll" class="tlx-scroll" title="Drag the middle to scroll, its ends to zoom · Ctrl+wheel on the tracks zooms, Shift+wheel scrolls"><div id="tlxThumb"></div></div>
+          <button id="tlxZin" class="ghost" title="Zoom in (+)">+</button>
+          <span id="tlxZoomLab" class="mono muted"></span>
+          <button id="tlxFitBtn" class="ghost" title="Show the whole episode (\\)">Fit</button>
+        </div>
+        <div class="tlx-empty">Open a source: the episode, its sound and subtitles appear here.</div>
+      </div>
+      <div class="hidden"><input id="rngPos" type="range" min="0" max="1000" value="100"><span id="tpTime"></span><span id="tpEp"></span><div id="trimInfo"></div></div>
+    </div>
+    <div class="dpage hidden" data-dpage="queue"><div class="group">
+        <div class="group-head"><h3>Queue</h3><button id="btnShowOut">Open folder</button></div>
+        <div id="queue" class="queue"></div>
+        <div class="actions"></div>
+      </div>
+      </div>
+    <div class="dpage hidden" data-dpage="script">
+      <div class="group script-group">
+        <div class="group-head">
+          <span id="scriptState" class="chip auto">from settings</span>
+          <span class="push"></span>
+          <button id="btnScriptCheck" title="Run the script and report frames, size and errors">Check</button>
+          <button id="btnScriptReset" title="Throw your edits away and rebuild the script from the settings">Rebuild from settings</button>
+          <button id="btnScriptOpen" title="Load a VapourSynth script (.vpy / .py) you wrote outside the app: it runs as written, with the sound and subtitles of the file opened here">Open .vpy…</button>
+          <button id="btnScriptSave" class="primary" title="Save the script as a .vpy file (vspipe, vsview, VapourSynth Editor)">Save .vpy…</button>
+        </div>
+        <textarea id="scriptBox" class="code" spellcheck="false" wrap="off"></textarea>
+        <div id="scriptMsg" class="note"></div>
+      </div>
+      <div class="note">While the script is <b>from settings</b> it follows every change in the other steps. Once you type in it, it is <b>edited</b>:
+        settings changes no longer reach it, until you press <i>Rebuild from settings</i>. The <code>EPISODE</code> block is filled in for each episode on export;
+        the preview shows VFR as CFR (VFR needs the analysis pass that runs on export).</div>
+      </div>
+    <div class="dpage hidden" data-dpage="log"><pre id="log" class="log"></pre></div>
+  </section>
+  <div id="scriptWin" class="script-win hidden" role="dialog" aria-label="Script">
+    <div class="sw-head" id="swHead"><b>Script</b><span class="sw-ep">episode <span id="swEp">1</span></span><span class="push"></span>
+      <button id="swClose" class="ghost icon" title="Close (Esc). The script keeps running as it is.">✕</button></div>
+    <div id="scriptWinBody" class="sw-body"></div>
+  </div>
+  <button class="edge-tab edge-bottom" data-cmd="toggle-dock" title="Show the Timeline again">⌃ Timeline</button>
   <div class="statusbar">
     <span id="busyDot" class="busy-dot"></span>
     <span id="statusText" class="status-text">Ready</span>
     <div class="progress"><div id="progBar"></div></div>
     <span id="progText" class="prog-text mono"></span>
     <button id="btnStop" class="danger hidden">Stop</button>
-    <button id="btnLog" class="link">Log ▴</button>
+    <div id="meters" class="meters" title="Computer load (updates every 1.5 s)"></div>
+    <button id="btnProblems" class="problems hidden" title="Something went wrong (see the Log). Click to make a report you can send."><i>⚠</i> <b>0</b> <span>problems</span> · Report</button>
+    <button id="btnLog" class="link">Log</button>
   </div>
-  <pre id="log" class="log hidden"></pre>
-</section>
+</div>
+
+<!-- kept for older code paths (hidden): the old step list and the Analyze panel -->
+<div id="legacy" hidden>
+  <div class="steps" id="stepNav">
+    <button data-step="source"><span class="dot">1</span><span class="lbl">Source<small>disc, file, episodes</small></span></button>
+    <button data-step="adjust"><span class="dot">2</span><span class="lbl">Filtering<small>fix the source, crop &amp; size</small></span></button>
+    <button data-step="colour"><span class="dot">3</span><span class="lbl">Colour<small>levels, white balance</small></span></button>
+    <button data-step="script"><span class="dot">6</span><span class="lbl">Script<small>VapourSynth, edit &amp; save</small></span></button>
+    <button data-step="export"><span class="dot">7</span><span class="lbl">Export<small>encode the episodes</small></span></button>
+  </div>
+  <section class="panel hidden" data-panel="analyze" style="display:none">
+      <header class="panel-head"><h2>Analyze</h2><p>Runs every detector on <b id="anEpisode">episode 1</b> and sets the repairs in <i>Adjust</i>. Once per series is enough.</p></header>
+      <div class="group">
+        <p class="lead">Telecine / PAL type, dot crawl, rainbows, MPEG blocking, halos, colour shift and bleed.
+          Colour correction and crop are not touched: each has its own <b>Auto</b> button in its step.</p>
+        <div class="actions"><button id="btnAnalyze" class="primary big">Analyze</button></div>
+      </div>
+      <div id="anResults" class="group hidden">
+        <div class="group-head"><h3>Results</h3><span class="hint">measured → setting</span></div>
+        <div id="anList" class="results"></div>
+      </div>
+      <div class="panel-foot"><button data-goto="source">← Source</button><button class="primary" data-goto="adjust">Next: Adjust →</button></div>
+    </section>
 </div>
 
 <!-- ============ settings dialog ============ -->
 <div id="vsfDlg" class="modal hidden">
-  <div class="dialog vsf-dlg">
-    <header><h2>Add a VapourSynth filter</h2><span id="vsfDlgFor" class="vsf-dlg-for"></span><button id="vsfDlgClose" class="link close" title="Close (Esc)">✕</button></header>
-    <input type="text" id="vsfDlgSearch" spellcheck="false" placeholder="Search by name, function, category or what it does: denoise, dehalo, VFM, bwdif, deband, sharpen, mask…">
-    <div class="vsf-dlg-body">
-      <nav id="vsfDlgCats" class="vsf-cats"></nav>
-      <div class="vsf-dlg-main">
+  <div class="dialog pick-dlg">
+    <header class="pick-top-bar">
+      <svg viewBox="0 0 16 16" class="pick-ico"><path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <h2 id="pickTitle">Add a filter</h2><span id="vsfDlgFor" class="pick-for"></span>
+      <button id="vsfDlgClose" class="link close" title="Close (Esc)">✕</button></header>
+    <div class="pick-search"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5"/></svg>
+      <input type="text" id="vsfDlgSearch" spellcheck="false" placeholder="Search by name, category or what it does: denoise, dehalo, deband, IVTC, sharpen, mask…"></div>
+    <div class="pick-body">
+      <nav id="vsfDlgCats" class="pick-cats"></nav>
+      <div class="pick-main">
+        <div id="pickChips" class="pick-chips"></div>
         <div id="vsfAiBar" class="vsf-ai-bar hidden"></div>
         <div id="vsfMyBar" class="vsf-ai-bar hidden"></div>
-        <div class="vsf-table-wrap"><table class="vsf-table">
-          <thead><tr><th>Filter</th><th>Function</th><th>From</th><th>Settings</th><th>What it does</th></tr></thead>
-          <tbody id="vsfDlgRows"></tbody></table></div>
-        <div id="vsfDlgInfo" class="vsf-info"></div>
+        <div id="vsfDlgRows" class="pick-list"></div>
       </div>
+      <aside id="pickSide" class="pick-side"></aside>
     </div>
+    <footer class="pick-foot"><span id="pickCount"></span><span class="push"></span><span class="dim">arrows choose · Enter or double-click adds · move the mouse over the picture to compare</span><kbd>Esc</kbd><span class="dim">to close</span></footer>
+  </div>
+</div>
+
+<div id="reportDlg" class="modal hidden">
+  <div class="dialog wide rep-dlg">
+    <header><h2>Report a problem</h2><button id="btnReportClose" class="link close" title="Close (Esc)">✕</button></header>
+    <div class="rep-body">
+      <p class="rep-lead">Say what went wrong. The report is one small zip: your words, the version and system, the log, your recent actions, your settings and a screenshot. Nothing is sent anywhere: you send the file.</p>
+      <label class="rep-lab" for="repText">What happened, and what did you expect?</label>
+      <textarea id="repText" rows="5" spellcheck="true" placeholder="e.g. I dropped Halos on the Timeline, pressed Play and the picture froze after a few seconds."></textarea>
+      <div class="rep-opts">
+        <label><input type="checkbox" id="repLog" checked> The log and my recent actions (names of buttons I used, never what I typed)</label>
+        <label><input type="checkbox" id="repSet" checked> My settings for this source and the generated script</label>
+        <label><input type="checkbox" id="repShot" checked> A screenshot of the window</label>
+        <label><input type="checkbox" id="repSrc" checked> Technical info about the video file (ffprobe)</label>
+        <label><input type="checkbox" id="repHide" checked> Hide my Windows user name in file paths</label>
+      </div>
+      <div id="repProblems" class="rep-problems hidden"></div>
+      <div id="repDone" class="note hidden"></div>
+    </div>
+    <footer class="rep-foot"><button id="btnReportLogs" class="ghost">Open the logs folder</button><span class="push"></span><button id="btnReportMake" class="primary">Create report</button></footer>
   </div>
 </div>
 
@@ -628,6 +727,12 @@
   </div>
 </div>
 
+<script src="timeline.js"></script>
+<script src="picker.js"></script>
+<script src="meters.js"></script>
+<script src="chainmode.js"></script>
+<script src="scriptmode.js"></script>
 <script src="app.js"></script>
+<script src="report.js"></script>
 </body>
 </html>

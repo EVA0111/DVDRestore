@@ -821,21 +821,9 @@ def note_bad_frame(path, err):
     return n
 
 
-def _timeline_gaps(path):
-    """jumps in a file's picture timeline (MPEG-PS / VOB cell boundaries: VTS_02_1 jumps 1.1 s at 47.3 s, picture and
-    audio alike): {"t0", "t_last", "gaps": [[time before the jump, length]]}, from the container's packet times (no
-    decoding; a few seconds for a 1 GB VOB), cached in temp\timeline next to the damaged-frame lists"""
-    import hashlib
-    st = os.stat(path)
-    key = hashlib.sha1(f"{os.path.abspath(path).lower()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:16]
-    f = os.path.join(paths.TEMP, "timeline", key + ".json")
-    try:
-        with open(f, encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:                                    # noqa: BLE001
-        pass
+def _packet_times(path, sel):
     import runner
-    r = runner._run([runner.TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time",
+    r = runner._run([runner.TOOLS["ffprobe"], "-v", "error", "-select_streams", sel, "-show_entries", "packet=pts_time",
                      "-of", "csv=p=0", path])
     t = []
     for x in (r.stdout or "").split():
@@ -843,9 +831,40 @@ def _timeline_gaps(path):
             t.append(float(x.strip(",")))
         except ValueError:
             pass
-    t.sort()
-    info = {"t0": t[0] if t else 0.0, "t_last": t[-1] if t else 0.0,
-            "gaps": [[a, b - a] for a, b in zip(t, t[1:]) if b - a > 0.1]}   # pulldown leaves at most 0.067 s
+    return sorted(t)
+
+
+def _timeline_gaps(path):
+    """jumps in a file's clock (MPEG-PS / VOB cell boundaries: VTS_02_1 jumps at 47.3 s, picture, sound and subtitles
+    alike): {"t0", "t_last", "gaps": [[last picture time before, picture gap, clock jump]]}. The clock jump is measured
+    on the audio (AC3 frames are exact: 1.024 s there), else on the picture. From the container's packet times (no
+    decoding, ~1 s for a 1 GB VOB), cached in temp\\timeline."""
+    import hashlib
+    st = os.stat(path)
+    key = hashlib.sha1(f"{os.path.abspath(path).lower()}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:16]
+    f = os.path.join(paths.TEMP, "timeline", key + ".v3.json")
+    try:
+        with open(f, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:                                    # noqa: BLE001
+        pass
+    v = _packet_times(path, "v:0")
+    try:
+        au = _packet_times(path, "a:0")
+    except Exception:                                    # noqa: BLE001
+        au = []
+    adur = sorted(b - a for a, b in zip(au, au[1:]))[len(au) // 2] if len(au) > 10 else 0.032
+    gaps = []
+    for a, b in zip(v, v[1:]):
+        if b - a <= 0.1:                                 # pulldown leaves at most 0.067 s between pictures
+            continue
+        jump, cut = None, a + 1001 / 30000
+        for x, y in zip(au, au[1:]):                     # the audio's own jump next to it
+            if abs(x - a) < 1.5 and y - x > adur * 2:
+                jump, cut = y - (x + adur), x + adur     # sound ends at cut, goes on at cut + jump
+                break
+        gaps.append([a, b - a, round(jump if jump is not None else b - a - 1001 / 30000, 4), round(cut, 4)])
+    info = {"t0": v[0] if v else 0.0, "t_last": v[-1] if v else 0.0, "gaps": gaps}
     try:
         os.makedirs(os.path.dirname(f), exist_ok=True)
         with open(f, "w", encoding="utf-8") as fh:
@@ -855,11 +874,21 @@ def _timeline_gaps(path):
     return info
 
 
+def timeline_jumps(path):
+    """[(time from the file start, clock jump)]: what the export removes from sound and subtitles, the picture alike"""
+    try:
+        tl = _timeline_gaps(path)
+    except Exception:                                    # noqa: BLE001
+        return []
+    return [(g[3] - tl["t0"], g[2]) for g in tl.get("gaps") or [] if g[2] > 0]   # where the sound stops, how long the jump is
+
+
 def timeline_holds(path, n_frames, fps):
-    """[(frame, count)]: where the decoder's frames fall short of the file's timeline. The decoder joins the pictures
-    on both sides of a timeline jump and also drops the undecodable ones next to it (VTS_02_1: 66348 frames for 66392
-    slots, all 44 at the 47.3 s jump), while the audio keeps its timestamps - everything after ran 1.43 s early. The
-    missing slots are held (copies of the last picture before the jump), shared between the jumps by their length."""
+    """[(frame, count)] in the decoder's numbering. At a clock jump the decoder joins the pictures on both sides and
+    drops the undecodable ones next to it (VTS_02_1: 66348 frames for 66392 slots, 44 short at the 47.3 s jump). The
+    jump itself (1.024 s there) is closed in every stream, as a DVD player plays it - only the pictures that are really
+    missing (13 there) are held, so frame numbers follow the file's clock with its jumps taken out. (Holding the whole
+    jump while the audio kept a hole put the subtitles ~1 s after the speech in MPC-HC.)"""
     try:
         tl = _timeline_gaps(path)
     except Exception as e:                                # noqa: BLE001
@@ -868,17 +897,20 @@ def timeline_holds(path, n_frames, fps):
     gaps = tl.get("gaps") or []
     if not gaps:
         return []
-    slots = int(round((tl["t_last"] - tl["t0"]) * fps)) + 1
-    missing = slots - n_frames
+    closed = (tl["t_last"] - tl["t0"]) - sum(max(0.0, g[2]) for g in gaps)
+    missing = int(round(closed * fps)) + 1 - n_frames
     if missing <= 0:
         return []
-    total = sum(g for _, g in gaps)
-    out, given = [], 0
-    for i, (t_end, g) in enumerate(gaps):
+    total = sum(g[1] for g in gaps)
+    out, given, shift, held = [], 0, 0.0, 0
+    for i, (t_end, g, d, *_c) in enumerate(gaps):
         n = missing - given if i == len(gaps) - 1 else int(round(missing * g / total))
         given += n
+        pos = int(round((t_end - tl["t0"] - shift) * fps)) + 1 - held      # closed position -> decoder numbering
+        shift += max(0.0, d)
         if n > 0:
-            out.append((min(n_frames, int(round((t_end - tl["t0"]) * fps)) + 1), n))
+            out.append((max(1, min(n_frames, pos)), n))
+            held += n
     return out
 
 
@@ -909,8 +941,31 @@ def _skip_bad(src, bad):
     return core.std.FreezeFrames(src, first=first, last=last, replacement=repl)
 
 
+_BS = {}
+
+
+def shared_source(path, w=None, h=None):
+    """One BestSource per file, shared by every chain (preview before / after, the cached chains, Play, the export): each
+    VideoSource keeps up to 4 decoders alive and every decoder its own libav thread pool and frame buffers - 6 cached
+    chains x 2 views came to ~600 threads and decoded the same GOP twice. Standard definition decodes at thousands of fps
+    on 4 decoder threads (measured: 4469 fps vs 5728 with the automatic ~16), so SD gets 4; bigger pictures keep
+    the automatic choice. DVDRESTORE_BS_THREADS overrides."""
+    try:
+        key = (os.path.normcase(os.path.abspath(path)), os.path.getmtime(path))
+    except OSError:
+        return core.bs.VideoSource(path, rff=True)
+    s = _BS.get(key)
+    if s is None:
+        env = os.environ.get("DVDRESTORE_BS_THREADS")
+        threads = int(env) if env else (4 if (w or 0) and (w or 0) <= 1024 and (h or 0) <= 600 else 0)
+        for k in [k for k in _BS if k[0] == key[0]]:
+            del _BS[k]                                  # the file changed on disk: the old one goes
+        s = _BS[key] = core.bs.VideoSource(path, rff=True, **({"threads": threads} if threads else {}))
+    return s
+
+
 def source(job, clean=True):
-    src = core.bs.VideoSource(job["source"], rff=True)
+    src = shared_source(job["source"], job.get("src_w"), job.get("src_h"))
     if not job.get("image"):
         src = _skip_bad(src, bad_frames(job["source"]))
     if job.get("image"):                               # a still: a short clip of identical frames (runner.IMAGE_FRAMES)
@@ -941,10 +996,8 @@ def source(job, clean=True):
     src = core.std.SetFrameProps(src, _Matrix=m, _Primaries=p, _Transfer=t, _Range=vs.RANGE_LIMITED)
     GUARD["on"] = opt(job, "temporal_guard") != "off"
     src = core.akarin.PropExpr(src, lambda: {"_SrcN": f"N {int(start)} +"})      # scene grades (Colour step)
-    if clean and opt(job, "composite") in ("chroma", "full", "clean", "on") and not _stablenet_on(job):
-        src = composite_restore(src, job)            # StableNet does the composite repair itself (trained on raw input)
-    if clean and not is_pal(job):
-        src = xtalk_stage_a(src, job)
+    if clean:
+        src = xtalk_ranged(src, job, _composite_a)   # composite decoder + dot crawl / rainbows (on frame ranges when set)
     if clean and vsf_at(job, "source"):                # your filters on the raw source (field matching / VFR analysis see them)
         src = vs_filters(src, job, "source")
     return src
@@ -2341,6 +2394,8 @@ def measure_cadence(job, windows=320, cycles=8):
     # picture moves in one strip only - averaged over the frame it looked like a still shot (Idaten Jump)
     blk = lambda a: np.abs(a).reshape(8, 16, 12, 16).mean(axis=(1, 3)).max()
     span = cycles * 5 + 1
+    # (tried: the windows on 12 threads - identical result, 76 s instead of 18 s: TFM works through its frames in order,
+    # so concurrent random windows only make it redo its neighbours. One window after the other is the fast way.)
     for w in np.linspace(n * 0.02, n * 0.98 - 21, windows).astype(int):   # positions as with 4 cycles
         w = max(0, min(int(w), n - span))
         fr = [np.asarray(y.get_frame(int(w + i))[0]) * 255 for i in range(span)]
@@ -3073,6 +3128,37 @@ _STAB_AFTER = {"after_ivtc": None, "after_cleanup": "compression", "after_halos"
                "after_size": "size", "end": "sharpen"}
 
 
+REMOVABLE = ("telecine", "composite", "compression", "halos", "colour", "crop", "stab", "size", "sharpen")
+
+
+def apply_removed(job):
+    """Steps the user deleted from the Repair list (job "removed_steps"): a copy of the job with that step's settings
+    neutral, so the step does nothing (the filter groups placed after it still run)."""
+    gone = {x for x in job.get("removed_steps") or [] if x in REMOVABLE}
+    if not gone:
+        return job
+    j = dict(job)
+    if "telecine" in gone:
+        j["progressive"] = True                       # no field matching / deinterlacing: the frames as the disc has them
+    if "composite" in gone:
+        j.update(crawl="off", rainbow="off", composite="off", rainbow_fill="off", ai_model="off", uni_crawl=0.0, uni_rainbow=0.0)
+    if "compression" in gone:
+        j.update(deblock="off", uni_mpeg=0.0)
+    if "halos" in gone:
+        j.update(ghost="off", halo_rx=0, ghost_taps=0, uni_halo=0.0)
+    if "colour" in gone:
+        j.update(chroma={}, repairnet="off", uni_chroma=0.0)
+    if "crop" in gone:
+        j["crop"] = {}
+    if "stab" in gone:
+        j["stab"] = "off"
+    if "size" in gone:
+        j.update(out_w=None, out_h=None)
+    if "sharpen" in gone:
+        j["sharp"] = {"luma": 0, "chroma": 0, "lines": 0}
+    return j
+
+
 def repair_order(job):
     """the movable Repair steps in their order; a missing step goes back to its usual place. Older jobs: the
     default order with the stabilizer where "stab_pos" put it."""
@@ -3102,7 +3188,7 @@ def _stab_ok(job):
 def vsf_groups(job):
     """[(point, [filters])]: the user's VapourSynth filter groups (Repair step, each dragged to its place), in order.
     The older single list (job "vs_filters" + "vs_filters_pos") counts as one more group."""
-    ok = lambda fl: [f for f in (fl or []) if isinstance(f, dict) and f.get("on", True) and f.get("type") in ("vs", "jet", "ai", "my", "code")]
+    ok = lambda fl: [f for f in (fl or []) if isinstance(f, dict) and f.get("on", True) and _vsf_type_ok(f.get("type"))]
     out = []
     for g in job.get("vs_groups") or []:
         if isinstance(g, dict) and g.get("on", True) and ok(g.get("filters")):
@@ -3111,6 +3197,32 @@ def vsf_groups(job):
         p = opt(job, "vs_filters_pos")
         out.append((p if p in VSF_POINTS else "repairs", ok(job.get("vs_filters"))))
     return out
+
+
+def vsf_groups_ranged(job):
+    """[(point, [filters], ranges or None)]: as vsf_groups, with the frame ranges of a group set to 'only some parts'"""
+    ok = lambda fl: [f for f in (fl or []) if isinstance(f, dict) and f.get("on", True) and _vsf_type_ok(f.get("type"))]
+    out = []
+    for g in job.get("vs_groups") or []:
+        if isinstance(g, dict) and g.get("on", True) and ok(g.get("filters")):
+            rg = [(r["start"], r["end"]) if isinstance(r, dict) else (r[0], r[1]) for r in g.get("ranges") or []
+                  if (isinstance(r, dict) and "start" in r) or (isinstance(r, (list, tuple)) and len(r) >= 2)] if g.get("only") else None
+            out.append((g.get("pos") if g.get("pos") in VSF_POINTS else "repairs", ok(g.get("filters")), rg))
+    if ok(job.get("vs_filters")):
+        p = opt(job, "vs_filters_pos")
+        out.append((p if p in VSF_POINTS else "repairs", ok(job.get("vs_filters")), None))
+    return out
+
+
+def _vsf_type_ok(t):
+    """a filter group's entry: a plugin / vs-jetpack function, your model / filter / code, or one of the app's own stages"""
+    if t in ("vs", "jet", "ai", "my", "code"):
+        return True
+    try:
+        import blocks
+        return t in blocks.BLOCKS and t not in ("source", "ivtc", "pal", "output", "colour")
+    except Exception:                                    # noqa: BLE001
+        return False
 
 
 def vsf_at(job, point):
@@ -3124,27 +3236,77 @@ def vsf_pos(job):
     return g[0][0] if g else None
 
 
+RANGE_STEPS = ("composite", "compression", "halos", "colour", "stab", "sharpen")   # steps that can run on frame ranges
+
+
+def splice_src(base, alt, ranges):
+    """frames whose source frame (_SrcN) lies in one of ranges [(a, b)] (b exclusive) come from alt, the rest from base.
+    Both were made from the whole clip, so temporal filters have their context at the range edges; by source frame, so
+    it holds through IVTC, VFR and 60p alike."""
+    rs = [(int(a), int(b)) for a, b in ranges or [] if int(b) > int(a)]
+    if not rs:
+        return base
+    if (alt.width, alt.height, alt.num_frames) != (base.width, base.height, base.num_frames):
+        print("a frame range changes the picture size or length - applied to the whole clip", file=sys.stderr)
+        return alt
+    if alt.format.id != base.format.id:
+        alt = core.resize.Bicubic(alt, format=base.format.id, dither_type="error_diffusion")
+
+    def pick(n, f):
+        s = f.props.get("_SrcN", -1)
+        return alt if any(a <= s < b for a, b in rs) else base
+    return core.std.FrameEval(base, pick, prop_src=base)
+
+
+def xtalk_ranged(clip, job, fn):
+    """Dots and rainbows (the composite stages, before and after the IVTC) on frame ranges: the stage on the whole clip
+    (unless it runs only on its ranges), then each range with its own settings - by source frame (_SrcN), which is
+    the frame number itself before the IVTC and still holds after it. Without ranges it is just fn(clip, job)."""
+    ranges = [r for r in job.get("ranges") or [] if isinstance(r, dict) and r.get("on", True) and r.get("step") == "composite"]
+    only = (job.get("range_only") or {}).get("composite")
+    if not ranges and not only:
+        return fn(clip, job)
+    out = clip if only else fn(clip, job)
+    for r in ranges:
+        alt = fn(clip, dict(job, **(r.get("set") or {})))
+        out = splice_src(out, alt, [(r.get("start", 0), r.get("end", 0))])
+    return out
+
+
+def _composite_a(src, job):
+    """the stages before the IVTC: the composite decoder (if on) and the dot crawl / rainbow cancelling"""
+    if opt(job, "composite") in ("chroma", "full", "clean", "on") and not _stablenet_on(job):
+        src = composite_restore(src, job)            # StableNet does the composite repair itself (trained on raw input)
+    if not is_pal(job):
+        src = xtalk_stage_a(src, job)
+    return src
+
+
 def vs_filters(clip, job, point="repairs"):
     """Repair -> VapourSynth filters: any installed plugin function or vs-jetpack function, in the user's order, after the
     colour alignment and before crop / stabilizer. Each entry {"type": "vs" | "jet", "p": {"call", "args"}, "on"} runs
     through blocks.block (the EVA toolbox: typed arguments, the picture converted to a format the filter accepts and
     back). Whatever the filters do to the format, the chain continues in its own format; a changed size is kept."""
-    fl = vsf_at(job, point)
-    if not fl:
+    groups = [(fl, rg) for p, fl, rg in vsf_groups_ranged(job) if p == point]
+    if not groups:
         return clip
     import blocks
     fmt = clip.format
-    ctx = {"sar": 1.0, "group_in": clip, "prev_in": clip}   # @group / @prev in a filter's clip settings
-    last_in = clip
-    for f in fl:
-        ctx["prev_in"], last_in = last_in, clip
-        try:
-            clip = blocks.block(clip, job, f["type"], f.get("p") or {}, ctx)
-        except Exception as e:                           # noqa: BLE001
-            raise RuntimeError(f"VapourSynth filter {f.get('p', {}).get('call', '?')}: {type(e).__name__}: {e}") from e
-    if clip.format.id != fmt.id:                         # back to the chain's format (RGB / grey results: BT.601 YUV)
-        kw = {"matrix_s": "170m"} if clip.format.color_family != vs.YUV and fmt.color_family == vs.YUV else {}
-        clip = core.resize.Bicubic(clip, format=fmt.id, dither_type="error_diffusion", **kw)
+    for fl, rg in groups:
+        start = clip
+        ctx = {"sar": 1.0, "group_in": clip, "prev_in": clip}   # @group / @prev in a filter's clip settings
+        last_in = clip
+        for f in fl:
+            ctx["prev_in"], last_in = last_in, clip
+            try:
+                clip = blocks.block(clip, job, f["type"], f.get("p") or {}, ctx)
+            except Exception as e:                       # noqa: BLE001
+                raise RuntimeError(f"VapourSynth filter {f.get('p', {}).get('call', '?')}: {type(e).__name__}: {e}") from e
+        if clip.format.id != fmt.id:                     # back to the chain's format (RGB / grey results: BT.601 YUV)
+            kw = {"matrix_s": "170m"} if clip.format.color_family != vs.YUV and fmt.color_family == vs.YUV else {}
+            clip = core.resize.Bicubic(clip, format=fmt.id, dither_type="error_diffusion", **kw)
+        if rg is not None:                               # the group runs only on its frame ranges
+            clip = splice_src(start, clip, rg)
     return clip
 
 
@@ -3351,9 +3513,10 @@ def script_text(job, title=""):
     """The job as an editable VapourSynth script: every stage that is switched on, in processing order,
     one line each. Running it (vspipe, vsview, the app's Script step) gives exactly build(job)."""
     import datetime
+    job = apply_removed(job)
     import pprint
     ep = {k: job[k] for k in EPISODE_KEYS if k in job}
-    st = {k: v for k, v in job.items() if k not in EPISODE_KEYS and k != "chain"}   # Chain step: the dr.block lines are the chain
+    st = {k: v for k, v in job.items() if k not in EPISODE_KEYS and k not in ("chain", "cuts", "chain_view")}   # Chain step: the dr.block lines are the chain
     pal, ntsc = is_pal(job), not is_pal(job)
     L = [
         "# EVA toolkit - VapourSynth script" + (f" for {title}" if title else ""),
@@ -3365,6 +3528,13 @@ def script_text(job, title=""):
         "import vapoursynth as vs",
         "import vsgraph as dr",
         "core = vs.core",
+        "import importlib",
+        "for _m in ('vstools', 'vsdenoise', 'vsaa', 'vsdehalo', 'vsdeinterlace', 'vsscale', 'vsmasktools', 'vsrgtools',",
+        "           'vsdeband', 'vskernels', 'vsexprtools'):   # vs-jetpack, ready to use (as in a Chain code block)",
+        "    try:",
+        "        globals()[_m] = importlib.import_module(_m)",
+        "    except Exception:",
+        "        pass",
         "",
         "# ---- settings ----",
         "job = " + pprint.pformat(st, indent=1, width=110, sort_dicts=True).replace("\n", "\n      "),
@@ -3413,6 +3583,9 @@ def script_text(job, title=""):
     if order != [x for x in REPAIR_STEPS]:
         L.append(f"# Repair order: {' -> '.join(order)} (job['repair_order'])")
     grading = bool(grade_active(grade_settings(job)) or grade_layers(job))
+    if job.get("ranges") or any((job.get("range_only") or {}).values()) or any(g.get("only") for g in job.get("vs_groups") or [] if isinstance(g, dict)):
+        L.append("# frame ranges are set: the lines below show the whole-episode settings; the export and preview run")
+        L.append("# dr.build(job), which also applies the ranges (job['ranges'], job['range_only'], each group's 'ranges')")
     gline = ("clip = dr.grade(clip, job)                     # colour correction" +
              (f" + {len(grade_layers(job))} adjustment layers (job['grade_layers'])" if grade_layers(job) else ""))
 
@@ -3514,7 +3687,8 @@ def chain_finish(clip, ctx):
 
 
 def build(job, ivtc=True, chroma=True, clean=True):
-    if job.get("chain"):                                # the Chain step: the blocks, in their order
+    job = apply_removed(job)
+    if job.get("chain"):                              # the Chain step: the blocks, in their order
         import blocks
         return blocks.build_chain(job, before=not clean)
     nnbackend.set_backend(opt(job, "backend"))
@@ -3545,43 +3719,66 @@ def build(job, ivtc=True, chroma=True, clean=True):
     # Repair now and the setting could not be seen or changed any more
     grading = bool(grade_active(grade_settings(job)) or grade_layers(job))
 
-    def compression(c):
-        return c if (uni and ud["mpeg"] > 0) else deblock(c, job)
+    def run_step(step, c, j):
+        """one rangeable Repair step with the settings j"""
+        if step == "compression":
+            return c if (uni and ud["mpeg"] > 0) or not clean else deblock(c, j)
+        if step == "halos":
+            rn = repair_dials(j) if not uni else None
+            if clean and opt(j, "ghost") != "off" and (j.get("halo_rx") or j.get("ghost_taps")) \
+                    and not (uni and ud["halo"] > 0) and not (rn and opt(j, "halo_method") == "ai"):
+                c = ghost_halo(c, j)
+            return c
+        if step == "colour":
+            ch = j.get("chroma", {}) if chroma else {}
+            if uni and ud["chroma"] > 0:
+                ch = dict(ch, method="off", shift_x=0.0, shift_y=0.0)
+            dials = repair_dials(j, ch) if clean and not uni else None
+            if dials:                                  # RepairNet: halos + bleed in one pass (after the colour shift)
+                c = repair_colour(c, j, ch, dials)
+            else:
+                c = chroma_fix(c, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
+                               ch.get("method", "off"), ch.get("strength", "normal"))
+            if chroma and ch.get("neutral", False):
+                c = neutralize(c)
+            return c
+        if step == "stab":
+            return stabilize(c, j) if _stab_ok(j) else c
+        if step == "sharpen":
+            return sharpen(line_darken(c, j), j)
+        return c
+
+    ranges = [r for r in job.get("ranges") or [] if isinstance(r, dict) and r.get("on", True)]
+    only = job.get("range_only") or {}
+
+    def ranged(step, c):
+        """the step on the whole clip (unless it runs only on its ranges), then each range with its own settings"""
+        rs = [r for r in ranges if r.get("step") == step]
+        if not rs and not only.get(step):
+            return run_step(step, c, job)
+        out = c if only.get(step) else run_step(step, c, job)
+        for r in rs:
+            alt = run_step(step, c, dict(job, **(r.get("set") or {})))
+            out = splice_src(out, alt, [(r.get("start", 0), r.get("end", 0))])
+        return out
+
     early = clean and order[0] == "compression"        # its usual place: MPEG repair before the dot crawl clean-up
     if early:
-        clip = compression(clip)
+        clip = ranged("compression", clip)
     if clean:
         if not is_pal(job) or uni:
-            clip = xtalk_stage_b(clip, job)
+            clip = xtalk_ranged(clip, job, xtalk_stage_b)
         clip = vs_filters(clip, job, "after_composite")
     out_done = False
     for i, step in enumerate(order):
         rest = order[i + 1:]
         if step == "compression":
-            if clean and not early:
-                clip = compression(clip)
-        elif step == "halos":
-            rn = repair_dials(job) if not uni else None
-            if clean and opt(job, "ghost") != "off" and (job.get("halo_rx") or job.get("ghost_taps")) \
-                    and not (uni and ud["halo"] > 0) and not (rn and opt(job, "halo_method") == "ai"):
-                clip = ghost_halo(clip, job)
-        elif step == "colour":
-            ch = job.get("chroma", {}) if chroma else {}
-            if uni and ud["chroma"] > 0:
-                ch = dict(ch, method="off", shift_x=0.0, shift_y=0.0)
-            dials = repair_dials(job, ch) if clean and not uni else None
-            if dials:                                  # RepairNet: halos + bleed in one pass (after the colour shift)
-                clip = repair_colour(clip, job, ch, dials)
-            else:
-                clip = chroma_fix(clip, ch.get("shift_x", 0.0), ch.get("shift_y", 0.0), int(ch.get("warp", 0)),
-                                  ch.get("method", "off"), ch.get("strength", "normal"))
-            if chroma and ch.get("neutral", False):
-                clip = neutralize(clip)
+            if not early:
+                clip = ranged("compression", clip)
+        elif step in ("halos", "colour", "stab"):
+            clip = ranged(step, clip)
         elif step == "crop":
             clip = crop(clip, job)
-        elif step == "stab":
-            if _stab_ok(job):
-                clip = stabilize(clip, job)
         elif step == "size":
             if not grading and all(r == "sharpen" for r in rest):
                 clip = resize_output(clip, job)        # nothing but sharpening after it: straight to the output format
@@ -3589,7 +3786,7 @@ def build(job, ivtc=True, chroma=True, clean=True):
             else:
                 clip = resize_size(clip, job)
         elif step == "sharpen":
-            clip = sharpen(line_darken(clip, job), job)
+            clip = ranged("sharpen", clip)
         if clean:
             clip = vs_filters(clip, job, STEP_POINT[step])
     if grading:
@@ -3642,7 +3839,13 @@ def locate_source_frame(job, src_n):
           "vfr" if job.get("mode") == "vfr" and job.get("preview_vfr") and not is_pal(job) else "cfr")
     j = dict(job, mode=tm, grade={}, grade_layers=[], sharp={}, upscale={}, stab="off",
              deblend="off" if opt(job, "deblend") == "ai" else opt(job, "deblend"), aa="off", ivtc_repair="off")
-    if is_pal(j) or j.get("chain"):
+    start = int(job.get("start", 0))
+    # 60p shows every field (2 frames per source frame), a progressive source / an image keeps its frames: these went
+    # through the 24p field matching below, and a timeline click in 60p landed at 4/5 of the place (13:16 -> 5:17)
+    if (tm == "bob" and not j.get("chain") and not vsf_at(j, "ivtc")) or j.get("progressive") or j.get("image"):
+        n = max(0, int(src_n) - start) * (2 if tm == "bob" and not j.get("progressive") else 1)
+        return min(n, max(0, (int(job.get("end") or n + 1) - start) * (2 if tm == "bob" and not j.get("progressive") else 1) - 1))
+    if is_pal(j) or j.get("chain") or vsf_at(j, "ivtc"):            # your own IVTC: its frames, found by _SrcN
         light = build(j, ivtc=True, chroma=False, clean=False)
     else:
         # only field matching + decimation, on the SAME source the VFR analysis saw: with the classic crawl cancellation
@@ -3715,6 +3918,12 @@ def preview_outputs(job):
     # colour change x4 on a dimmed picture: grey = unchanged, colour = what the fix added/removed
     diff = core.std.Expr([final, before], ["x 2 / 256 +", "x y - 4 * 512 +", "x y - 4 * 512 +"])
     set_output(diff, idx + 3, "Chroma change x4" + tag, framedurs=fd)
+    for i, sn in enumerate(job.get("snaps") or []):     # the app's A / B snapshots: B next to FINAL
+        try:
+            sj = dict(sn["job"], mode=pj["mode"], work=job.get("work"))
+            set_output(build(sj), idx + 4 + i, f"B · snapshot {sn.get('name', i + 1)}" + tag, framedurs=fd)
+        except Exception as e:                           # noqa: BLE001
+            print(f"snapshot tab skipped: {e}", file=sys.stderr)
 
 
 def preview(job, after=True):

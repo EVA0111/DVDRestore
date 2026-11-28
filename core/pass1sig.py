@@ -16,7 +16,7 @@ def signature(job):
     raw = bool(job.get("raw_ivtc")) or job.get("ai_model") == "field"
     d = {"source": str(src.resolve()), "size": st.st_size, "mtime": int(st.st_mtime),
          "start": job["start"], "end": job["end"], **{k: job.get(k) for k in KEYS},
-         "ivtc": "raw" if raw else "repair", "version": 8}   # 8: timeline holds (frame numbers follow the file timeline)
+         "ivtc": "raw" if raw else "repair", "version": 9}   # 9: clock jumps closed (frame numbers follow the file clock without its jumps)
     try:                                                 # undecodable frames replaced by vsgraph.source change the clip
         from vsgraph import bad_frames                   # (only listed when there are any: other sources keep their pass 1)
         bad = bad_frames(job["source"])

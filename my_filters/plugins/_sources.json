@@ -1,0 +1,434 @@
+{
+ "AdaptiveBinarize.dll": {
+  "package": "AdaptiveBinarize",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/vapoursynth-adaptivebinarize/releases/download/r1/AdaptiveBinarize-r1-win64.7z",
+  "sha256": "05bcd9ed596f07ba5239541fde93a9acacc57439af9477a8f73f86898fa069aa"
+ },
+ "ac_filter_avs_vs.dll": {
+  "package": "Anime4KCPP",
+  "version": "v3.2.0",
+  "url": "https://github.com/TianZerL/Anime4KCPP/releases/download/v3.2.0/Anime4KCPP-Filter-AVS-VS-v3.2.0-x86-x64-MSVC.zip",
+  "sha256": "23a2c6a9c618191f11f0bf520f829f3ef7857ed14dda216e0ebcacabfe1a25f0"
+ },
+ "areafilter.dll": {
+  "package": "AreaFilter",
+  "version": "R2",
+  "url": "https://github.com/yuygfgg/Vapoursynth-areafilter/releases/download/R2/release-windows-amd64.zip",
+  "sha256": "dd43ff88b7e5e072bed426b84c6359628bc3561bcf8aab97f4250541fc14518b"
+ },
+ "AudioResample.dll": {
+  "package": "AudioResample",
+  "version": "v0.4.0",
+  "url": "https://github.com/ropagr/VS-AudioResample/releases/download/v0.4.0/AudioResample-v0.4-x64.zip",
+  "sha256": "7c3fe67301b5bf8aa0b27c049c17e42b187894cc685aafa8ddf6dc044df873f1"
+ },
+ "artyfox.dll": {
+  "package": "artyfox",
+  "version": "R21",
+  "url": "https://github.com/artyfoxx/artyfox-plugin/releases/download/R21/artyfox.zip",
+  "sha256": "dbdffe9cd5a9abe7cd938b43aa278dcfaa86c043be7d18467a6f37b8cb9b4ecd"
+ },
+ "AudioTools.dll": {
+  "package": "AudioTools",
+  "version": "v0.1.0",
+  "url": "https://github.com/ropagr/VS-AudioTools/releases/download/v0.1.0/AudioTools-v0.1-x64.zip",
+  "sha256": "b393e6b7a04b196fef1b6870ca8d4babf691311ab835e4dd03293434f4de7e25"
+ },
+ "atwt.dll": {
+  "package": "ATWT",
+  "version": "R2",
+  "url": "https://github.com/yuygfgg/Vapoursynth-ATWT/releases/download/R2/release-windows-amd64.zip",
+  "sha256": "02ab6129167f952336090803b067863d02e52640b5af237c94070c31abc9aade"
+ },
+ "avisource.dll": {
+  "package": "AVISource (obsolete)",
+  "version": "R1",
+  "url": "https://github.com/vapoursynth/vs-avisource-obsolete/releases/download/R1/avisource-r1.7z",
+  "sha256": "6bb32a379c93a2c6e3a34dbcb83bc32c677cd37f16fcc462f0ef9a03a094f24c"
+ },
+ "webp.dll": {
+  "package": "webp",
+  "version": "v1.0.10",
+  "url": "https://github.com/sgt0/vapoursynth-webp/releases/download/v1.0.10/webp-x86_64-pc-windows-gnu.zip",
+  "sha256": "09d6411799100bdfda6c3859b6251e445339f30aef0c56262b1d991e8c90d535"
+ },
+ "zbilateral.dll": {
+  "package": "zbilateral",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/vapoursynth-zbilateral/releases/download/r1/vapoursynth-zbilateral-r1.7z",
+  "sha256": "92914779451fbbc5a091741fe2596c4b01b437df7a5468e837995b4803501e46"
+ },
+ "zboxblur.dll": {
+  "package": "zboxblur",
+  "version": "R3",
+  "url": "https://github.com/dnjulek/vapoursynth-zboxblur/releases/download/R3/vapoursynth-zboxblur-r3.7z",
+  "sha256": "b1f57d561d35dccab4d01230bee950d1f81ad1d54d92b2f8e41bab3f222bef34"
+ },
+ "zscene.dll": {
+  "package": "Zscene",
+  "version": "0.5",
+  "url": "https://github.com/adworacz/zscene/releases/download/0.5/zscene-x86_64-windows.zip",
+  "sha256": "deadb0109e910f6208ef09c3e45c8d4d88fc7af7d4ecf58cd640107ca897b91c"
+ },
+ "avsproxy.dll": {
+  "package": "AvsProxy",
+  "version": "r3",
+  "url": "https://github.com/sekrit-twc/avsproxy/releases/download/r3/avsproxy_r3.7z",
+  "sha256": "84cffb7d4250539b8d4ec0a35dd71d62c75421e6a726f6be6fb9897ea77cd71a"
+ },
+ "bifrost.dll": {
+  "package": "Bifrost",
+  "version": "v3.0",
+  "url": "https://github.com/dubhatervapoursynth/vapoursynth-bifrost/releases/download/v3.0/Bifrost-3.0.7z",
+  "sha256": "bc0360aacb5ecc39a4cdcbcbe1f76b1b04cdfb8573ffdb5fb1390cee2aa161a3"
+ },
+ "BM3D.dll": {
+  "package": "BM3D",
+  "version": "r8",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-BM3D/releases/download/r8/BM3D-r8.7z",
+  "sha256": "1c3f970d062c16ae77fd7275db17d65caf7890653a62eebf568a4ae4154a5574"
+ },
+ "libbore.dll": {
+  "package": "bore",
+  "version": "v1.0.0",
+  "url": "https://github.com/OpusGang/bore/releases/download/v1.0.0/libbore.dll",
+  "sha256": "a139ecc1e89166f5fba55c34c754461a65d3351da8460efd1ab28dc320db770b"
+ },
+ "cambi.dll": {
+  "package": "cambi",
+  "version": "v1.2.0",
+  "url": "https://github.com/sgt0/vapoursynth-cambi/releases/download/v1.2.0/cambi-x86_64-pc-windows-gnu.zip",
+  "sha256": "ee9f72497bbbbbd52eaec8d8fc76a9511d0c87bef2582204d6902a1d41140a0a"
+ },
+ "CAS.dll": {
+  "package": "CAS - Contrast Adaptive Sharpening",
+  "version": "r2",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-CAS/releases/download/r2/CAS-r2.7z",
+  "sha256": "e6128294afdb5f0884c8f063c0da17e05999d4a7e977b3ff7cf1261eb616b0bc"
+ },
+ "checkmate.dll": {
+  "package": "Checkmate",
+  "version": "r2",
+  "url": "https://github.com/dnjulek/vapoursynth-checkmate/releases/download/r2/Checkmate-r2-win64.7z",
+  "sha256": "aadf17d7556acbace0f75a069e42dd1ef88274de0111298fa9986e0830bc14e7"
+ },
+ "chromanr.dll": {
+  "package": "chromanr",
+  "version": "R1",
+  "url": "https://github.com/dnjulek/vapoursynth-chromanr/releases/download/R1/vapoursynth-chromanr-r1.7z",
+  "sha256": "86382a2b9caf90bfb16d960d8188d77595d9923df09ba904c0272108028b9564"
+ },
+ "chromanrcuda.dll": {
+  "package": "chromanr cuda",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/vapoursynth-chromanrcuda/releases/download/r1/vapoursynth-chromanrcuda-r1.7z",
+  "sha256": "fb0647f0db4af43997945b07098b70bef34536d13fe7cb6f2bce62b8bc4a1fa9"
+ },
+ "colorbars.dll": {
+  "package": "ColorBars",
+  "version": "R4",
+  "url": "https://github.com/ifb/vapoursynth-colorbars/releases/download/R4/colorbars-R4.7z",
+  "sha256": "7bffc1a1dae0a34fd41795ce58d1c9b3c3f3971c4351b586c68b50a8bc63dbba"
+ },
+ "cv_ccl_filter.dll": {
+  "package": "ccl_filter",
+  "version": "v0.2.1",
+  "url": "https://github.com/dtlnor/VapourSynth-cv_ccl_filter/releases/download/v0.2.1/cv_ccl_filter.7z",
+  "sha256": "fb620b0861c5f32eb456fc2cf09ddf0f47d798f4dc48bb4d69c8d8f6c05953ec"
+ },
+ "cv_hfs.dll": {
+  "package": "cv_hfs",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/VapourSynth-cv_hfs/releases/download/r1/cv_hfs-r1-win64.7z",
+  "sha256": "f37887c447ce776f4365ea0bdd1f12eb34295db8f386b92eeda851dd5ecb48e3"
+ },
+ "cv_inpaint.dll": {
+  "package": "cv_inpaint",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/VapourSynth-cv_inpaint/releases/download/r1/cv_inpaint-r1-win64.7z",
+  "sha256": "596e448256c29e807b83a1a3b3c87e983d5d937b20a4584a5391d5ca36cb9cbb"
+ },
+ "d2vsource.dll": {
+  "package": "D2V Source",
+  "version": "v1.3",
+  "url": "https://github.com/dwbuiten/d2vsource/releases/download/v1.3/d2vsource-1.3-windows.zip",
+  "sha256": "5a9629c5526a40b5f98a26b8c4173dc22b2471e8e7944f87bfae29345baf21c3"
+ },
+ "Deblock.dll": {
+  "package": "Deblock",
+  "version": "r7.1",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-Deblock/releases/download/r7.1/Deblock-r7.1.7z",
+  "sha256": "4fa23e644d51cf601f2f719938c7752c45b1f5cd0d84dd2559bbf6f42ea8d771"
+ },
+ "libdescale.dll": {
+  "package": "Descale",
+  "version": "r11",
+  "url": "https://github.com/Jaded-Encoding-Thaumaturgy/vapoursynth-descale/releases/download/r11/descale-win64.zip",
+  "sha256": "2de2b41300f2b35fe5203ac8402a6872115027993ec5083ef00937730010183d"
+ },
+ "DeScratch.dll": {
+  "package": "DeScratch",
+  "version": "R3",
+  "url": "https://github.com/vapoursynth/descratch/releases/download/R3/descratch-r3.7z",
+  "sha256": "ba61b2a411f2ce1bbbc035ee7a71879527edb78dfc1731c94440ced0219bd84f"
+ },
+ "dfttest2_cpu.dll": {
+  "package": "dfttest2-cpu",
+  "version": "v10",
+  "url": "https://github.com/AmusementClub/vs-dfttest2/releases/download/v10/vs-dfttest2-cpu-windows-v10.7z",
+  "sha256": "91361754c39d0d0e221817c4ac4c9bd2984a47ebd02eed7f9ddbe97ad62c8a6e"
+ },
+ "DMetrics.dll": {
+  "package": "dmetrics",
+  "version": "R1",
+  "url": "https://github.com/vapoursynth/dmetrics/releases/download/R1/DMetrics-R1.7z",
+  "sha256": "e05f729ac66274b74c394f98eb4a4bfcece1245d9bd336c90b5005afe9b3a6b5"
+ },
+ "DotKill.dll": {
+  "package": "DotKill",
+  "version": "R2",
+  "url": "https://github.com/myrsloik/DotKill/releases/download/R2/DotKill-x64-R2.7z",
+  "sha256": "345721d13241afe86666f8442c264e3db1a126e61b26d1cd0058e5ada5741567"
+ },
+ "EdgeFixer.dll": {
+  "package": "EdgeFixer",
+  "version": "r3",
+  "url": "https://github.com/sekrit-twc/EdgeFixer/releases/download/r3/EdgeFixer_r3.7z",
+  "sha256": "90556e564fff70d6e3739c734580d1c0ab1ca8519814c50fbeb970c480fd7467"
+ },
+ "EEDI3.dll": {
+  "package": "EEDI3 (obsolete)",
+  "version": "R1",
+  "url": "https://github.com/vapoursynth/vs-eedi3-obsolete/releases/download/R1/eedi3-r1.7z",
+  "sha256": "f101bf621ff582b5e269783be6b02329f84306f414f87a305c4d23878764fd88"
+ },
+ "EEDI3m.dll": {
+  "package": "EEDI3m",
+  "version": "r8",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-EEDI3/releases/download/r8/EEDI3-r8.7z",
+  "sha256": "8fc1a433112707164c1a87d2c9e78709822b7ca89325f0d691d36337f6bf9051"
+ },
+ "libeedi3vk.dll": {
+  "package": "EEDI3VK",
+  "version": "R1.2",
+  "url": "https://github.com/Sunflower-Dolls/Vapoursynth-EEDI3VK/releases/download/R1.2/release-windows-amd64.zip",
+  "sha256": "35f0db97cdff1ca2061a41c965ec373e6dcdf00b2b664884e8c7a205cf90ba0e"
+ },
+ "EqualizeHist.dll": {
+  "package": "EqualizeHist",
+  "version": "r2",
+  "url": "https://github.com/dnjulek/vapoursynth-equalizehist/releases/download/r2/EqualizeHist-r2.7z",
+  "sha256": "5dccc516016dc31814dc73ed3ad94363d8c4cb65af277c68cf6477b2286dfdca"
+ },
+ "felbaker.dll": {
+  "package": "FelBaker",
+  "version": "1.0.0",
+  "url": "https://github.com/bbeny123/felbaker/releases/download/1.0.0/felbaker-win-x64-avx2.zip",
+  "sha256": "2ad5d7a80c502c370ed533c426d1ea9d642ae686b08771a130e0c01c0c0fcd4d"
+ },
+ "ffms2.dll": {
+  "package": "FFmpegSource2",
+  "version": "5.0",
+  "url": "https://github.com/FFMS/ffms2/releases/download/5.0/ffms2-5.0-msvc.7z",
+  "sha256": "970d3f8d170fd13a2dd8a7e8a7f56b0ce5a1dc7eea79d1774bbb2c2cab47e3f0"
+ },
+ "fft3dfilter.dll": {
+  "package": "FFT3DFilter",
+  "version": "R2",
+  "url": "https://github.com/myrsloik/VapourSynth-FFT3DFilter/releases/download/R2/FFT3DFilter-r2.7z",
+  "sha256": "6f4299318e8879d74b46b2516b95bf0dd170749a4ed42534a5d3c485eb2ab2ef"
+ },
+ "libimwri.dll": {
+  "package": "ImageMagick Writer-Reader (IMWRI)",
+  "version": "R2",
+  "url": "https://github.com/vapoursynth/vs-imwri/releases/download/R2/imwri-r2.7z",
+  "sha256": "8970a12f7497c04d99c053f9bd2b7c1e28143fa407ccfd180ac6a1c728ea7c40"
+ },
+ "fftspectrum_rs.dll": {
+  "package": "FFTSpectrum-rs",
+  "version": "v1.0.13",
+  "url": "https://github.com/sgt0/vapoursynth-fftspectrum-rs/releases/download/v1.0.13/fftspectrum_rs-x86_64-pc-windows-gnu.zip",
+  "sha256": "76ec50ed6187c0ff9f823d62cf1b5316ed50477712957c1632469f9f1d286f10"
+ },
+ "fmtconv.dll": {
+  "package": "fmtconv",
+  "version": "r30",
+  "url": "https://github.com/EleonoreMizo/fmtconv/releases/download/r30/fmtconv-r30.zip",
+  "sha256": "ddbe77e0b09d745608202c9fbca2c70d0c26e0428b27b15b92dfd2cad87f1898"
+ },
+ "libfpng.dll": {
+  "package": "fpng",
+  "version": "1.0",
+  "url": "https://github.com/Mikewando/vsfpng/releases/download/1.0/libfpng.dll",
+  "sha256": "fb37f68e5599155a8d18368b7900f9cf29772b32957fed371e9f42cb076dafd3"
+ },
+ "vsgifski.dll": {
+  "package": "gifski",
+  "version": "R1",
+  "url": "https://github.com/dnjulek/vapoursynth-gifski/releases/download/R1/vapoursynth-gifski-r1.7z",
+  "sha256": "0dcfaa892cac09e704024c6630d9c9bb74c913698244b7aae5e1f6983b078d72"
+ },
+ "AddGrain.dll": {
+  "package": "AddGrain",
+  "version": "r10",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-AddGrain/releases/download/r10/AddGrain-r10-win64.7z",
+  "sha256": "74f1fcb53e7a91efc015730a03a92cbed70485b68422805f441f43dd8a343a92"
+ },
+ "grayworld.dll": {
+  "package": "Grayworld",
+  "version": "1.0.4",
+  "url": "https://github.com/Asd-g/AviSynthPlus-grayworld/releases/download/1.0.4/grayworld-1.0.4.7z",
+  "sha256": "65196db3953420600460ca7afe238c48e7ad5367ac5331c9868ae5479d16c3f6"
+ },
+ "hysteresis.dll": {
+  "package": "Hysteresis",
+  "version": "v1.2.0",
+  "url": "https://github.com/sgt0/vapoursynth-hysteresis/releases/download/v1.2.0/hysteresis-x86_64-pc-windows-gnu-x86-64.zip",
+  "sha256": "0cad5adc56c145a8be062e01718d35f3b260a20f7cb6ed2970f31f5b135c4421"
+ },
+ "libiccc.dll": {
+  "package": "ICCConvert",
+  "version": "6.2",
+  "url": "https://github.com/YomikoR/VapourSynth-ICCConvert/releases/download/6.2/libiccc.dll",
+  "sha256": "c25c65b91c7ae0eb5e9f8c02722f646f8bd90080d604984a7a8fe59bc3ee2ca7"
+ },
+ "julek.dll": {
+  "package": "julek",
+  "version": "r3",
+  "url": "https://github.com/dnjulek/vapoursynth-julek-plugin/releases/download/r3/vapoursynht-julek-plugin-r3-win64.7z",
+  "sha256": "a5e7c04e773d640968cde6fac77ebfbdee2b890aeff47b6beec2583ab489435d"
+ },
+ "LibP2P.dll": {
+  "package": "LibP2P",
+  "version": "r2",
+  "url": "https://github.com/DJATOM/LibP2P-Vapoursynth/releases/download/r2/LibP2P-x64.7z",
+  "sha256": "7e76db73085c51f43949954d2ab5d9abf49257bf559f038ee92961b611934750"
+ },
+ "LSMASHSource.dll": {
+  "package": "LSMASHSource",
+  "version": "1296.0.0.0",
+  "url": "https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works/releases/download/1296.0.0.0/L-SMASH-Works-r1296.0.0.0.7z",
+  "sha256": "672d9e2887b30d89a06b35724717682193de6ca833a86d4798a9fa160321e658"
+ },
+ "manipmv.dll": {
+  "package": "Manipulate Motion Vectors",
+  "version": "1.2.2",
+  "url": "https://github.com/Mikewando/manipulate-motion-vectors/releases/download/1.2.2/manipmv.dll",
+  "sha256": "60f44a2572f481ea0e943cce79b05cfbd948518269924319865948a0c6df1809"
+ },
+ "MiscFilters.dll": {
+  "package": "Miscfilters (obsolete)",
+  "version": "R2",
+  "url": "https://github.com/vapoursynth/vs-miscfilters-obsolete/releases/download/R2/miscfilters-r2.7z",
+  "sha256": "33d911c2f5fd59d33cabb9056348f821421fd18afc0754e8a29ebfe3a35047ab"
+ },
+ "ReadMpls.dll": {
+  "package": "ReadMpls",
+  "version": "r5",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-ReadMpls/releases/download/r5/ReadMpls-r5-win64.7z",
+  "sha256": "7f4a1da088d889825bdb0197d0fb04f3f2aee4d5c01e2b49023a6857704bdbb1"
+ },
+ "MTCombMask.dll": {
+  "package": "MTCombMask",
+  "version": "r1",
+  "url": "https://github.com/dnjulek/vapoursynth-mtcombmask/releases/download/r1/MTCombMask-r1-win64.7z",
+  "sha256": "28b192fec7380f360ef689c84ca84b81550d139dbc45c08777308071b0543324"
+ },
+ "libvsmvc.dll": {
+  "package": "mvc-source",
+  "version": "v0.8.0",
+  "url": "https://github.com/jens-duttke/mvc-source/releases/download/v0.8.0/libvsmvc.dll",
+  "sha256": "18ef4afb90ba8a9f7633a615119a004ffe556a811c30164116f3499c92699223"
+ },
+ "vsnlm_ispc.dll": {
+  "package": "nlm-ispc",
+  "version": "v4",
+  "url": "https://github.com/AmusementClub/vs-nlm-ispc/releases/download/v4/vs-nlm-ispc-windows-x64.v4.7z",
+  "sha256": "d6b9b7d2693cf122146ffd5fe752edbaf12f4f00534d17a93e586a8bcf305a5c"
+ },
+ "addnoise.dll": {
+  "package": "vs-noise",
+  "version": "r4",
+  "url": "https://github.com/wwww-wwww/vs-noise/releases/download/r4/addnoise.zip",
+  "sha256": "a0d8e023b3bbdbc2d7ec54a7708ca3c47caa7b44f2960bdb8fadfc13923520c3"
+ },
+ "vsocd.dll": {
+  "package": "ocd",
+  "version": "0.6",
+  "url": "https://github.com/Mr-Z-2697/vapoursynth-ocd/releases/download/0.6/vsocd-0.6-cv5-win64.7z",
+  "sha256": "bfd09a3efbb314c6720d0592ad91a48abb4b091059d2a7d9bb8713049fd555b1"
+ },
+ "TesseractOCR.dll": {
+  "package": "OCR",
+  "version": "R3",
+  "url": "https://github.com/vapoursynth/vs-ocr/releases/download/R3/vs-ocr-r3.7z",
+  "sha256": "ddde389d8da0bef8e0b4e3c4019481321fb764729c0f2a9b248374f2ad5f096a"
+ },
+ "libvs_placebo.dll": {
+  "package": "vs-placebo",
+  "version": "v3.3.1",
+  "url": "https://github.com/sgt0/vs-placebo/releases/download/v3.3.1/vsplacebo-windows-3.3.1.zip",
+  "sha256": "d40dfe5574d7cb121703242332286b65acf8354800a335789b22eb63422694e4"
+ },
+ "PlaneStatsMod.dll": {
+  "package": "PlaneStatsMod",
+  "version": "r3",
+  "url": "https://github.com/dnjulek/VapourSynth-PlaneStatsMod/releases/download/r3/PlaneStatsMod-r3.7z",
+  "sha256": "c14b1cfbd37603449e9abca6556f29c022bcddc7f06712bc5d6a144b1dc73196"
+ },
+ "recon.dll": {
+  "package": "Chroma reconstruction",
+  "version": "v0.1.0",
+  "url": "https://github.com/Irrational-Encoding-Wizardry/vapoursynth-reconstruct/releases/download/v0.1.0/recon.dll",
+  "sha256": "14fceace4c3bfb6f5d33c69050f0743e3b50f555b6fcf39e5595790d75aebc8c"
+ },
+ "RemoveDirt.dll": {
+  "package": "RemoveDirt",
+  "version": "v1.1",
+  "url": "https://github.com/pinterf/RemoveDirt/releases/download/v1.1/RemoveDirt-1.1.7z",
+  "sha256": "bca297bd8120c43521c966dc69691b50ace8d6d97bef8b6a4e88551d9e513290"
+ },
+ "RemoveGrainVS.dll": {
+  "package": "RemoveGrain",
+  "version": "R1",
+  "url": "https://github.com/vapoursynth/vs-removegrain/releases/download/R1/removegrain-r1.7z",
+  "sha256": "eed537d5f0de88fc4d5acac1d3dde16b3c81524565fd1fe5e4322bd91117c3fe"
+ },
+ "ssimulacra2.dll": {
+  "package": "SSIMULACRA2",
+  "version": "r3",
+  "url": "https://github.com/dnjulek/vapoursynth-ssimulacra2/releases/download/r3/vapoursynth-ssimulacra2-r3.7z",
+  "sha256": "da47358229bb4fec94cee7dcccf4de2e6002f4437161a111a1b3c086f6a1d426"
+ },
+ "SubText.dll": {
+  "package": "Subtext",
+  "version": "R5",
+  "url": "https://github.com/vapoursynth/subtext/releases/download/R5/subtext-r5.7z",
+  "sha256": "37ce1c6fafdb8788e44e9522ce47efb161c5cdcdc30352bc03104f86599cda80"
+ },
+ "TCanny.dll": {
+  "package": "TCanny",
+  "version": "r14",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-TCanny/releases/download/r14/TCanny-r14-win64.7z",
+  "sha256": "372d0399d9806026e5e3631a957525364c5bf06fd43766f111505769ca0c1aca"
+ },
+ "vscube.dll": {
+  "package": "TimeCube",
+  "version": "r5",
+  "url": "https://github.com/sekrit-twc/timecube/releases/download/r5/timecube_r5.7z",
+  "sha256": "c05c9a05ec8a429aab610a9c3e0cb63e18b9d491c08f77cde73d8ecf6b8d7fab"
+ },
+ "TTempSmooth.dll": {
+  "package": "TTempSmooth",
+  "version": "r4.1",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-TTempSmooth/releases/download/r4.1/TTempSmooth-r4.1-win64.7z",
+  "sha256": "0e3b2b94528544de50f6eeb44f5e68461145240dd99c698400daf151a97b7923"
+ },
+ "VMAF.dll": {
+  "package": "VMAF",
+  "version": "r10",
+  "url": "https://github.com/HomeOfVapourSynthEvolution/VapourSynth-VMAF/releases/download/r10/VMAF-r10-win64.7z",
+  "sha256": "413561ab967cea4038ad33c55e830f3e9ce00fe86fb1915253403f3d93340a83"
+ }
+}

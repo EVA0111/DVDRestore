@@ -1,8 +1,9 @@
 // EVA toolkit - Electron main process.
 // Starts the Python backend (../core/server.py), relays JSON-line RPC between it and the window,
 // and provides native dialogs.
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
-const { spawn } = require("child_process");
+const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require("electron");
+const { spawn, execFile } = require("child_process");
+const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const readline = require("readline");
@@ -50,6 +51,7 @@ function logf(...a) {
 
 let win = null;
 let py = null;
+let restarting = false;                                        // the engine is being restarted on purpose: its exit is no news
 let nextId = 1;
 const pending = new Map();
 
@@ -70,8 +72,9 @@ function startBackend() {
       if (msg.error && msg.error !== "superseded") logf(`RPC ${method} FAILED after ${ms} ms: ${String(msg.error).slice(0, 4000)}`);
       else if (ms > 15000 && (method === "preview" || method === "probe")) logf(`RPC ${method} slow: ${ms} ms`);
       resolve(msg);
-    } else if (msg.event && win) {
-      win.webContents.send("backend-event", msg);
+    } else if (msg.event) {
+      if (msg.event === "log" && msg.msg) logf("LOG", String(msg.msg).slice(0, 2000));       // the Log pane's lines, kept
+      if (win) win.webContents.send("backend-event", msg);
     }
   });
   readline.createInterface({ input: py.stderr }).on("line", (line) => {
@@ -80,13 +83,47 @@ function startBackend() {
       if (win) win.webContents.send("backend-event", { event: "stderr", msg: line });
     }
   });
+  const me = py;
   py.on("exit", (code, signal) => {
     logf(`ENGINE EXITED code=${code} signal=${signal} (pending requests: ${[...pending.values()].map((p) => p.method).join(", ") || "none"})`);
+    if (py !== me || restarting) return;                         // an engine that was replaced (restart): nothing to report
     for (const { resolve } of pending.values()) resolve({ error: "backend stopped" });
     pending.clear();
     if (win) win.webContents.send("backend-event", { event: "exit", code });
   });
 }
+
+// ---- problems / reports: what the window tells the log, a screenshot, the system, the logs folder, restarting the engine
+ipcMain.on("app-log", (_e, level, text) => logf("UI", String(level), String(text).slice(0, 4000)));
+ipcMain.handle("capture-window", async () => {
+  try { const img = await win.webContents.capturePage(); return img.toPNG().toString("base64"); } catch { return null; }
+});
+ipcMain.handle("system-info", async () => {
+  const cpus = os.cpus() || [];
+  let gpu = null;
+  try { gpu = await Promise.race([app.getGPUInfo("basic"), new Promise((r) => setTimeout(() => r(null), 1500))]); } catch { /* none */ }
+  return {
+    app: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node,
+    platform: process.platform, release: os.release(), arch: os.arch(), cpu: cpus[0] ? `${cpus[0].model.trim()} x${cpus.length}` : "",
+    ramGB: Math.round(os.totalmem() / 2 ** 30), freeGB: Math.round(os.freemem() / 2 ** 30), portable: PORTABLE, python: findPython(),
+    appDir: APP_DIR, logFile: LOG, uptimeMin: Math.round(process.uptime() / 60),
+    gpuDevices: gpu && gpu.gpuDevice ? gpu.gpuDevice.map((d) => ({ vendor: d.vendorId, device: d.deviceId, driver: d.driverVersion, active: d.active })) : null,
+    screens: screen.getAllDisplays().map((d) => `${d.size.width}x${d.size.height}@${d.scaleFactor}`),
+  };
+});
+ipcMain.handle("open-logs", () => shell.openPath(path.dirname(LOG)));
+ipcMain.handle("restart-engine", async () => {
+  logf("--- restart the engine (asked)");
+  const old = py;
+  restarting = true;
+  try { if (old && old.exitCode === null) old.kill(); } catch { /* gone */ }
+  await new Promise((r) => setTimeout(r, 700));
+  for (const { resolve } of pending.values()) resolve({ error: "backend restarted" });
+  pending.clear();
+  startBackend();
+  restarting = false;
+  return true;
+});
 
 ipcMain.handle("rpc", (_e, method, params) => new Promise((resolve) => {
   if (!py || py.exitCode !== null) return resolve({ error: "backend not running" });
@@ -124,7 +161,7 @@ ipcMain.handle("open-lut", async () => {
 ipcMain.handle("open-my-filter", async () => {
   const r = await dialog.showOpenDialog(win, {
     title: "Add your own filters", properties: ["openFile", "multiSelections"],
-    filters: [{ name: "Python filters or VapourSynth plugins", extensions: ["py", "dll"] }, { name: "All files", extensions: ["*"] }],
+    filters: [{ name: "Python filters, custom filters (.json) or VapourSynth plugins", extensions: ["py", "json", "dll"] }, { name: "All files", extensions: ["*"] }],
   });
   return r.canceled ? [] : r.filePaths;
 });
@@ -153,15 +190,45 @@ ipcMain.handle("open-text", async (_e, filters) => {
   return { path: r.filePaths[0], text: fs.readFileSync(r.filePaths[0], "utf-8") };
 });
 ipcMain.handle("show-path", (_e, p) => shell.openPath(p));
+// CPU / RAM / GPU / VRAM meters (status bar): CPU from the time every core spent busy since the last call, the GPU from
+// nvidia-smi (NVIDIA driver; ~80 ms) - no NVIDIA card or driver: the GPU part is left out
+let cpuLast = null, gpuOk = true;
+function cpuTimes() { return os.cpus().map((c) => { const t = c.times; return { idle: t.idle, all: t.user + t.nice + t.sys + t.idle + t.irq }; }); }
+ipcMain.handle("sys-stats", () => new Promise((resolve) => {
+  const now = cpuTimes();
+  let cpu = null;
+  if (cpuLast) {
+    let idle = 0, all = 0;
+    now.forEach((c, i) => { idle += c.idle - cpuLast[i].idle; all += c.all - cpuLast[i].all; });
+    cpu = all > 0 ? Math.max(0, Math.min(100, 100 * (1 - idle / all))) : null;
+  }
+  cpuLast = now;
+  const out = { cpu, cores: now.length, ram_used: os.totalmem() - os.freemem(), ram_total: os.totalmem() };
+  if (!gpuOk) return resolve(out);
+  execFile("nvidia-smi", ["--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits"],
+    { timeout: 3000, windowsHide: true }, (err, stdout) => {
+      if (err) { if (err.code === "ENOENT") gpuOk = false; return resolve(out); }
+      const q = String(stdout).split("\n")[0].split(",").map((x) => x.trim());
+      if (q.length >= 4) Object.assign(out, { gpu_name: q[0], gpu: +q[1], vram_used: +q[2] * 1048576, vram_total: +q[3] * 1048576, gpu_temp: +q[4] });
+      resolve(out);
+    });
+}));
 const GITHUB_URL = "https://github.com/EVA0111";                 // the GitHub button (fixed address, nothing else opens)
 ipcMain.handle("open-github", () => shell.openExternal(GITHUB_URL));
 ipcMain.handle("show-item", (_e, p) => shell.showItemInFolder(p));
 ipcMain.handle("is-dir", (_e, p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } });
 
 function createWindow() {
+  // the window fits the screen it opens on (1600 x 960 was wider than a laptop screen at 125-150 % scaling, the
+  // right part - Inspector, Queue, Settings - outside the screen)
+  const wa = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: 1600, height: 960, minWidth: 1280, minHeight: 720,
-    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.25 alpha", autoHideMenuBar: true,
+    width: Math.min(1600, wa.width), height: Math.min(960, wa.height),
+    minWidth: Math.min(1100, wa.width), minHeight: Math.min(680, wa.height),
+    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.3 alpha", autoHideMenuBar: true,
+    // no Windows title bar: the app's own top bar is the title bar (drag it to move the window), Windows draws its
+    // minimise / maximise / close buttons on it in the app's colours
+    titleBarStyle: "hidden", titleBarOverlay: { color: "#12151b", symbolColor: "#c9ced8", height: 42 },
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
@@ -216,7 +283,7 @@ function openDeps(firstRun) {
   if (depsWin) { depsWin.focus(); return; }
   depsWin = new BrowserWindow({
     width: 760, height: 640, minWidth: 620, minHeight: 520, parent: firstRun ? undefined : (win || undefined),
-    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.25 alpha - Dependencies", autoHideMenuBar: true,
+    backgroundColor: "#15171c", icon: ICON, title: "EVA toolkit v0.3 alpha - Dependencies", autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false },
   });
   depsWin.loadFile(path.join(__dirname, "renderer", "deps.html"), { query: { first: firstRun ? "1" : "0" } });

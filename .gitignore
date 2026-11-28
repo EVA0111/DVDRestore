@@ -15,3 +15,6 @@ dist/
 
 __pycache__/
 *.pyc
+
+# the 75 VapourSynth plugin binaries are only in the release zip (sources + hashes: my_filters/plugins/_sources.json)
+my_filters/plugins/*.dll

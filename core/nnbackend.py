@@ -117,6 +117,63 @@ def _weights_tag(path):
 
 MAX_ENGINES = 3                                          # frame sizes kept per model (crop changes make new ones)
 
+# A build the user asked for in the model library reports its progress: BUILD_HOOK[0] = callable(event dict) -> keep going (bool), set by the
+# server for the length of that build (None = builds the preview / export start are silent, as before).
+BUILD_HOOK = [None]
+_BUILD_NO = [0]
+
+
+def progress_monitor(trt, label):
+    """a TensorRT IProgressMonitor that reports to BUILD_HOOK (None when nobody asked: then no monitor at all)"""
+    hook = BUILD_HOOK[0]
+    if hook is None:
+        return None
+    import time as _t
+    _BUILD_NO[0] += 1
+    no = _BUILD_NO[0]
+
+    class Mon(trt.IProgressMonitor):
+        def __init__(self):
+            super().__init__()
+            self.t0, self.last, self.best = _t.time(), 0.0, 0.0
+            self.ph = {}                                  # name -> [parent, steps, completed]
+
+        def _frac(self, name):
+            f, chain = 0.0, []
+            p = name
+            while p is not None and p in self.ph:         # this phase up to the top one
+                chain.append(p)
+                p = self.ph[p][0]
+            for k, nm in enumerate(chain):
+                par, n, done = self.ph[nm]
+                f = (done / n if n else 0.0) if k == 0 else (done + f) / max(1, n)
+            return f
+
+        def _emit(self, name, force=False):
+            now = _t.time()
+            if not force and now - self.last < 0.25:
+                return True
+            self.last = now
+            self.best = max(self.best, self._frac(name))      # never backwards (the phases restart)
+            return bool(hook({"event": "engine_build", "model": label, "build": no, "frac": round(self.best, 4), "phase": name,
+                              "elapsed": round(now - self.t0, 1)}))
+
+        def phase_start(self, phase_name, parent_phase, num_steps):
+            self.ph[phase_name] = [parent_phase, int(num_steps), 0]
+            return self._emit(phase_name, True) and None
+
+        def step_complete(self, phase_name, step):
+            if phase_name in self.ph:
+                self.ph[phase_name][2] = int(step) + 1
+            return self._emit(phase_name)
+
+        def phase_finish(self, phase_name):
+            if phase_name in self.ph:
+                self.ph[phase_name][2] = self.ph[phase_name][1]
+            self._emit(phase_name, True)
+
+    return Mon()
+
 
 class TRTNet:
     """Callable like the module. One engine + execution context per input shape set."""
@@ -161,10 +218,19 @@ class TRTNet:
         config = builder.create_builder_config()
         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, int(self.workspace) << 20)
         config.builder_optimization_level = int(self.level)
+        _mon = progress_monitor(trt, self.name)
+        if _mon is not None:
+            config.progress_monitor = _mon
+        _t0 = __import__("time").time()
         blob = builder.build_serialized_network(network, config)
         if blob is None:
             raise RuntimeError("engine build failed")
         save_engine(path, blob)
+        try:                                              # how long it took (the model library lists it)
+            import engines
+            engines.write_meta(path, __import__("time").time() - _t0, {"opt_level": self.level, "workspace": self.workspace}, None)
+        except Exception:                                # noqa: BLE001
+            pass
         try:
             os.remove(onnx_path)
         except OSError:

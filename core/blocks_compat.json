@@ -3,27 +3,105 @@
   "vapoursynth": "R81",
   "vsjetpack": "2.2.6",
   "plugins": [
+   "abrz:PluginVersion(major=1, minor=0)",
+   "acrop:PluginVersion(major=2, minor=0)",
    "akarin:PluginVersion(major=1, minor=5)",
+   "anime4kcpp:PluginVersion(major=3, minor=1)",
+   "areafilter:PluginVersion(major=1, minor=0)",
+   "ares:PluginVersion(major=0, minor=4)",
+   "artyfox:PluginVersion(major=21, minor=0)",
+   "atools:PluginVersion(major=0, minor=1)",
+   "atwt:PluginVersion(major=1, minor=0)",
+   "avisource:PluginVersion(major=1, minor=0)",
    "avs:PluginVersion(major=81, minor=0)",
+   "avsw:PluginVersion(major=0, minor=0)",
    "awarp:PluginVersion(major=3, minor=1)",
+   "bifrost:PluginVersion(major=3, minor=0)",
+   "bm3d:PluginVersion(major=12, minor=0)",
+   "bore:PluginVersion(major=1, minor=0)",
    "bs:PluginVersion(major=22, minor=0)",
    "bwdif:PluginVersion(major=5, minor=1)",
+   "cambi:PluginVersion(major=1, minor=2)",
+   "cas:PluginVersion(major=3, minor=0)",
+   "checkmate:PluginVersion(major=1, minor=0)",
+   "chromanr:PluginVersion(major=1, minor=0)",
+   "chromanrcuda:PluginVersion(major=1, minor=0)",
+   "colorbars:PluginVersion(major=1, minor=0)",
    "composite:PluginVersion(major=0, minor=2)",
+   "cv_ccl:PluginVersion(major=1, minor=0)",
+   "cv_hfs:PluginVersion(major=1, minor=0)",
+   "cv_inpaint:PluginVersion(major=1, minor=0)",
+   "d2v:PluginVersion(major=1, minor=3)",
+   "deblock:PluginVersion(major=7, minor=1)",
+   "dedot:PluginVersion(major=4, minor=0)",
+   "descale:PluginVersion(major=11, minor=0)",
+   "descratch:PluginVersion(major=3, minor=0)",
+   "dfttest2_cpu:PluginVersion(major=11, minor=1)",
+   "dmetrics:PluginVersion(major=1, minor=0)",
+   "dotkill:PluginVersion(major=4, minor=0)",
+   "dvdsrc2:PluginVersion(major=1, minor=0)",
+   "edgefixer:PluginVersion(major=0, minor=0)",
    "edgemasks:PluginVersion(major=4, minor=1)",
+   "eedi3:PluginVersion(major=1, minor=0)",
+   "eedi3m:PluginVersion(major=8, minor=0)",
+   "eedi3vk:PluginVersion(major=1, minor=2)",
+   "ehist:PluginVersion(major=1, minor=0)",
+   "fb:PluginVersion(major=5, minor=0)",
+   "fel:PluginVersion(major=1, minor=0)",
+   "ffms2:PluginVersion(major=1280, minor=0)",
+   "fft3dfilter:PluginVersion(major=2, minor=0)",
+   "fftspectrum_rs:PluginVersion(major=1, minor=0)",
+   "fmtc:PluginVersion(major=30, minor=0)",
+   "fpng:PluginVersion(major=1, minor=0)",
+   "gifski:PluginVersion(major=1, minor=0)",
+   "grain:PluginVersion(major=10, minor=0)",
+   "grwrld:PluginVersion(major=1, minor=0)",
+   "hysteresis:PluginVersion(major=1, minor=2)",
+   "iccc:PluginVersion(major=6, minor=2)",
+   "imwri:PluginVersion(major=2, minor=0)",
+   "julek:PluginVersion(major=0, minor=3)",
+   "libp2p:PluginVersion(major=1, minor=1)",
+   "lsmas:PluginVersion(major=1, minor=0)",
+   "manipmv:PluginVersion(major=1, minor=2)",
+   "misc:PluginVersion(major=0, minor=1)",
+   "mpls:PluginVersion(major=5, minor=0)",
+   "mtcm:PluginVersion(major=1, minor=0)",
    "mv:PluginVersion(major=29, minor=0)",
+   "mvc:PluginVersion(major=0, minor=8)",
    "mvu:PluginVersion(major=9, minor=0)",
+   "nlm_ispc:PluginVersion(major=4, minor=1)",
+   "noise:PluginVersion(major=1, minor=0)",
+   "ocd:PluginVersion(major=1, minor=0)",
+   "ocr:PluginVersion(major=1, minor=0)",
+   "placebo:PluginVersion(major=3, minor=3)",
+   "psm:PluginVersion(major=1, minor=0)",
+   "recon:PluginVersion(major=1, minor=0)",
+   "removedirt:PluginVersion(major=1, minor=0)",
    "resize2:PluginVersion(major=5, minor=1)",
    "resize:PluginVersion(major=81, minor=0)",
+   "rgvs:PluginVersion(major=1, minor=0)",
+   "sangnom:PluginVersion(major=45, minor=0)",
+   "ssimulacra2:PluginVersion(major=3, minor=0)",
    "std:PluginVersion(major=81, minor=0)",
+   "sub:PluginVersion(major=5, minor=0)",
+   "tcanny:PluginVersion(major=13, minor=0)",
    "text:PluginVersion(major=81, minor=0)",
+   "timecube:PluginVersion(major=0, minor=0)",
    "tivtc:PluginVersion(major=4, minor=0)",
+   "trt:PluginVersion(major=17, minor=1)",
+   "ttmpsm:PluginVersion(major=4, minor=1)",
    "vivtc:PluginVersion(major=1, minor=0)",
+   "vmaf:PluginVersion(major=10, minor=0)",
    "vszip:PluginVersion(major=22, minor=1)",
+   "webp:PluginVersion(major=1, minor=0)",
+   "zbilateral:PluginVersion(major=1, minor=0)",
+   "zboxblur:PluginVersion(major=3, minor=0)",
    "znedi3:PluginVersion(major=0, minor=3)",
+   "zscene:PluginVersion(major=0, minor=5)",
    "zsmooth:PluginVersion(major=0, minor=20)"
   ]
  },
- "made": "2026-11-27 01:15",
+ "made": "2026-11-28 12:44",
  "results": {
   "vs:akarin.DLISR": {
    "status": "hidden",
@@ -33,9 +111,25 @@
    "status": "hidden",
    "why": "needs NVIDIA's Video Effects SDK (NvVFX), not installed"
   },
+  "vs:bm3d.OPP2RGB": {
+   "status": "hidden",
+   "why": "only after bm3d.RGB2OPP + bm3d.Basic/Final (opponent colour) - use vsdenoise or Custom code"
+  },
   "vs:composite.Decode": {
    "status": "hidden",
    "why": "needs a composite (GRAY16) signal from composite.Encode - use Custom code"
+  },
+  "vs:descale.Decustom": {
+   "status": "hidden",
+   "why": "needs a Python kernel function - use a Custom code block"
+  },
+  "vs:descale.ScaleCustom": {
+   "status": "hidden",
+   "why": "needs a Python kernel function - use a Custom code block"
+  },
+  "vs:dfttest2_cpu.DFTTest": {
+   "status": "hidden",
+   "why": "the low-level part of DFTTest2 - use vsdenoise DFTTest instead"
   },
   "vs:mv.Analyse": {
    "status": "hidden",
@@ -97,6 +191,14 @@
    "status": "hidden",
    "why": "needs motion vectors from mvu.Analyse - use Custom code"
   },
+  "vs:placebo.Shader": {
+   "status": "args",
+   "need": "shader: the path of a .glsl shader file, e.g. D:\\shaders\\FSRCNNX_x2_8-0-4-1.glsl"
+  },
+  "vs:placebo.Tonemap": {
+   "status": "hidden",
+   "why": "HDR -> SDR only (no DVD is HDR)"
+  },
   "vs:resize2.Custom": {
    "status": "hidden",
    "why": "needs a Python kernel function - use a Custom code block"
@@ -156,6 +258,14 @@
   "vs:std.SplitPlanes": {
    "status": "hidden",
    "why": "returns several clips - use Custom code"
+  },
+  "vs:sub.ImageFile": {
+   "status": "args",
+   "need": "file: the path of a subtitle image file (.sup / .sub)"
+  },
+  "vs:sub.TextFile": {
+   "status": "args",
+   "need": "file: the path of a subtitle file (.ass / .srt)"
   },
   "vs:vszip.PackRGB": {
    "status": "hidden",
@@ -289,6 +399,338 @@
    "status": "hidden",
    "why": "needs regression clips from vsrgtools.regression - use a Custom code block"
   },
+  "jet:vs_tiletools.crop": {
+   "status": "ok",
+   "note": "works only after its partner (it undoes what that one did), so it cannot be tried on its own: Pad / Mod before it"
+  },
+  "jet:vs_tiletools.croprandom": {
+   "status": "hidden",
+   "why": "random crops for training models, not for restoring"
+  },
+  "jet:vs_tiletools.crossfade": {
+   "status": "hidden",
+   "why": "takes two clips - use Custom code"
+  },
+  "jet:vs_tiletools.inpaint": {
+   "status": "hidden",
+   "why": "needs a mask clip - use Custom code (vs_tiletools.inpaint(clip, mask))"
+  },
+  "jet:vs_tiletools.markdups": {
+   "status": "hidden",
+   "why": "needs the Vship plugin (libvship), which is not installed"
+  },
+  "jet:vs_tiletools.skipdups": {
+   "status": "hidden",
+   "why": "needs the Vship plugin (libvship), which is not installed"
+  },
+  "jet:vs_tiletools.trim": {
+   "status": "ok",
+   "note": "works only after its partner (it undoes what that one did), so it cannot be tried on its own: Extend before it"
+  },
+  "jet:vs_tiletools.trim_overlaps": {
+   "status": "ok",
+   "note": "works only after its partner (it undoes what that one did), so it cannot be tried on its own: Insert overlaps before it"
+  },
+  "jet:vs_tiletools.untile": {
+   "status": "ok",
+   "note": "works only after its partner (it undoes what that one did), so it cannot be tried on its own: Tile before it"
+  },
+  "jet:vs_undistort.vs_undistort": {
+   "status": "ok",
+   "note": "tested on a DVD: TensorRT engine built once (~80 s), then 25 fps at 720x480 on an RTX 5070 Ti",
+   "formats": [
+    "RGBH"
+   ]
+  },
+  "vs:abrz.AdaptiveBinarize": {
+   "status": "args",
+   "need": [
+    "clip2"
+   ]
+  },
+  "vs:areafilter.AreaFilter": {
+   "status": "args",
+   "need": [
+    "min_area"
+   ]
+  },
+  "vs:areafilter.RelFilter": {
+   "status": "args",
+   "need": [
+    "percentage"
+   ]
+  },
+  "vs:artyfox.BitDepth": {
+   "status": "args",
+   "need": [
+    "bits"
+   ]
+  },
+  "vs:artyfox.Descale": {
+   "status": "args",
+   "need": [
+    "width",
+    "height"
+   ]
+  },
+  "vs:artyfox.FixBorder": {
+   "status": "args",
+   "need": [
+    "fix"
+   ]
+  },
+  "vs:artyfox.Metric": {
+   "status": "args",
+   "need": [
+    "clip1"
+   ]
+  },
+  "vs:artyfox.Resize": {
+   "status": "args",
+   "need": [
+    "width",
+    "height"
+   ]
+  },
+  "vs:atwt.ReplaceFrequency": {
+   "status": "args",
+   "need": [
+    "detail"
+   ]
+  },
+  "vs:cv_ccl.ExcludeCCLAbove": {
+   "status": "args",
+   "need": [
+    "cc_thr"
+   ]
+  },
+  "vs:cv_ccl.ExcludeCCLUnder": {
+   "status": "args",
+   "need": [
+    "cc_thr"
+   ]
+  },
+  "vs:cv_inpaint.InpaintFSR": {
+   "status": "args",
+   "need": [
+    "mask"
+   ]
+  },
+  "vs:cv_inpaint.InpaintNS": {
+   "status": "args",
+   "need": [
+    "mask"
+   ]
+  },
+  "vs:cv_inpaint.InpaintShiftmap": {
+   "status": "args",
+   "need": [
+    "mask"
+   ]
+  },
+  "vs:cv_inpaint.InpaintTelea": {
+   "status": "args",
+   "need": [
+    "mask"
+   ]
+  },
+  "vs:edgefixer.Reference": {
+   "status": "args",
+   "need": [
+    "ref"
+   ]
+  },
+  "vs:eedi3.eedi3": {
+   "status": "args",
+   "need": [
+    "field"
+   ]
+  },
+  "vs:eedi3m.EEDI3": {
+   "status": "args",
+   "need": [
+    "field"
+   ]
+  },
+  "vs:eedi3vk.EEDI3": {
+   "status": "args",
+   "need": [
+    "field"
+   ]
+  },
+  "vs:fel.Bake": {
+   "status": "args",
+   "need": [
+    "el"
+   ]
+  },
+  "vs:fpng.Write": {
+   "status": "args",
+   "need": [
+    "filename"
+   ]
+  },
+  "vs:iccc.Tag": {
+   "status": "args",
+   "need": [
+    "icc"
+   ]
+  },
+  "vs:imwri.Write": {
+   "status": "args",
+   "need": [
+    "imgformat",
+    "filename"
+   ]
+  },
+  "vs:julek.Butteraugli": {
+   "status": "args",
+   "need": [
+    "distorted"
+   ]
+  },
+  "vs:julek.RFS": {
+   "status": "args",
+   "need": [
+    "clip_b",
+    "frames"
+   ]
+  },
+  "vs:julek.SSIMULACRA": {
+   "status": "args",
+   "need": [
+    "distorted"
+   ]
+  },
+  "vs:julek.VisualizeDiffs": {
+   "status": "args",
+   "need": [
+    "clip_b"
+   ]
+  },
+  "vs:manipmv.ShowVect": {
+   "status": "args",
+   "need": [
+    "vectors"
+   ]
+  },
+  "vs:misc.Hysteresis": {
+   "status": "args",
+   "need": [
+    "clipb"
+   ]
+  },
+  "vs:psm.PlaneAverage": {
+   "status": "args",
+   "need": [
+    "value_exclude"
+   ]
+  },
+  "vs:recon.Reconstruct": {
+   "status": "args",
+   "need": [
+    "slope",
+    "weights"
+   ]
+  },
+  "vs:removedirt.RestoreMotionBlocks": {
+   "status": "args",
+   "need": [
+    "restore"
+   ]
+  },
+  "vs:removedirt.SCSelect": {
+   "status": "args",
+   "need": [
+    "sbegin",
+    "send",
+    "gmotion"
+   ]
+  },
+  "vs:rgvs.RemoveGrain": {
+   "status": "args",
+   "need": [
+    "mode"
+   ]
+  },
+  "vs:rgvs.Repair": {
+   "status": "args",
+   "need": [
+    "repairclip",
+    "mode"
+   ]
+  },
+  "vs:rgvs.VerticalCleaner": {
+   "status": "args",
+   "need": [
+    "mode"
+   ]
+  },
+  "vs:ssimulacra2.SSIMULACRA2": {
+   "status": "args",
+   "need": [
+    "distorted"
+   ]
+  },
+  "vs:timecube.Cube": {
+   "status": "args",
+   "need": [
+    "cube"
+   ]
+  },
+  "vs:vmaf.CAMBI": {
+   "status": "args",
+   "need": [
+    "log_path"
+   ]
+  },
+  "vs:vmaf.Metric": {
+   "status": "args",
+   "need": [
+    "distorted",
+    "feature"
+   ]
+  },
+  "vs:vmaf.VMAF": {
+   "status": "args",
+   "need": [
+    "distorted",
+    "log_path"
+   ]
+  },
+  "vs:webp.WebP": {
+   "status": "args",
+   "need": [
+    "path"
+   ]
+  },
+  "vs:zscene.ReadScenes": {
+   "status": "args",
+   "need": [
+    "path",
+    "format"
+   ]
+  },
+  "vs:acrop.AutoCrop": {
+   "status": "error",
+   "error": "ZeroDivisionError: division by zero",
+   "error_last": "ZeroDivisionError: division by zero"
+  },
+  "vs:acrop.CropValues": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:akarin.Cambi": {
    "status": "ok",
    "formats": [
@@ -296,6 +738,128 @@
     "YUV420P10",
     "YUV444P8",
     "GRAY8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:anime4kcpp.ACUpscale": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:artyfox.AverageFields": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:artyfox.Linearize": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:artyfox.Mean": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:artyfox.MedianBlur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:artyfox.Transfer": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:artyfox.UnsharpMask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:atwt.ExtractFrequency": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "YUV420P8"
   },
@@ -314,6 +878,142 @@
    ],
    "format": "YUV444P8"
   },
+  "vs:bifrost.Bifrost": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:bifrost.BlockDiff": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:bm3d.Basic": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444P8"
+  },
+  "vs:bm3d.Final": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444P8"
+  },
+  "vs:bm3d.RGB2OPP": {
+   "status": "ok",
+   "formats": [
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444P16"
+  },
+  "vs:bm3d.VAggregate": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS"
+   ],
+   "format": "YUV444P16"
+  },
+  "vs:bm3d.VBasic": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:bm3d.VFinal": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:bore.MultiPlane": {
+   "status": "ok",
+   "formats": [
+    "RGBS"
+   ],
+   "format": "RGBS"
+  },
+  "vs:bore.SinglePlane": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:bore.SinglePlaneDebug": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:bore.SinglePlaneLimited": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:bore.SinglePlaneWeighted": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
   "vs:bwdif.Bwdif": {
    "status": "ok",
    "formats": [
@@ -331,6 +1031,59 @@
     "RGBS"
    ],
    "format": "YUV420P8"
+  },
+  "vs:cambi.Cambi": {
+   "status": "ok",
+   "formats": [
+    "YUV420P10"
+   ],
+   "format": "YUV420P10"
+  },
+  "vs:cas.CAS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:checkmate.Checkmate": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8",
+    "RGB24"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:chromanr.CNR": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:chromanrcuda.CNR": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS"
+   ],
+   "format": "YUV444PS"
   },
   "vs:composite.Encode": {
    "status": "ok",
@@ -355,6 +1108,234 @@
     "YUV444PS"
    ],
    "format": "YUV444P16"
+  },
+  "vs:cv_ccl.GetCCLStats": {
+   "status": "ok",
+   "formats": [
+    "GRAY8"
+   ],
+   "format": "Gray8"
+  },
+  "vs:cv_hfs.HFS": {
+   "status": "ok",
+   "formats": [
+    "RGB24"
+   ],
+   "format": "RGB24"
+  },
+  "vs:deblock.Deblock": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:dedot.Dedot": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:descale.Bicubic": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Bilinear": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Debicubic": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Debilinear": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Delanczos": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Depoint": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline16": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline36": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Despline64": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Lanczos": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Point": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline16": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline36": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descale.Spline64": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:descratch.DeScratch": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:dmetrics.DMetrics": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:dotkill.DotKillS": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:dotkill.DotKillT": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:dotkill.DotKillZ": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:edgefixer.Continuity": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16"
+   ],
+   "format": "YUV420P8"
   },
   "vs:edgemasks.Cross": {
    "status": "ok",
@@ -605,6 +1586,354 @@
     "RGB24",
     "RGB48",
     "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ehist.CLAHE": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ehist.EqualizeHist": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fb.FillBorders": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fel.ToRGB": {
+   "status": "error",
+   "error": "Error: FelBaker: BL subsampling must be 4:4:4",
+   "error_last": "Error: FelBaker: BL subsampling must be 4:4:4"
+  },
+  "vs:fft3dfilter.FFT3DFilter": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fftspectrum_rs.FFTSpectrum": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "GrayS"
+  },
+  "vs:fmtc.bitdepth": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fmtc.histluma": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fmtc.matrix": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB24"
+  },
+  "vs:fmtc.matrix2020cl": {
+   "status": "ok",
+   "formats": [
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB48"
+  },
+  "vs:fmtc.nativetostack16": {
+   "status": "ok",
+   "formats": [
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P16",
+    "GRAY16",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:fmtc.primaries": {
+   "status": "ok",
+   "formats": [
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB48"
+  },
+  "vs:fmtc.resample": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P16"
+  },
+  "vs:fmtc.stack16tonative": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8",
+    "RGB24"
+   ],
+   "format": "YUV420P16"
+  },
+  "vs:fmtc.transfer": {
+   "status": "ok",
+   "formats": [
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "Gray16"
+  },
+  "vs:gifski.Write": {
+   "status": "ok",
+   "formats": [
+    "RGB24"
+   ],
+   "format": "RGB24"
+  },
+  "vs:grain.Add": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:grwrld.grayworld": {
+   "status": "ok",
+   "formats": [
+    "RGBS"
+   ],
+   "format": "RGBS"
+  },
+  "vs:hysteresis.Hysteresis": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:iccc.Convert": {
+   "status": "error",
+   "error": "Error: iccc: Currently only RGB24, RGB48 and RGBS input formats are well supported.",
+   "error_last": "Error: iccc: Currently only RGB24, RGB48 and RGBS input formats are well supported."
+  },
+  "vs:iccc.Playback": {
+   "status": "ok",
+   "formats": [
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "RGB24"
+  },
+  "vs:julek.AGM": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:julek.AutoGain": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:julek.ColorMap": {
+   "status": "error",
+   "error": "Error: ColorMap: only Gray8 format is supported.",
+   "error_last": "Error: ColorMap: only Gray8 format is supported."
+  },
+  "vs:libp2p.Pack": {
+   "status": "error",
+   "error": "Error: Pack: only RGB24, RGB30 and RGB48 inputs are supported!",
+   "error_last": "Error: Pack: only RGB24, RGB30 and RGB48 inputs are supported!"
+  },
+  "vs:libp2p.Unpack": {
+   "status": "error",
+   "error": "Error: Unpack: only pfGray32 intput is supported!",
+   "error_last": "Error: Unpack: only pfGray32 intput is supported!"
+  },
+  "vs:manipmv.ExpandAnalysisData": {
+   "status": "error",
+   "error": "Error: Could not read MVTools_MVAnalysisData property.",
+   "error_last": "Error: Could not read MVTools_MVAnalysisData property."
+  },
+  "vs:manipmv.ScaleVect": {
+   "status": "error",
+   "error": "Error: Could not read MVTools_MVAnalysisData property when attempting to scale vectors.",
+   "error_last": "Error: Could not read MVTools_MVAnalysisData property when attempting to scale vectors."
+  },
+  "vs:misc.SCDetect": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:mtcm.MTCombMask": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "GRAY8",
+    "RGB24"
    ],
    "format": "YUV420P8"
   },
@@ -1318,6 +2647,144 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:nlm_ispc.NLMeans": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:noise.Add": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ocd.dct": {
+   "status": "ok",
+   "formats": [
+    "YUV444PS",
+    "GRAYS",
+    "RGBS"
+   ],
+   "format": "YUV444PS"
+  },
+  "vs:ocd.gaussianblur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ocd.gb": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ocr.Recognize": {
+   "status": "ok",
+   "formats": [
+    "GRAY8"
+   ],
+   "format": "Gray8"
+  },
+  "vs:placebo.Deband": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:placebo.Resample": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:psm.PlaneMinMax": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:resize.Bicubic": {
    "status": "ok",
    "formats": [
@@ -1569,6 +3036,66 @@
    "format": "YUV420P8"
   },
   "vs:resize2.Spline64": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:rgvs.BackwardClense": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:rgvs.Clense": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:rgvs.ForwardClense": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:sangnom.SangNom": {
    "status": "ok",
    "formats": [
     "YUV420P8",
@@ -2390,6 +3917,42 @@
    ],
    "format": "YUV420P8"
   },
+  "vs:sub.Subtitle": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:tcanny.TCanny": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
   "vs:text.ClipInfo": {
    "status": "ok",
    "formats": [
@@ -2499,6 +4062,24 @@
     "YUV420P16",
     "YUV444P8",
     "YUV444P16"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:ttmpsm.TTempSmooth": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "YUV420P8"
   },
@@ -2860,6 +4441,39 @@
     "YUV420P8",
     "YUV420P10",
     "YUV444P8"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:zbilateral.Bilateral": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "GRAY8",
+    "GRAY16",
+    "RGB24",
+    "RGB48"
+   ],
+   "format": "YUV420P8"
+  },
+  "vs:zboxblur.Blur": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
    ],
    "format": "YUV420P8"
   },
@@ -3511,9 +5125,22 @@
    "format": "YUV420P8"
   },
   "jet:vsdenoise.deblock_qed": {
-   "status": "error",
-   "error": "AttributeError: There is no attribute or namespace named deblock. Did you mistype a plugin namespace or forget to install a plugin?",
-   "error_last": "AttributeError: There is no attribute or namespace named deblock. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsdenoise.decrease_size": {
    "status": "ok",
@@ -3666,19 +5293,58 @@
    "format": "YUV420P8"
   },
   "jet:vsdehalo.hq_dering": {
-   "status": "error",
-   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
-   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsdehalo.smooth_dering": {
-   "status": "error",
-   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
-   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsdehalo.vine_dehalo": {
-   "status": "error",
-   "error": "CustomRuntimeError: No available NLMeans plugin found. Please install one.",
-   "error_last": "UnsupportedFieldBasedError: (vine_dehalo) Only progressive video is supported!"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsdeinterlace.deblend": {
    "status": "ok",
@@ -3717,9 +5383,12 @@
    "format": "YUV420P8"
   },
   "jet:vsdeinterlace.dmetrics": {
-   "status": "error",
-   "error": "UnsupportedFieldBasedError: (FieldBased.is_tff) Progressive video isn't field based.",
-   "error_last": "AttributeError: No attribute with the name dmetrics exists. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8"
+   ],
+   "interlaced": true,
+   "format": "YUV420P8"
   },
   "jet:vsdeinterlace.get_field_difference": {
    "status": "ok",
@@ -3912,9 +5581,19 @@
    "format": "Gray8"
   },
   "jet:vsmasktools.diff_hardsub_mask": {
-   "status": "error",
-   "error": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?",
-   "error_last": "AttributeError: There is no attribute or namespace named hysteresis. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vsmasktools.flat_mask": {
    "status": "ok",
@@ -4502,9 +6181,20 @@
    "format": "YUV420P8"
   },
   "jet:vsdeband.placebo_deband": {
-   "status": "error",
-   "error": "AttributeError: There is no attribute or namespace named placebo. Did you mistype a plugin namespace or forget to install a plugin?",
-   "error_last": "AttributeError: There is no attribute or namespace named placebo. Did you mistype a plugin namespace or forget to install a plugin?"
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
   },
   "jet:vskernels.resample_to": {
    "status": "ok",
@@ -4558,6 +6248,126 @@
    "format": "YUV420P8"
   },
   "jet:vsexprtools.norm_expr": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.autofill": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.extend": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.fill": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.insert_overlaps": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.mod": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.pad": {
+   "status": "ok",
+   "formats": [
+    "YUV420P8",
+    "YUV420P10",
+    "YUV420P16",
+    "YUV444P8",
+    "YUV444P16",
+    "YUV444PS",
+    "GRAY8",
+    "GRAY16",
+    "GRAYS",
+    "RGB24",
+    "RGB48",
+    "RGBS"
+   ],
+   "format": "YUV420P8"
+  },
+  "jet:vs_tiletools.tile": {
    "status": "ok",
    "formats": [
     "YUV420P8",

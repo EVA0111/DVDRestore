@@ -198,7 +198,7 @@ def run_output(clip, job, p, ctx):
     return _v().output_format(to_yuv(clip), job)   # 10-bit (or the encoder's), colour tags; size as it is
 
 
-ADAPT_FORMATS = ("RGB24", "RGB48", "RGBS", "GRAY8", "GRAY16", "GRAYS", "YUV420P16", "YUV444P8", "YUV444P16", "YUV444PS")
+ADAPT_FORMATS = ("RGBH", "RGB24", "RGB48", "RGBS", "GRAY8", "GRAY16", "GRAYS", "YUV420P16", "YUV444P8", "YUV444P16", "YUV444PS")
 # every format the chain can hand a block (the scan tries each and records those that work)
 SCAN_FORMATS = ("YUV420P8", "YUV420P10", "YUV420P16", "YUV444P8", "YUV444P16", "YUV444PS",
                 "GRAY8", "GRAY16", "GRAYS", "RGB24", "RGB48", "RGBS")
@@ -357,7 +357,10 @@ def run_jet(clip, job, p, ctx):
 def run_code(clip, job, p, ctx):
     if not p.get("code") and (p.get("args") or {}).get("code"):
         p = dict(p, code=p["args"]["code"])          # a Custom code filter of a filter group
-    ns = {"clip": clip, "core": core, "vs": vs, "job": job, "dr": _v(), "group": (ctx or {}).get("group_in") or clip}
+    ns = {"clip": clip, "core": core, "vs": vs, "job": job, "dr": _v(), "group": (ctx or {}).get("group_in") or clip,
+          # a filter added as code: dr.block(..., ctx) lines, and the vs-jetpack defaults that use the picture's size
+          "ctx": ctx if ctx is not None else chain_context(job), "Fraction": Fraction,
+          "w": clip.width, "h": clip.height, "current": clip, "prev": (ctx or {}).get("prev_in") or clip}
     for m in ("vstools", "vsdenoise", "vsaa", "vsdehalo", "vsdeinterlace", "vsscale", "vsmasktools", "vsrgtools", "vsdeband",
               "vskernels", "vsexprtools"):
         try:
@@ -708,7 +711,8 @@ def run_my(clip, job, p, ctx):
         for n in ("group", "prev"):
             if any(n in str(e) for e in raw.values()):
                 extra[n] = _ref_clip(n, c, ctx)
-        out = f(c, **{k: _eval_expr(CLIP_REFS.get(str(e).strip(), e), "vstools", extra) for k, e in raw.items()})
+        kw = {k: _eval_expr(CLIP_REFS.get(str(e).strip(), e), "vstools", extra) for k, e in raw.items()}
+        out = f(c, **{k: v for k, v in kw.items() if v is not None})      # None = the function's own default
         if not isinstance(out, vs.VideoNode):
             raise TypeError(f"{p['call']} returned {type(out).__name__}, not a clip")
         return out
@@ -926,7 +930,8 @@ def _vs_args(call, args, c=None):
 
 
 JET_MODULES = ("vstools", "vsdenoise", "vsaa", "vsdehalo", "vsdeinterlace", "vsscale", "vsmasktools", "vsrgtools", "vsdeband",
-               "vskernels", "vsexprtools")
+               "vskernels", "vsexprtools",
+               "vs_tiletools", "vs_undistort")          # pifroggi: tiling / padding / overlaps, and distortion (TMT) removal
 
 
 def jet_catalogue():
@@ -958,7 +963,8 @@ def jet_catalogue():
                 if q.kind in (q.VAR_POSITIONAL, q.VAR_KEYWORD):
                     continue
                 args.append({"name": q.name, "type": str(q.annotation) if q.annotation is not q.empty else "",
-                             "default": "" if q.default is q.empty else repr(q.default), "required": q.default is q.empty})
+                             "default": "" if q.default is q.empty else repr(q.default), "required": q.default is q.empty,
+                             **({"pos": True} if q.kind == q.POSITIONAL_ONLY else {})})   # must be passed by position
             doc = (inspect.getdoc(f) or "").strip().split("\n\n")[0][:300]
             res.append({"call": f"{m}.{name}", "doc": doc, "args": args})
     return res
@@ -1042,6 +1048,8 @@ def build_chain(job, before=False):
         if clip is None and b["type"] != "source":
             clip = block(None, job, "source", {}, ctx)
         clip = block(clip, job, b["type"], b.get("p"), ctx)
+        if not before and job.get("chain_view") and b.get("uid") == job["chain_view"]:
+            break                                        # Chain mode's "View": the picture after this block
     if clip is None:
         clip = block(None, job, "source", {}, ctx)
     clip = block(clip, job, "output", {}, ctx)

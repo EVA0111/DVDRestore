@@ -225,12 +225,16 @@ def probe(path):
         except Exception as e:                           # noqa: BLE001
             print(f"frame times not read: {e}", file=sys.stderr)
     return {"path": path, "width": v["width"], "height": v["height"], "dar": dar, "duration": dur,
-            "fps_num": num, "fps_den": den, "pal": pal, "frames": len(frame_ms) if frame_ms else int(round(dur * num / den)),
+            "fps_num": num, "fps_den": den, "pal": pal,
+            "frames": len(frame_ms) if frame_ms else int(round((dur - sum(d for _, d in (_tl_jumps(path) if not progressive else []))) * num / den)),
             "frame_ms": frame_ms,
+            # clock jumps (VOB cell boundaries) the export closes: [[time from the start, length]] - times shown and
+            # chapters follow the jump-free timeline the frames are numbered on
+            "tl_jumps": (tlj := (_tl_jumps(path) if not progressive and not frame_ms else [])),
             "audio": audio, "subs": subs, "chapters": chapters, "progressive24": progressive24, "progressive": progressive,
             # how it was decided ("flags" / "picture" + the combed share) and a hint that frame times vary (an
             # average rate such as 17732/665: 24p and 30p parts in one file - the export keeps each frame's time)
-            "scan": ({"by": "picture", **scan} if scan else {"by": "flags"}),
+            "scan": ({"by": "picture", **scan} if scan else {"by": "flags"}), "pulldown": bool(pulldown),
             "vfr_hint": bool(progressive and not any(abs(num / den - r) < 0.01 for r in std_rates)),
             # ffprobe: tt/bb = top/bottom first; tb = top coded, BOTTOM displayed first; bt = the reverse
             "order": "bff" if fo in ("bb", "tb") else "tff"}
@@ -258,6 +262,23 @@ def picture_scan(path, dur, windows=(0.15, 0.45, 0.75), frames=200):
     return {"frames": il + pr, "combed": round(il / max(1, il + pr), 4)}
 
 
+def _tl_jumps(path):
+    try:
+        import vsgraph
+        return [[round(t, 4), round(d, 4)] for t, d in vsgraph.timeline_jumps(path)]
+    except Exception:                                    # noqa: BLE001
+        return []
+
+
+def _closed(info, t):
+    """file time -> the jump-free time the frames are numbered on"""
+    c = t
+    for tj, d in info.get("tl_jumps") or []:
+        if t > tj:
+            c -= min(d, t - tj)
+    return c
+
+
 def _frame_secs(info):
     """frame start times (s, from the first frame) of a variable-rate source, or None (constant rate)"""
     ms = info.get("frame_ms")
@@ -274,7 +295,7 @@ def time_to_frame(info, t):
     """the frame shown at time t (s): the first frame that starts at or after t (half a ms of rounding allowed)"""
     secs = _frame_secs(info)
     if not secs:
-        return int(round(t * info.get("fps_num", 30000) / info.get("fps_den", 1001)))
+        return int(round(_closed(info, t) * info.get("fps_num", 30000) / info.get("fps_den", 1001)))
     import bisect
     return min(len(secs), bisect.bisect_left(secs, t - 0.0005))
 
@@ -282,7 +303,12 @@ def time_to_frame(info, t):
 def frame_to_time(info, f):
     secs = _frame_secs(info)
     if not secs:
-        return f * info.get("fps_den", 1001) / info.get("fps_num", 30000)
+        c = f * info.get("fps_den", 1001) / info.get("fps_num", 30000)
+        acc = 0.0
+        for tj, d in info.get("tl_jumps") or []:        # jump-free time -> file time
+            if c + acc > tj:
+                acc += d
+        return c + acc
     if f < len(secs):
         return secs[max(0, int(f))]
     step = secs[-1] - secs[-2] if len(secs) > 1 else 0.04
@@ -449,7 +475,7 @@ def _gray_frames(path, t, n, w=96, h=64):
     return a[: a.size // (w * h) * w * h].reshape(-1, h, w).astype(np.float32), r.returncode
 
 
-def picture_sync(src, start_s, out, dur_s, out_fps, points=(0.1, 0.3, 0.5, 0.7, 0.9), win=2.0):
+def picture_sync(src, start_s, out, dur_s, out_fps, points=(0.1, 0.3, 0.5, 0.7, 0.9), win=2.0, tmap=None):
     """Picture against sound: the source picture at a few times is searched for in the output around the same time
     (+-win s). The audio is cut on the source's timeline, so an offset here is how far picture and sound disagree -
     the audio-only check cannot see it (a VOB's timeline jump put the picture 1.43 s early while the audio check
@@ -460,7 +486,7 @@ def picture_sync(src, start_s, out, dur_s, out_fps, points=(0.1, 0.3, 0.5, 0.7, 
         t = frac * dur_s
         if t < win or t > dur_s - win:
             continue
-        ref, rc = _gray_frames(src, start_s + t, 1)
+        ref, rc = _gray_frames(src, tmap(t) if tmap else start_s + t, 1)
         cand, rc2 = _gray_frames(out, t - win, int(2 * win * out_fps) + 1)
         if rc or rc2 or not len(ref) or len(cand) < 10:
             continue
@@ -473,7 +499,19 @@ def picture_sync(src, start_s, out, dur_s, out_fps, points=(0.1, 0.3, 0.5, 0.7, 
     return res
 
 
-def verify_sync(src, start_s, out, dur_s):
+def jump_map(jumps, start_closed):
+    """the export takes the source's clock jumps out (VOB cell boundaries): output time t -> source time"""
+    cj, acc = [], 0.0
+    for tj, d in jumps or []:
+        cj.append((tj - acc, d)); acc += d                # where the jump sits on the jump-free timeline
+
+    def to_src(t):
+        c = start_closed + t
+        return c + sum(d for ci, d in cj if ci < c)
+    return to_src
+
+
+def verify_sync(src, start_s, out, dur_s, tmap=None):
     """Measure audio sync of the finished file against the source at several points."""
     res = []
     for frac in (0.02, 0.25, 0.5, 0.75, 0.97):
@@ -482,7 +520,10 @@ def verify_sync(src, start_s, out, dur_s):
             win = min(4.0, dur_s - (t + dt) - 0.05)    # the window must lie inside the clip (short clips)
             if win < 1.0:
                 break
-            m = audio_lag(src, start_s + t + dt, out, t + dt, window=win)
+            s0 = tmap(t + dt) if tmap else start_s + t + dt
+            if tmap and tmap(t + dt + win) - s0 > win + 0.05:
+                continue                               # a window across a closed jump compares two different places
+            m = audio_lag(src, s0, out, t + dt, window=win)
             if m and m[1] > 0.9:
                 res.append(m[0])
                 break
@@ -986,7 +1027,11 @@ class JobRunner:
             self.log(f"Progressive source ({job['fps_num'] / job['fps_den']:.3f} fps): no inverse telecine, frame rate kept")
             jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
         import vsgraph as _vg
-        own_ivtc = bool(_vg.vsf_at(job, "ivtc"))     # a filter group set to do the IVTC itself
+        own_ivtc = bool(_vg.vsf_at(job, "ivtc")) or bool(job.get("external"))   # a filter group / your own script does the IVTC
+        if job.get("external") and job["mode"] in ("vfr", "bob"):
+            job["mode"] = "cfr"                         # your script makes the frames: its rate is measured from them
+            self.log("Your own script: exported at the frame rate it makes")
+            jp.write_text(json.dumps(job, indent=1), encoding="utf-8")
         if own_ivtc and job["mode"] == "vfr":
             job["mode"] = "cfr"                         # the app's VFR analysis needs its own IVTC
             self.log("Your VapourSynth filters do the IVTC: exported with a constant frame rate (theirs)")
@@ -1056,7 +1101,44 @@ class JobRunner:
                     self.log(f"Variable frame rate source: each frame keeps its own time ({b - a} frames, {dur_s:.2f} s)")
             except Exception as e:                       # noqa: BLE001
                 self.log(f"Frame times not read ({e}): constant rate")
-        has_audio = cut_audio(job["source"], start_s, dur_s, audio)
+        # a clock jump in the source (VOB cell boundary) is closed in the picture: sound and subtitles are cut around it
+        # and joined, so every stream runs on without a hole (players fill a hole differently: MPC-HC played the sound
+        # on and the subtitles came ~1 s after the speech)
+        jumps, tmap = [], None
+        if src_tc is None and not job.get("progressive"):
+            try:
+                jumps = list(_vg.timeline_jumps(job["source"]))
+            except Exception:                            # noqa: BLE001
+                jumps = []
+        if jumps:
+            tmap = jump_map(jumps, job["start"] / fps)
+            start_s = tmap(0.0)
+            end_src = tmap(dur_s)
+            inside = [(tj, d) for tj, d in jumps if start_s < tj < end_src]
+            segs, cur = [], start_s
+            for tj, d in inside:
+                # the sound goes on exactly at tj + d; 5 ms earlier so the first AC3 frame there (47.904000 vs 47.904033)
+                # is not dropped - it was, and the joined sound came out 32 ms early
+                segs.append((cur, tj - cur)); cur = tj + d - 0.005
+            segs.append((cur, end_src - cur))
+            parts = []
+            for i, (s0, ln) in enumerate(segs):
+                if ln > 0.02 and cut_audio(job["source"], s0, ln, work / f"audio_{i}.mka"):
+                    parts.append(work / f"audio_{i}.mka")
+            has_audio = bool(parts)
+            if len(parts) > 1:
+                args = [TOOLS["mkvmerge"], "-q", "-o", str(audio)]
+                for i, pth in enumerate(parts):
+                    args += (["+"] if i else []) + [str(pth)]
+                rr = _run(args)
+                has_audio = rr.returncode in (0, 1) and audio.exists()
+            elif parts:
+                parts[0].replace(audio)
+            if inside:
+                self.log("Clock jump in the source closed in every stream (" + ", ".join(f"{d:.3f} s at {tj:.1f} s" for tj, d in inside)
+                         + "): sound and subtitles are cut there and joined")
+        else:
+            has_audio = cut_audio(job["source"], start_s, dur_s, audio)
         import encoding
         aa = encoding.audio_args(job)
         if has_audio and aa:
@@ -1099,7 +1181,9 @@ class JobRunner:
                 # standard rate it is (23.976 / 29.97 / 25 / 24 / 30 / 50 / 59.94 / 48 / 47.952 / 15 ...)
                 # the probe's frame count is estimated from the duration (can be 1 too many): the frames that exist
                 try:
-                    n_src = min(job["end"], _vg.source(job, clean=False).num_frames) - job["start"]
+                    # source() already returns the episode's part: its length, at most end - start (was min(end, that)
+                    # - start: for an episode not starting at frame 0 it read 0 frames and the rate came out 2.4e9 fps)
+                    n_src = min(job["end"] - job["start"], _vg.source(job, clean=False).num_frames)
                 except Exception:                     # noqa: BLE001
                     n_src = job["end"] - job["start"]
                 exact = n_video / max(n_src / fps, 1e-6)
@@ -1122,6 +1206,20 @@ class JobRunner:
                         f"The video lasts {n_video / rate:.2f} s at {rate:.3f} fps but the episode is {dur_s:.2f} s "
                         f"({diff:+.2f} s): the audio would drift. Something in the script changes the number of frames.")
             self.log(f"Frame count check: {n_video} frames - OK")
+
+        if job.get("external"):
+            # your own script decides the size: the source's display shape only fits a picture still the source's size
+            r2 = _run([TOOLS["ffprobe"], "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                       "-of", "csv=p=0", str(video)])
+            try:
+                vw, vh = (int(x) for x in (r2.stdout or "").strip().splitlines()[0].split(","))
+            except (ValueError, IndexError):
+                vw, vh = 0, 0
+            if (vw, vh) != (job.get("src_w"), job.get("src_h")):
+                job["anamorphic"] = False
+                self.log(f"Your script's picture: {vw}x{vh}, square pixels")
+            else:
+                job["display"] = None                    # source-sized: shown at the source's aspect ratio
 
         # 4. mux
         self.log("Muxing...")
@@ -1159,7 +1257,7 @@ class JobRunner:
         if r.returncode not in (0, 1):
             raise RuntimeError("mkvmerge failed: " + r.stdout[-500:])
         if has_audio:
-            lags = verify_sync(job["source"], start_s, str(out), dur_s)
+            lags = verify_sync(job["source"], start_s, str(out), dur_s, tmap)
             if lags:
                 worst = max(lags, key=abs)
                 self.log(f"Audio sync check ({len(lags)} points): " + ", ".join(f"{x:+.1f}" for x in lags)
@@ -1171,7 +1269,7 @@ class JobRunner:
                         job["fps_num"] / job["fps_den"] if job.get("progressive") else
                         (50.0 if job.get("pal_mode_resolved", job.get("pal_mode")) == "deint50" else 25.0) if pal else
                         60000 / 1001 if job["mode"] == "bob" else 24000 / 1001)
-                pic = picture_sync(job["source"], start_s, str(out), dur_s, ofps) if src_tc is None and job["mode"] != "vfr" else []
+                pic = picture_sync(job["source"], start_s, str(out), dur_s, ofps, tmap=tmap) if src_tc is None and job["mode"] != "vfr" else []
                 if pic:
                     bad = [x for x in pic if abs(x) > 1500 / ofps]        # more than 1.5 frames off
                     self.log(f"Picture sync check ({len(pic)} points): " + ", ".join(f"{x:+.0f}" for x in pic) + " ms"
